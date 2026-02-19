@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Using Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        {% include 'sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1>Dashboard</h1>
+                    <p>Welcome back! Here's what's happening in your medical practice today.</p>
+                </div>
+                <div class="header-right">
+                    {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
+                    <a href="{{ url_for('view_schedule') }}" class="btn btn-outline" style="text-decoration: none;"><i class="fas fa-calendar"></i> View Schedule</a>
+                    {% endif %}
+                    
+                    {% if current_role in ['admin', 'doctor'] %}
+                    <a href="{{ url_for('analytics') }}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-chart-line"></i> Analytics</a>
+                    {% endif %}
+                    
+                    <div class="icon-btn"><i class="fas fa-envelope"></i></div>
+                    <div class="icon-btn"><i class="fas fa-bell"></i></div>
+                    <div class="user-profile" title="Role: {{ current_role|title }}">
+                        <span style="margin-right: 10px; font-weight: bold;">{{ current_user }}</span>
+                        <img src="https://ui-avatars.com/api/?name={{ current_user }}&background=random" alt="User">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="card stat-card">
+                    <div class="stat-icon blue-bg"><i class="fas fa-users"></i></div>
+                    <h3>Total Patients</h3>
+                    <p class="subtext">Active registered users</p>
+                    <div class="stat-value">
+                        <h2>{{ total_patients }}</h2>
+                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +23%</span> -->
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon green-bg"><i class="fas fa-user-md"></i></div>
+                    <h3>Active Doctors</h3>
+                    <p class="subtext">Available medical staff</p>
+                    <div class="stat-value">
+                        <h2>{{ active_doctors }}</h2>
+                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +10%</span> -->
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon red-bg"><i class="fas fa-calendar-check"></i></div>
+                    <h3>Today Appointments</h3>
+                    <p class="subtext">Scheduled consultations</p>
+                    <div class="stat-value">
+                        <h2>{{ today_appointments }}</h2>
+                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +13%</span> -->
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon yellow-bg"><i class="fas fa-flask"></i></div>
+                    <h3>Pending lab results</h3>
+                    <p class="subtext">Awaiting review</p>
+                    <div class="stat-value">
+                        <h2>{{ pending_lab_results }}</h2>
+                        <!-- <span class="badge warning"><i class="fas fa-history"></i> +64%</span> -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-grid">
+                <!-- Recent Appointments -->
+                <div class="card recent-appointments">
+                    <div class="card-header">
+                        <h3>Recent Appointment</h3>
+                        <select class="select-sm">
+                            <option>Today</option>
+                        </select>
+                    </div>
+                    <div class="appointment-list">
+                        {% for appt in recent_appointments %}
+                        <div class="appointment-item">
+                            <div class="appt-info">
+                                <h4>{{ appt.patient_name }}</h4>
+                                <p>{{ appt.doctor_name }} - {{ appt.time }}</p>
+                            </div>
+                            <div class="appt-status">
+                                <span class="type">{{ appt.type }}</span>
+                                <span class="status {{ appt.status|lower }}">{{ appt.status }}</span>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="appointment-item">
+                            <div class="appt-info">
+                                <p>No recent appointments</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="right-column">
+                    <!-- Quick Actions -->
+                    <div class="card quick-actions">
+                        <h3>Quick Actions</h3>
+                        <div class="action-list">
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-user-plus"></i> Add New Patient</div>
+                                <a href="{{ url_for('add_patient') }}" class="btn-sm" style="text-decoration: none;">Add</a>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-calendar-plus"></i> Schedule Appointment</div>
+                                <a href="{{ url_for('schedule_appointment') }}" class="btn-sm" style="text-decoration: none;">Add</a>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-flask"></i> View Lab Results</div>
+                                <a href="{{ url_for('view_lab_results') }}" class="btn-sm" style="text-decoration: none;">View</a>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-file-alt"></i> General Reports</div>
+                                <a href="{{ url_for('general_reports') }}" class="btn-sm" style="text-decoration: none;">View</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Patient Analytics -->
+                    <div class="card analytics">
+                        <div class="card-header">
+                            <h3>Patient Analytics</h3>
+                            <div class="toggle-group">
+                                <button>7 Days</button>
+                                <button class="active">30 Days</button>
+                                <button>90 Days</button>
+                            </div>
+                        </div>
+                        <div class="chart-placeholder">
+                            <p>Chart component will be integrated here</p>
+                            <small>Patient registration and appointment trends.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

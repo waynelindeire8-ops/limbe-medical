@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Messages</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .messages-container {
+            display: flex;
+            height: calc(100vh - 100px);
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        .messages-sidebar {
+            width: 300px;
+            border-right: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+        }
+        .search-box {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .message-list {
+            flex: 1;
+            overflow-y: auto;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .message-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #f9f9f9;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .message-item:hover, .message-item.active {
+            background-color: #f8f9fa;
+        }
+        .message-item.active {
+            border-left: 3px solid #4361ee;
+        }
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .sender-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .message-time {
+            font-size: 12px;
+            color: #888;
+        }
+        .message-preview {
+            font-size: 13px;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .message-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .content-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .content-body {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background-color: #fcfcfc;
+        }
+        .reply-box {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            background-color: white;
+        }
+        .reply-box textarea {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: none;
+            margin-bottom: 10px;
+        }
+        .btn-send {
+            background-color: #4361ee;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            float: right;
+        }
+        .no-message-selected {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #888;
+        }
+        .no-message-selected i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+            <h2>Messages</h2>
+            
+            <div class="messages-container">
+                <div class="messages-sidebar">
+                    <div class="search-box">
+                        <input type="text" placeholder="Search messages...">
+                    </div>
+                    <ul class="message-list">
+                        {% for msg in messages %}
+                        <li class="message-item {% if msg.active %}active{% endif %}" onclick="selectMessage('{{ msg.id }}')">
+                            <div class="message-header">
+                                <span class="sender-name">{{ msg.sender }}</span>
+                                <span class="message-time">{{ msg.time }}</span>
+                            </div>
+                            <div class="message-preview">{{ msg.preview }}</div>
+                            <!-- Hidden data for JS -->
+                            <div id="data-{{ msg.id }}" style="display:none;">
+                                <div class="sender">{{ msg.sender }}</div>
+                                <div class="role">{{ msg.role }}</div>
+                                <div class="content">{{ msg.content|replace('\n', '<br>')|safe }}</div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="message-content">
+                    {% if messages %}
+                    <div class="content-header">
+                        <div>
+                            <h3 style="margin: 0;" id="display-sender">{{ messages[0].sender }}</h3>
+                            <span style="font-size: 13px; color: #666;" id="display-role">{{ messages[0].role }}</span>
+                        </div>
+                        <div style="color: #888;">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-trash" style="margin-left: 15px;"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="content-body" id="display-content">
+                        {{ messages[0].content|replace('\n', '<br>')|safe }}
+                    </div>
+                    
+                    <div class="reply-box">
+                        <form action="{{ url_for('send_message') }}" method="post">
+                            <input type="hidden" name="recipient" id="recipient-input" value="{{ messages[0].sender }}">
+                            <textarea name="message" rows="3" placeholder="Type your reply..."></textarea>
+                            <button type="submit" class="btn-send"><i class="fas fa-paper-plane"></i> Send</button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <div class="no-message-selected">
+                        <i class="fas fa-inbox"></i>
+                        <h3>No messages</h3>
+                        <p>Start a conversation by sending a message.</p>
+                        <div class="reply-box" style="width: 100%; border-top: none; margin-top: 20px;">
+                            <form action="{{ url_for('send_message') }}" method="post">
+                                <input type="hidden" name="recipient" value="System Admin">
+                                <textarea name="message" rows="3" placeholder="Type a message to System Admin..."></textarea>
+                                <button type="submit" class="btn-send"><i class="fas fa-paper-plane"></i> Send New</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        function selectMessage(id) {
+            // Update UI active state
+            document.querySelectorAll('.message-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Get data
+            const dataDiv = document.getElementById('data-' + id);
+            const sender = dataDiv.querySelector('.sender').innerText;
+            const role = dataDiv.querySelector('.role').innerText;
+            const content = dataDiv.querySelector('.content').innerHTML;
+            
+            // Update view
+            document.getElementById('display-sender').innerText = sender;
+            document.getElementById('display-role').innerText = role;
+            document.getElementById('display-content').innerHTML = content;
+            
+            // Update hidden recipient input
+            const recipientInput = document.getElementById('recipient-input');
+            if (recipientInput) {
+                recipientInput.value = sender;
+            }
+        }
+    </script>
+</body>
+</html>

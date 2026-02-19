@@ -1,0 +1,41 @@
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="logo">
+        <div class="logo-icon">
+            <i class="fas fa-stethoscope"></i>
+        </div>
+    </div>
+    <nav class="menu">
+        <a href="{{ url_for('dashboard') }}" class="menu-item {% if active_page == 'dashboard' %}active{% endif %}" title="Dashboard"><i class="fas fa-th-large"></i></a>
+        
+        {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
+        <a href="{{ url_for('patients') }}" class="menu-item {% if active_page == 'patients' %}active{% endif %}" title="Patients"><i class="fas fa-user-injured"></i></a>
+        {% endif %}
+        
+        {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
+        <a href="{{ url_for('doctors') }}" class="menu-item {% if active_page == 'doctors' %}active{% endif %}" title="Doctors"><i class="fas fa-user-md"></i></a>
+        {% endif %}
+        
+        {% if current_role in ['admin', 'doctor', 'receptionist'] %}
+        <a href="{{ url_for('departments') }}" class="menu-item {% if active_page == 'departments' %}active{% endif %}" title="Departments"><i class="fas fa-building"></i></a>
+        {% endif %}
+        
+        {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
+        <a href="{{ url_for('view_schedule') }}" class="menu-item {% if active_page == 'schedule' %}active{% endif %}" title="Schedule"><i class="fas fa-calendar-alt"></i></a>
+        {% endif %}
+        
+        <a href="{{ url_for('messages') }}" class="menu-item {% if active_page == 'messages' %}active{% endif %}" title="Messages"><i class="fas fa-comments"></i></a>
+        
+        {% if current_role in ['admin', 'doctor', 'lab_assistant', 'nurse'] %}
+        <a href="{{ url_for('view_lab_results') }}" class="menu-item {% if active_page == 'lab_results' %}active{% endif %}" title="Lab Results"><i class="fas fa-flask"></i></a>
+        {% endif %}
+        
+        {% if current_role in ['admin', 'doctor'] %}
+        <a href="{{ url_for('general_reports') }}" class="menu-item {% if active_page == 'reports' %}active{% endif %}" title="Reports"><i class="fas fa-file-medical"></i></a>
+        {% endif %}
+    </nav>
+    <div class="settings">
+        <a href="#" class="menu-item" title="Settings"><i class="fas fa-cog"></i></a>
+        <a href="{{ url_for('logout') }}" class="menu-item" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
+    </div>
+</aside>
