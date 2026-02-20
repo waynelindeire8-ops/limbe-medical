@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Bill - Limbe Medical</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .bill-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .bill-details .column {
+            flex: 1;
+        }
+        .bill-details h4 {
+            margin-bottom: 10px;
+            color: #444;
+        }
+        .bill-details p {
+            margin-bottom: 5px;
+            color: #666;
+        }
+        .bill-status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: 500;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        .status.paid { background-color: #d4edda; color: #155724; }
+        .status.pending { background-color: #fff3cd; color: #856404; }
+        .status.cancelled { background-color: #f8d7da; color: #721c24; }
+        
+        .services-list {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .services-list th, .services-list td {
+            border-bottom: 1px solid #eee;
+            padding: 10px;
+            text-align: left;
+        }
+        .services-list th {
+            background-color: #f8f9fa;
+        }
+        .total-row td {
+            font-weight: bold;
+            font-size: 1.1em;
+            border-top: 2px solid #ddd;
+        }
+        .action-buttons {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content">
+            <header class="header">
+                <h1>Bill Details: {{ bill.bill_id }}</h1>
+                <div class="header-right">
+                    <a href="{{ url_for('billing_dashboard') }}" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+            </header>
+
+            <div class="card">
+                <div class="bill-details">
+                    <div class="column">
+                        <h4>Patient Information</h4>
+                        <p><strong>Name:</strong> {{ patient.first_name }} {{ patient.last_name }}</p>
+                        <p><strong>ID:</strong> {{ patient.patient_id }}</p>
+                        <p><strong>Phone:</strong> {{ patient.phone }}</p>
+                    </div>
+                    <div class="column" style="text-align: right;">
+                        <h4>Bill Information</h4>
+                        <p><strong>Date:</strong> {{ bill.created_date }}</p>
+                        <p><strong>Status:</strong> <span class="bill-status status {{ bill.status|lower }}">{{ bill.status }}</span></p>
+                        {% if bill.status|lower == 'pending' %}
+                        <form action="{{ url_for('process_payment', bill_id=bill.bill_id) }}" method="post" style="display: inline-block; margin-top: 10px;">
+                            <button type="submit" class="btn btn-success"><i class="fas fa-check-circle"></i> Mark as Paid</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <table class="services-list">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th style="text-align: right;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Services are stored as a comma-separated string like "Consultation ($50.00), X-Ray ($30.00)" -->
+                        {% for item in bill.services.split(', ') %}
+                        <tr>
+                            <td>{{ item.split(' ($')[0] }}</td>
+                            <td style="text-align: right;">${{ item.split(' ($')[1].replace(')', '') if ' ($' in item else '0.00' }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="total-row">
+                            <td>Total</td>
+                            <td style="text-align: right;">${{ "%.2f"|format(bill.amount) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="action-buttons">
+                    <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" target="_blank" class="btn btn-primary"><i class="fas fa-file-invoice"></i> Print Invoice</a>
+                    {% if bill.status|lower == 'paid' %}
+                    <a href="{{ url_for('print_receipt', bill_id=bill.bill_id) }}" target="_blank" class="btn btn-secondary"><i class="fas fa-receipt"></i> Print Receipt</a>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

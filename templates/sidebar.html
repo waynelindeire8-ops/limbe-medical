@@ -33,6 +33,10 @@
         {% if current_role in ['admin', 'doctor'] %}
         <a href="{{ url_for('general_reports') }}" class="menu-item {% if active_page == 'reports' %}active{% endif %}" title="Reports"><i class="fas fa-file-medical"></i></a>
         {% endif %}
+        
+        {% if current_role in ['admin', 'cashier'] %}
+        <a href="{{ url_for('billing_dashboard') }}" class="menu-item {% if active_page == 'billing' %}active{% endif %}" title="Billing"><i class="fas fa-file-invoice-dollar"></i></a>
+        {% endif %}
     </nav>
     <div class="settings">
         <a href="#" class="menu-item" title="Settings"><i class="fas fa-cog"></i></a>

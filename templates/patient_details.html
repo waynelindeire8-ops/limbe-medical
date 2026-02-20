@@ -182,14 +182,26 @@
                         <ul class="file-list">
                             {% for file in files %}
                             <li class="file-item">
+                                {% set is_image = file.file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')) %}
                                 <div class="file-info">
-                                    <i class="fas fa-file-alt file-icon"></i>
-                                    <div>
-                                        <div style="font-weight: 500;">{{ file.file_name }}</div>
-                                        <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
-                                    </div>
+                                    {% if is_image %}
+                                        <i class="fas fa-file-image file-icon" style="color: #4cc9f0; cursor: pointer;" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')"></i>
+                                        <div>
+                                            <div style="font-weight: 500; cursor: pointer; color: #4361ee;" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')">{{ file.file_name }}</div>
+                                            <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
+                                        </div>
+                                    {% else %}
+                                        <i class="fas fa-file-alt file-icon"></i>
+                                        <div>
+                                            <div style="font-weight: 500;">{{ file.file_name }}</div>
+                                            <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
+                                        </div>
+                                    {% endif %}
                                 </div>
                                 <div class="file-actions">
+                                    {% if is_image %}
+                                    <button type="button" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')" title="Preview" style="background:none; border:none; cursor:pointer; color: #4361ee; margin-right: 5px;"><i class="fas fa-eye"></i></button>
+                                    {% endif %}
                                     <a href="{{ url_for('download_file', path=file.path) }}" title="Download" style="color: #4361ee; margin-right: 10px;"><i class="fas fa-download"></i></a>
                                     <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.path) }}" title="Delete" style="color: #dc3545;" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
                                 </div>

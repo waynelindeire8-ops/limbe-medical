@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice - Limbe Medical</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #333; }
+        .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); }
+        .invoice-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4361ee; padding-bottom: 20px; margin-bottom: 20px; }
+        .logo { font-size: 28px; font-weight: bold; color: #4361ee; }
+        .invoice-title { font-size: 24px; color: #555; text-align: right; }
+        .details { display: flex; justify-content: space-between; margin-bottom: 40px; }
+        .bill-to, .invoice-info { width: 48%; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #ddd; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        .total { text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; }
+        .footer { text-align: center; font-size: 12px; color: #999; margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; }
+        @media print { .no-print { display: none; } body { padding: 0; } .invoice-box { border: none; box-shadow: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align: right; max-width: 800px; margin: auto; margin-bottom: 10px;">
+        <button onclick="window.print()" style="padding: 10px 20px; background: #4361ee; color: white; border: none; border-radius: 4px; cursor: pointer;">Print Invoice</button>
+    </div>
+
+    <div class="invoice-box">
+        <div class="invoice-header">
+            <div class="logo">Limbe Medical</div>
+            <div class="invoice-title">
+                INVOICE<br>
+                <span style="font-size: 16px; color: #777;">#{{ bill.bill_id }}</span>
+            </div>
+        </div>
+
+        <div class="details">
+            <div class="bill-to">
+                <strong>Bill To:</strong><br>
+                {{ patient.first_name }} {{ patient.last_name }}<br>
+                {{ patient.address }}<br>
+                {{ patient.phone }}
+            </div>
+            <div class="invoice-info" style="text-align: right;">
+                <strong>Date:</strong> {{ bill.created_date }}<br>
+                <strong>Status:</strong> {{ bill.status }}<br>
+                <strong>Patient ID:</strong> {{ patient.patient_id }}
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in bill.services.split(', ') %}
+                {% if ' ($' in item %}
+                <tr>
+                    <td>{{ item.split(' ($')[0] }}</td>
+                    <td style="text-align: right;">${{ item.split(' ($')[1].replace(')', '') }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="total">
+            Total: ${{ "%.2f"|format(bill.amount) }}
+        </div>
+
+        <div class="footer">
+            Thank you for choosing Limbe Medical.<br>
+            Please pay within 30 days. Checks payable to Limbe Medical Center.
+        </div>
+    </div>
+</body>
+</html>

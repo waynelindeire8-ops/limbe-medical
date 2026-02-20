@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Bill - Limbe Medical</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn-add {
+            background-color: #4361ee;
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .item-list {
+            margin-top: 20px;
+        }
+        .item-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .item-row input {
+            flex: 1;
+        }
+        .item-row input[type="number"] {
+            width: 100px;
+            flex: 0 0 100px;
+        }
+        .remove-btn {
+            background-color: #f72585;
+            color: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content">
+            <header class="header">
+                <h1>Create New Bill</h1>
+                <div class="header-right">
+                    <a href="{{ url_for('billing_dashboard') }}" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>
+            </header>
+
+            <div class="card">
+                <form action="{{ url_for('create_bill') }}" method="post">
+                    <div class="form-group">
+                        <label for="patient_id">Patient</label>
+                        <select name="patient_id" id="patient_id" class="form-control" required>
+                            <option value="">Select Patient</option>
+                            {% for patient in patients %}
+                            <option value="{{ patient.patient_id }}">{{ patient.first_name }} {{ patient.last_name }} ({{ patient.patient_id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="item-list" id="itemList">
+                        <div class="item-row">
+                            <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
+                            <input type="number" name="costs[]" class="form-control" placeholder="Cost" step="0.01" min="0" required>
+                            <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn-add" onclick="addItem()"><i class="fas fa-plus"></i> Add Item</button>
+
+                    <div class="form-actions" style="margin-top: 30px; display: flex; justify-content: flex-end; gap: 10px;">
+                        <a href="{{ url_for('billing_dashboard') }}" class="btn btn-outline">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Create Bill</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function addItem() {
+            const list = document.getElementById('itemList');
+            const row = document.createElement('div');
+            row.className = 'item-row';
+            row.innerHTML = `
+                <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
+                <input type="number" name="costs[]" class="form-control" placeholder="Cost" step="0.01" min="0" required>
+                <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
+            `;
+            list.appendChild(row);
+        }
+
+        function removeItem(btn) {
+            const row = btn.parentNode;
+            if (document.querySelectorAll('.item-row').length > 1) {
+                row.remove();
+            } else {
+                alert("At least one item is required.");
+            }
+        }
+    </script>
+</body>
+</html>

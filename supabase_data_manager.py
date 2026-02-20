@@ -3,11 +3,20 @@ import json
 from supabase import create_client, Client
 
 def get_supabase_client() -> Client:
-    url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_API_KEY")
+    # On Render or other cloud platforms, env vars are often strings.
+    # We strip whitespace just in case.
+    url = os.environ.get("SUPABASE_URL", "").strip()
+    key = os.environ.get("SUPABASE_SERVICE_ROLE", "").strip() or os.environ.get("SUPABASE_API_KEY", "").strip()
+
     if not url or not key:
+        print("[ERROR] Supabase credentials missing.")
         return None
-    return create_client(url, key)
+        
+    try:
+        return create_client(url, key)
+    except Exception as e:
+        print(f"[ERROR] Failed to create Supabase client: {e}")
+        return None
 
 def supabase_connected() -> bool:
     return get_supabase_client() is not None

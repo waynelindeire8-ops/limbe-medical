@@ -62,10 +62,10 @@ class HospitalManagementSystem:
             'language': 'English',
             'date_format': 'DD/MM/YYYY',
             'server_url': None,
-            'supabase_project_id': os.environ.get('SUPABASE_PROJECT_ID'),
-            'supabase_url': os.environ.get('SUPABASE_URL'),
-            'supabase_api_key': os.environ.get('SUPABASE_API_KEY'),
-            'supabase_service_role': os.environ.get('SUPABASE_SERVICE_ROLE'),
+            'supabase_project_id': os.environ.get('SUPABASE_PROJECT_ID', 'qiudxdvssvkbpoovwpbr'),
+            'supabase_url': os.environ.get('SUPABASE_URL', 'https://qiudxdvssvkbpoovwpbr.supabase.co'),
+            'supabase_api_key': os.environ.get('SUPABASE_API_KEY', 'sb_publishable_Vs-dFSB4tHvRGfgUPt_Ypw_lndFfuBr'),
+            'supabase_service_role': os.environ.get('SUPABASE_SERVICE_ROLE', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpdWR4ZHZzc3ZrYnBvb3Z3cGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTUyOTQ2NywiZXhwIjoyMDgxMTA1NDY3fQ.WoHT4S5Or9sjs4TpB9gpq4ys5F9MlTNiToZA8dOfUPw'),
         }
 
         onedrive_path = self._route_data_file_to_onedrive(os.path.basename(self.data_file))
@@ -124,22 +124,20 @@ class HospitalManagementSystem:
     def load_data(self) -> None:
         """Load all data from the JSON file."""
         try:
+            from supabase_data_manager import get_supabase_json
             data = get_supabase_json()
             if data:
                 self._apply_loaded_data(data)
                 return
         except Exception as e:
             print(f"[WARN] Supabase load failed: {e}")
-        srv = self.settings.get('server_url')
-        if srv:
-            try:
-                data = self._get_remote_json('/api/load', srv)
-                self._apply_loaded_data(data)
-                return
-            except Exception as e:
-                print(f"[WARN] Remote load failed: {e}")
+
         if not os.path.exists(self.data_file):
-            print(f"[INFO] Data file '{self.data_file}' not found — starting fresh.")
+            print(f"[ERROR] Data file '{self.data_file}' not found and no remote data available.")
+            # We do NOT create a fresh file automatically anymore per user request.
+            # But we might need empty structures to avoid crashes if the app continues running.
+            # Ideally, we should probably raise an error or exit, but for safety in a running app,
+            # we'll just leave lists empty (initialized in __init__) and let the user know.
             return
 
         try:
@@ -147,7 +145,7 @@ class HospitalManagementSystem:
                 data = json.load(f)
             self._apply_loaded_data(data)
         except Exception as e:
-            print(f"[ERROR] Failed to load data: {e}")
+            print(f"[ERROR] Failed to load data from {self.data_file}: {e}")
 
     def _apply_loaded_data(self, data: Dict[str, Any]) -> None:
         from dataclasses import fields as _dc_fields

@@ -4,7 +4,7 @@ import os
 from werkzeug.utils import secure_filename
 from functools import wraps
 from main import HospitalManagementSystem
-from models import Patient, Appointment, Doctor, Message
+from models import Patient, Appointment, Doctor, Message, Bill
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key'  # Needed for flashing messages
@@ -602,6 +602,131 @@ def view_schedule():
 def analytics():
     # Placeholder for analytics
     return render_template('analytics.html', active_page='analytics')
+
+@app.route('/billing')
+def billing_dashboard():
+    # Filter for search if needed
+    search_term = request.args.get('search', '').lower()
+    
+    # Sort bills by date descending (newest first)
+    # Assuming bill_id or created_date can be used for sorting. 
+    # created_date is a string, might need parsing, but lexical sort of YYYY-MM-DD works.
+    
+    all_bills = sorted(hms.bills, key=lambda x: x.created_date, reverse=True)
+    
+    if search_term:
+        filtered_bills = []
+        for bill in all_bills:
+            patient = hms.get_patient(bill.patient_id)
+            p_name = f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
+            if (search_term in bill.bill_id.lower() or 
+                search_term in p_name.lower() or 
+                search_term in bill.status.lower()):
+                filtered_bills.append(bill)
+        bills_to_show = filtered_bills
+    else:
+        bills_to_show = all_bills
+
+    # Calculate stats
+    total_revenue = sum(b.amount for b in hms.bills if b.status.lower() == 'paid')
+    pending_amount = sum(b.amount for b in hms.bills if b.status.lower() == 'pending')
+    total_bills = len(hms.bills)
+    
+    return render_template('billing/dashboard.html', 
+                           bills=bills_to_show, 
+                           total_revenue=total_revenue,
+                           pending_amount=pending_amount,
+                           total_bills=total_bills,
+                           active_page='billing')
+
+@app.route('/billing/create', methods=['GET', 'POST'])
+def create_bill():
+    if request.method == 'POST':
+        try:
+            patient_id = request.form.get('patient_id')
+            items = request.form.getlist('items[]')
+            costs = request.form.getlist('costs[]')
+            
+            # Combine items and calculate total
+            services_list = []
+            total_amount = 0.0
+            
+            for i in range(len(items)):
+                if items[i].strip():
+                    cost = float(costs[i]) if costs[i] else 0.0
+                    services_list.append(f"{items[i]} (${cost:.2f})")
+                    total_amount += cost
+            
+            services_str = ", ".join(services_list)
+            
+            new_bill = Bill(
+                bill_id=hms.generate_id("INV"),
+                patient_id=patient_id,
+                appointment_id="", # Optional linkage
+                amount=total_amount,
+                services=services_str,
+                status="Pending",
+                created_date=datetime.datetime.now().strftime("%Y-%m-%d")
+            )
+            
+            hms.create_bill(new_bill)
+            flash('Bill created successfully!', 'success')
+            return redirect(url_for('billing_dashboard'))
+            
+        except Exception as e:
+            flash(f'Error creating bill: {e}', 'error')
+    
+    patients = hms.patients
+    return render_template('billing/create_bill.html', patients=patients, active_page='billing')
+
+@app.route('/billing/view/<bill_id>')
+def view_bill(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        flash('Bill not found', 'error')
+        return redirect(url_for('billing_dashboard'))
+        
+    patient = hms.get_patient(bill.patient_id)
+    return render_template('billing/view_bill.html', bill=bill, patient=patient, active_page='billing')
+
+@app.route('/billing/pay/<bill_id>', methods=['POST'])
+def process_payment(bill_id):
+    if hms.update_bill_status(bill_id, "Paid"):
+        flash('Payment processed successfully!', 'success')
+    else:
+        flash('Error processing payment', 'error')
+    return redirect(url_for('view_bill', bill_id=bill_id))
+
+@app.route('/billing/invoice/<bill_id>')
+def print_invoice(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        return "Bill not found", 404
+    patient = hms.get_patient(bill.patient_id)
+    return render_template('billing/invoice.html', bill=bill, patient=patient)
+
+@app.route('/billing/receipt/<bill_id>')
+def print_receipt(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        return "Bill not found", 404
+    patient = hms.get_patient(bill.patient_id)
+    return render_template('billing/receipt.html', bill=bill, patient=patient)
+
+@app.route('/billing/reports')
+def billing_reports():
+    # Simple reports logic
+    # Revenue by month
+    revenue_by_month = {}
+    for bill in hms.bills:
+        if bill.status.lower() == 'paid':
+            month = bill.created_date[:7] # YYYY-MM
+            revenue_by_month[month] = revenue_by_month.get(month, 0) + bill.amount
+            
+    # Sort by month
+    sorted_revenue = dict(sorted(revenue_by_month.items()))
+    
+    return render_template('billing/reports.html', revenue_data=sorted_revenue, active_page='billing')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
