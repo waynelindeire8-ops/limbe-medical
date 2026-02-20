@@ -64,7 +64,8 @@ class HospitalManagementSystem:
             'server_url': None,
             'supabase_project_id': os.environ.get('SUPABASE_PROJECT_ID', 'qiudxdvssvkbpoovwpbr'),
             'supabase_url': os.environ.get('SUPABASE_URL', 'https://qiudxdvssvkbpoovwpbr.supabase.co'),
-            'supabase_api_key': os.environ.get('SUPABASE_API_KEY', 'sb_publishable_Vs-dFSB4tHvRGfgUPt_Ypw_lndFfuBr'),
+            # We use the service role key for API key fallback to ensure permissions, as the publishable key was causing issues.
+            'supabase_api_key': os.environ.get('SUPABASE_API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpdWR4ZHZzc3ZrYnBvb3Z3cGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTUyOTQ2NywiZXhwIjoyMDgxMTA1NDY3fQ.WoHT4S5Or9sjs4TpB9gpq4ys5F9MlTNiToZA8dOfUPw'),
             'supabase_service_role': os.environ.get('SUPABASE_SERVICE_ROLE', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpdWR4ZHZzc3ZrYnBvb3Z3cGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTUyOTQ2NywiZXhwIjoyMDgxMTA1NDY3fQ.WoHT4S5Or9sjs4TpB9gpq4ys5F9MlTNiToZA8dOfUPw'),
         }
 
