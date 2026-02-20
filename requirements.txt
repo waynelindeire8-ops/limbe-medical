@@ -1,2 +1,5 @@
+Flask
+gunicorn
+Werkzeug
 python-dotenv==1.0.0
 supabase==2.4.1
