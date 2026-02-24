@@ -4,7 +4,7 @@ import os
 from werkzeug.utils import secure_filename
 from functools import wraps
 from main import HospitalManagementSystem
-from models import Patient, Appointment, Doctor, Message, Bill
+from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key'  # Needed for flashing messages
@@ -727,6 +727,244 @@ def billing_reports():
     sorted_revenue = dict(sorted(revenue_by_month.items()))
     
     return render_template('billing/reports.html', revenue_data=sorted_revenue, active_page='billing')
+
+@app.route('/prescriptions')
+def prescriptions():
+    search_term = request.args.get('search', '').lower()
+    all_rx = sorted(hms.prescriptions, key=lambda x: x.date, reverse=True)
+    def map_display(rx):
+        patient = hms.get_patient(rx.patient_id)
+        doctor = hms.get_doctor(rx.doctor_id)
+        return {
+            'prescription_id': rx.prescription_id,
+            'date': rx.date,
+            'patient_name': f"{patient.first_name} {patient.last_name}" if patient else 'Unknown',
+            'doctor_name': f"Dr. {doctor.last_name}" if doctor else 'Unknown',
+            'medication': rx.medication,
+            'status': rx.status
+        }
+    display_list = [map_display(rx) for rx in all_rx]
+    if search_term:
+        display_list = [d for d in display_list if (
+            search_term in d['prescription_id'].lower() or
+            search_term in d['patient_name'].lower() or
+            search_term in d['doctor_name'].lower() or
+            search_term in d['medication'].lower()
+        )]
+    return render_template('prescriptions.html', prescriptions=display_list, active_page='prescriptions', search_term=search_term)
+
+@app.route('/prescriptions/add', methods=['GET', 'POST'])
+def add_prescription():
+    patients = hms.patients
+    doctors = hms.doctors
+    if request.method == 'POST':
+        try:
+            new_rx = Prescription(
+                prescription_id=hms.generate_id('RX'),
+                patient_id=request.form['patient_id'],
+                doctor_id=request.form['doctor_id'],
+                date=request.form['date'],
+                medication=request.form['medication'],
+                dosage=request.form['dosage'],
+                frequency=request.form['frequency'],
+                duration=request.form['duration'],
+                notes=request.form.get('notes',''),
+                status=request.form.get('status','Active')
+            )
+            hms.add_prescription(new_rx)
+            flash('Prescription added successfully!', 'success')
+            return redirect(url_for('prescriptions'))
+        except Exception as e:
+            flash(f'Error adding prescription: {e}', 'error')
+    return render_template('add_prescription.html', patients=patients, doctors=doctors, active_page='prescriptions')
+
+@app.route('/prescriptions/edit/<prescription_id>', methods=['GET', 'POST'])
+def edit_prescription(prescription_id):
+    rx = hms.get_prescription(prescription_id)
+    if not rx:
+        flash('Prescription not found', 'error')
+        return redirect(url_for('prescriptions'))
+    patients = hms.patients
+    doctors = hms.doctors
+    if request.method == 'POST':
+        try:
+            updated = Prescription(
+                prescription_id=rx.prescription_id,
+                patient_id=request.form['patient_id'],
+                doctor_id=request.form['doctor_id'],
+                date=request.form['date'],
+                medication=request.form['medication'],
+                dosage=request.form['dosage'],
+                frequency=request.form['frequency'],
+                duration=request.form['duration'],
+                notes=request.form.get('notes',''),
+                status=request.form.get('status','Active')
+            )
+            hms.update_prescription(updated)
+            flash('Prescription updated successfully!', 'success')
+            return redirect(url_for('prescriptions'))
+        except Exception as e:
+            flash(f'Error updating prescription: {e}', 'error')
+    return render_template('edit_prescription.html', rx=rx, patients=patients, doctors=doctors, active_page='prescriptions')
+
+@app.route('/prescriptions/delete/<prescription_id>')
+def delete_prescription(prescription_id):
+    if hms.delete_prescription(prescription_id):
+        flash('Prescription deleted successfully!', 'success')
+    else:
+        flash('Error deleting prescription', 'error')
+    return redirect(url_for('prescriptions'))
+
+@app.route('/prescriptions/view/<prescription_id>')
+def view_prescription(prescription_id):
+    rx = hms.get_prescription(prescription_id)
+    if not rx:
+        flash('Prescription not found', 'error')
+        return redirect(url_for('prescriptions'))
+    patient = hms.get_patient(rx.patient_id)
+    doctor = hms.get_doctor(rx.doctor_id)
+    return render_template('view_prescription.html', rx=rx, patient=patient, doctor=doctor, active_page='prescriptions')
+
+@app.route('/prescriptions/print/<prescription_id>')
+def print_prescription(prescription_id):
+    rx = hms.get_prescription(prescription_id)
+    if not rx:
+        return 'Prescription not found', 404
+    patient = hms.get_patient(rx.patient_id)
+    doctor = hms.get_doctor(rx.doctor_id)
+    return render_template('prescriptions/print.html', rx=rx, patient=patient, doctor=doctor)
+
+@app.route('/medical_records')
+def medical_records():
+    search_term = request.args.get('search', '').lower()
+    all_records = sorted(hms.medical_records, key=lambda x: x.date, reverse=True)
+    
+    display_list = []
+    for record in all_records:
+        patient = hms.get_patient(record.patient_id)
+        doctor = hms.get_doctor(record.doctor_id)
+        p_name = f"{patient.first_name} {patient.last_name}" if patient else 'Unknown'
+        d_name = f"Dr. {doctor.last_name}" if doctor else 'Unknown'
+        
+        if (search_term in record.record_id.lower() or
+            search_term in p_name.lower() or
+            search_term in d_name.lower() or
+            search_term in record.diagnosis.lower()):
+            display_list.append({
+                'record_id': record.record_id,
+                'date': record.date,
+                'patient_name': p_name,
+                'doctor_name': d_name,
+                'diagnosis': record.diagnosis,
+                'consult_reason': record.consult_reason
+            })
+            
+    return render_template('medical_records.html', records=display_list, active_page='medical_records', search_term=search_term)
+
+@app.route('/medical_records/add', methods=['GET', 'POST'])
+def add_medical_record():
+    if request.method == 'POST':
+        try:
+            details = {
+                'main_symptoms': request.form.get('main_symptoms'),
+                'symptoms_duration': request.form.get('symptoms_duration'),
+                'pain_level': request.form.get('pain_level'),
+                'blood_pressure': request.form.get('blood_pressure'),
+                'temperature': request.form.get('temperature'),
+                'heart_rate': request.form.get('heart_rate'),
+                'weight': request.form.get('weight'),
+                'preliminary_diagnosis': request.form.get('preliminary_diagnosis'),
+                # Add placeholders for other tabs if they were in the form
+                'personal_info': request.form.get('personal_info'),
+                'emergency_contact': request.form.get('emergency_contact'),
+                'office_use': request.form.get('office_use'),
+                'authorization_release': request.form.get('authorization_release')
+            }
+            
+            new_record = MedicalRecord(
+                record_id=hms.generate_id("MR"),
+                patient_id=request.form['patient_id'],
+                doctor_id=request.form['doctor_id'],
+                date=request.form['date'],
+                consult_reason=request.form['consult_reason'],
+                diagnosis=request.form['diagnosis'],
+                treatment=request.form['treatment'],
+                prescriptions=request.form['prescriptions'],
+                notes=request.form.get('notes', ''),
+                details=details
+            )
+            hms.add_medical_record(new_record)
+            flash('Medical record added successfully!', 'success')
+            return redirect(url_for('medical_records'))
+        except Exception as e:
+            flash(f'Error adding medical record: {e}', 'error')
+            
+    patients = hms.patients
+    doctors = hms.doctors
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    return render_template('add_medical_record.html', patients=patients, doctors=doctors, today=today, active_page='medical_records')
+
+@app.route('/medical_records/edit/<record_id>', methods=['GET', 'POST'])
+def edit_medical_record(record_id):
+    record = next((r for r in hms.medical_records if r.record_id == record_id), None)
+    if not record:
+        flash('Medical record not found!', 'error')
+        return redirect(url_for('medical_records'))
+        
+    if request.method == 'POST':
+        try:
+            record.patient_id = request.form['patient_id']
+            record.doctor_id = request.form['doctor_id']
+            record.date = request.form['date']
+            record.consult_reason = request.form['consult_reason']
+            record.diagnosis = request.form['diagnosis']
+            record.treatment = request.form['treatment']
+            record.prescriptions = request.form['prescriptions']
+            record.notes = request.form.get('notes', '')
+            
+            record.details.update({
+                'main_symptoms': request.form.get('main_symptoms'),
+                'symptoms_duration': request.form.get('symptoms_duration'),
+                'pain_level': request.form.get('pain_level'),
+                'blood_pressure': request.form.get('blood_pressure'),
+                'temperature': request.form.get('temperature'),
+                'heart_rate': request.form.get('heart_rate'),
+                'weight': request.form.get('weight'),
+                'preliminary_diagnosis': request.form.get('preliminary_diagnosis'),
+                'personal_info': request.form.get('personal_info'),
+                'emergency_contact': request.form.get('emergency_contact'),
+                'office_use': request.form.get('office_use'),
+                'authorization_release': request.form.get('authorization_release')
+            })
+            
+            hms.update_medical_record(record)
+            flash('Medical record updated successfully!', 'success')
+            return redirect(url_for('medical_records'))
+        except Exception as e:
+            flash(f'Error updating medical record: {e}', 'error')
+            
+    patients = hms.patients
+    doctors = hms.doctors
+    return render_template('edit_medical_record.html', record=record, patients=patients, doctors=doctors, active_page='medical_records')
+
+@app.route('/medical_records/view/<record_id>')
+def view_medical_record(record_id):
+    record = next((r for r in hms.medical_records if r.record_id == record_id), None)
+    if not record:
+        flash('Medical record not found!', 'error')
+        return redirect(url_for('medical_records'))
+        
+    patient = hms.get_patient(record.patient_id)
+    doctor = hms.get_doctor(record.doctor_id)
+    return render_template('view_medical_record.html', record=record, patient=patient, doctor=doctor, active_page='medical_records')
+
+@app.route('/medical_records/delete/<record_id>')
+def delete_medical_record(record_id):
+    if hms.delete_medical_record(record_id):
+        flash('Medical record deleted successfully!', 'success')
+    else:
+        flash('Error deleting medical record!', 'error')
+    return redirect(url_for('medical_records'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Prescription</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+        {% include 'sidebar.html' %}
+        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+            <a href="{{ url_for('prescriptions') }}" class="back-link" style="color: #4361ee; text-decoration: none; display: block; margin-bottom: 20px;"><i class="fas fa-arrow-left"></i> Back to Prescriptions</a>
+            <div class="card" style="background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+                <h2 style="margin-top: 0;">Add Prescription</h2>
+                <form method="post" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label>Patient</label>
+                        <select name="patient_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                            {% for p in patients %}
+                            <option value="{{ p.patient_id }}">{{ p.first_name }} {{ p.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Doctor</label>
+                        <select name="doctor_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                            {% for d in doctors %}
+                            <option value="{{ d.doctor_id }}">Dr. {{ d.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Date</label>
+                        <input type="date" name="date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    </div>
+                    <div>
+                        <label>Status</label>
+                        <select name="status" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                            <option>Active</option>
+                            <option>Completed</option>
+                            <option>Cancelled</option>
+                        </select>
+                    </div>
+                    <div style="grid-column: 1 / span 2;">
+                        <label>Medication</label>
+                        <input type="text" name="medication" required placeholder="Medication name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    </div>
+                    <div>
+                        <label>Dosage</label>
+                        <input type="text" name="dosage" required placeholder="e.g., 500mg" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    </div>
+                    <div>
+                        <label>Frequency</label>
+                        <input type="text" name="frequency" required placeholder="e.g., twice daily" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    </div>
+                    <div>
+                        <label>Duration</label>
+                        <input type="text" name="duration" required placeholder="e.g., 7 days" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    </div>
+                    <div style="grid-column: 1 / span 2;">
+                        <label>Notes</label>
+                        <textarea name="notes" rows="3" placeholder="Additional instructions" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;"></textarea>
+                    </div>
+                    <div style="grid-column: 1 / span 2; text-align: right;">
+                        <button type="submit" class="btn btn-primary" style="padding: 10px 20px; background-color: #4361ee; color: white; border: none; border-radius: 8px;">Save</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

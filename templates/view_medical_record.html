@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Medical Record</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .view-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        .view-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .info-item label {
+            display: block;
+            color: #8d99ae;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .info-item div {
+            font-size: 16px;
+            color: #2b2d42;
+            font-weight: 500;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #4361ee;
+            margin: 25px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2eafc;
+        }
+        .detail-block {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .exam-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background-color: #e2eafc;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-box label {
+            display: block;
+            font-size: 11px;
+            color: #4361ee;
+            font-weight: 700;
+            margin-bottom: 3px;
+        }
+        .stat-box span {
+            font-size: 15px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+            <div style="margin-bottom: 20px;">
+                <a href="{{ url_for('medical_records') }}" style="color: #4361ee; text-decoration: none;"><i class="fas fa-arrow-left"></i> Back to Medical Records</a>
+            </div>
+
+            <div class="view-container">
+                <div class="view-header">
+                    <div>
+                        <h2 style="margin: 0; color: #2b2d42;">Medical Record #{{ record.record_id }}</h2>
+                        <p style="margin: 5px 0 0 0; color: #8d99ae;">Created on {{ record.date }}</p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <a href="{{ url_for('edit_medical_record', record_id=record.record_id) }}" class="btn btn-outline" style="text-decoration: none;"><i class="fas fa-edit"></i> Edit</a>
+                        <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Print</button>
+                    </div>
+                </div>
+
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Patient Name</label>
+                        <div>{{ patient.first_name }} {{ patient.last_name }} ({{ patient.patient_id }})</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Attending Doctor</label>
+                        <div>Dr. {{ doctor.first_name }} {{ doctor.last_name }} ({{ doctor.specialization }})</div>
+                    </div>
+                </div>
+
+                <div class="section-title">Consultation Details</div>
+                <div class="info-item" style="margin-bottom: 15px;">
+                    <label>Reason for Consultation</label>
+                    <div class="detail-block">{{ record.consult_reason }}</div>
+                </div>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Main Symptoms</label>
+                        <div class="detail-block">{{ record.details.get('main_symptoms', 'None recorded') }}</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Symptoms Duration</label>
+                        <div class="detail-block">{{ record.details.get('symptoms_duration', 'Not specified') }}</div>
+                    </div>
+                </div>
+
+                <div class="section-title">Medical Examination</div>
+                <div class="exam-stats">
+                    <div class="stat-box">
+                        <label>Blood Pressure</label>
+                        <span>{{ record.details.get('blood_pressure', 'N/A') }}</span>
+                    </div>
+                    <div class="stat-box">
+                        <label>Temperature</label>
+                        <span>{{ record.details.get('temperature', 'N/A') }}</span>
+                    </div>
+                    <div class="stat-box">
+                        <label>Heart Rate</label>
+                        <span>{{ record.details.get('heart_rate', 'N/A') }}</span>
+                    </div>
+                    <div class="stat-box">
+                        <label>Weight</label>
+                        <span>{{ record.details.get('weight', 'N/A') }}</span>
+                    </div>
+                </div>
+                
+                <div class="info-item">
+                    <label>Pain Level (0-10)</label>
+                    <div style="font-weight: 700; color: {% if record.details.get('pain_level', '0')|int > 7 %}#f72585{% elif record.details.get('pain_level', '0')|int > 3 %}#ffb703{% else %}#2ec4b6{% endif %};">
+                        {{ record.details.get('pain_level', '0') }} / 10
+                    </div>
+                </div>
+
+                <div class="section-title">Diagnosis & Treatment</div>
+                <div class="info-item" style="margin-bottom: 15px;">
+                    <label>Preliminary Diagnosis</label>
+                    <div class="detail-block">{{ record.details.get('preliminary_diagnosis', 'None') }}</div>
+                </div>
+                <div class="info-item" style="margin-bottom: 15px;">
+                    <label>Final Diagnosis</label>
+                    <div class="detail-block" style="font-weight: 600; border-left: 4px solid #4361ee;">{{ record.diagnosis }}</div>
+                </div>
+                <div class="info-item" style="margin-bottom: 15px;">
+                    <label>Treatment Plan</label>
+                    <div class="detail-block">{{ record.treatment }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Prescriptions</label>
+                    <div class="detail-block" style="font-family: monospace;">{{ record.prescriptions }}</div>
+                </div>
+
+                {% if record.notes %}
+                <div class="section-title">Additional Notes</div>
+                <div class="detail-block">{{ record.notes }}</div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

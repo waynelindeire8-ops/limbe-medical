@@ -23,6 +23,10 @@
         {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
         <a href="{{ url_for('view_schedule') }}" class="menu-item {% if active_page == 'schedule' %}active{% endif %}" title="Schedule"><i class="fas fa-calendar-alt"></i></a>
         {% endif %}
+
+        {% if current_role in ['admin', 'doctor', 'nurse'] %}
+        <a href="{{ url_for('medical_records') }}" class="menu-item {% if active_page == 'medical_records' %}active{% endif %}" title="Medical Records"><i class="fas fa-file-medical"></i></a>
+        {% endif %}
         
         <a href="{{ url_for('messages') }}" class="menu-item {% if active_page == 'messages' %}active{% endif %}" title="Messages"><i class="fas fa-comments"></i></a>
         
@@ -33,9 +37,13 @@
         {% if current_role in ['admin', 'doctor'] %}
         <a href="{{ url_for('general_reports') }}" class="menu-item {% if active_page == 'reports' %}active{% endif %}" title="Reports"><i class="fas fa-file-medical"></i></a>
         {% endif %}
-        
-        {% if current_role in ['admin', 'cashier', 'doctor', 'receptionist', 'nurse'] %}
+
+        {% if current_role in ['admin', 'cashier'] %}
         <a href="{{ url_for('billing_dashboard') }}" class="menu-item {% if active_page == 'billing' %}active{% endif %}" title="Billing"><i class="fas fa-file-invoice-dollar"></i></a>
+        {% endif %}
+        
+        {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
+        <a href="{{ url_for('prescriptions') }}" class="menu-item {% if active_page == 'prescriptions' %}active{% endif %}" title="Prescriptions"><i class="fas fa-capsules"></i></a>
         {% endif %}
     </nav>
     <div class="settings">
