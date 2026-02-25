@@ -3,77 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice - Limbe Medical</title>
+    <title>Generate Invoice</title>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #333; }
-        .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); }
-        .invoice-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4361ee; padding-bottom: 20px; margin-bottom: 20px; }
-        .logo { font-size: 28px; font-weight: bold; color: #4361ee; }
-        .invoice-title { font-size: 24px; color: #555; text-align: right; }
-        .details { display: flex; justify-content: space-between; margin-bottom: 40px; }
-        .bill-to, .invoice-info { width: 48%; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #ddd; }
-        td { padding: 12px; border-bottom: 1px solid #eee; }
-        .total { text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; }
-        .footer { text-align: center; font-size: 12px; color: #999; margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; }
-        @media print { .no-print { display: none; } body { padding: 0; } .invoice-box { border: none; box-shadow: none; } }
+        body { font-family: Segoe UI, Arial, sans-serif; padding: 20px; color: #333; background: #f6f7f9; }
+        .wrap { max-width: 1100px; margin: 0 auto; }
+        .card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .header h2 { font-size: 18px; margin: 0; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .field { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .field label { width: 110px; color: #444; }
+        .value { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 8px; background: #fafafa; }
+        .table { border: 1px solid #bbb; border-radius: 4px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: #0b2e67; color: #fff; padding: 8px; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+        tbody td { padding: 8px; border-bottom: 1px solid #eee; font-size: 13px; }
+        .row-actions { display: flex; gap: 12px; justify-content: flex-end; }
+        .btn { padding: 10px 18px; border-radius: 4px; border: 1px solid #0b2e67; background: #0b2e67; color: #fff; cursor: pointer; }
+        .btn-outline { padding: 10px 18px; border-radius: 4px; border: 1px solid #0b2e67; background: #fff; color: #0b2e67; cursor: pointer; }
+        .totals { font-weight: 600; padding: 8px; text-align: right; color: #222; }
+        .section-title { font-size: 14px; color: #444; margin-bottom: 6px; }
+        @media print { .no-print { display: none; } body { padding: 0; background: #fff; } .card { border: none; } }
     </style>
 </head>
 <body>
-    <div class="no-print" style="text-align: right; max-width: 800px; margin: auto; margin-bottom: 10px;">
-        <button onclick="window.print()" style="padding: 10px 20px; background: #4361ee; color: white; border: none; border-radius: 4px; cursor: pointer;">Print Invoice</button>
-    </div>
-
-    <div class="invoice-box">
-        <div class="invoice-header">
-            <div class="logo">Limbe Medical</div>
-            <div class="invoice-title">
-                INVOICE<br>
-                <span style="font-size: 16px; color: #777;">#{{ bill.bill_id }}</span>
+    <div class="wrap">
+        <div class="header">
+            <h2>Generate Invoice</h2>
+            <div class="no-print row-actions">
+                <a class="btn-outline" href="{{ url_for('billing_dashboard') }}">Back</a>
+                <button class="btn-outline" onclick="window.print()">Print Form</button>
+                <a class="btn" href="{{ url_for('export_invoice_csv', bill_id=bill.bill_id) }}">Export CSV</a>
             </div>
         </div>
 
-        <div class="details">
-            <div class="bill-to">
-                <strong>Bill To:</strong><br>
-                {{ patient.first_name }} {{ patient.last_name }}<br>
-                {{ patient.address }}<br>
-                {{ patient.phone }}
-            </div>
-            <div class="invoice-info" style="text-align: right;">
-                <strong>Date:</strong> {{ bill.created_date }}<br>
-                <strong>Status:</strong> {{ bill.status }}<br>
-                <strong>Patient ID:</strong> {{ patient.patient_id }}
+        <div class="card">
+            <form action="{{ url_for('update_invoice_scheme', bill_id=bill.bill_id) }}" method="post">
+                <div class="grid">
+                    <div>
+                        <div class="field"><label>Patient:</label><input class="value" value="{{ patient.first_name }} {{ patient.last_name }}" readonly></div>
+                        <div class="field"><label>Invoice No:</label><input class="value" value="{{ bill.bill_id }}" readonly></div>
+                        <div class="field"><label>Member No:</label><input name="membership_number" class="value" value="{{ scheme.membership_number or '' }}"></div>
+                        <div class="field"><label>Form No:</label><input name="form_number" class="value" value="{{ scheme.form_number or '' }}"></div>
+                        <div class="field"><label>Date:</label><input class="value" value="{{ bill.created_date }}" readonly></div>
+                    </div>
+                    <div>
+                        <div class="section-title">Insurance</div>
+                        <div class="field"><label>Provider:</label><input name="provider" class="value" value="{{ scheme.provider or '' }}"></div>
+                        <div class="field"><label>Type:</label><input name="type" class="value" value="{{ scheme.type or '' }}"></div>
+                        <div class="field"><label>Member No:</label><input name="membership_number" class="value" value="{{ scheme.membership_number or '' }}"></div>
+                        <div class="field"><label>Policy No:</label><input name="policy_number" class="value" value="{{ scheme.policy_number or '' }}"></div>
+                        <div class="field"><label>Coverage %:</label><input name="coverage_percent" class="value" value="{{ coverage_percent }}"></div>
+                    </div>
+                </div>
+                <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+                    <button type="submit" class="btn">Save Changes</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="section-title">Details</div>
+            <div class="table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>LINE</th>
+                            <th>CODE</th>
+                            <th>DESCRIPTION</th>
+                            <th>QTY</th>
+                            <th>YR</th>
+                            <th>MH</th>
+                            <th>DAY</th>
+                            <th>FEE CHG</th>
+                            <th>AWARD</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in items %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ row.code }}</td>
+                            <td>{{ row.description }}</td>
+                            <td>{{ row.qty }}</td>
+                            <td>{{ row.yr }}</td>
+                            <td>{{ row.mh }}</td>
+                            <td>{{ row.day }}</td>
+                            <td>MWK {{ "%.2f"|format(row.fee) }}</td>
+                            <td>MWK {{ "%.2f"|format(row.award) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Description</th>
-                    <th style="text-align: right;">Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in bill.services.split(', ') %}
-                {% if ' ($' in item %}
-                <tr>
-                    <td>{{ item.split(' ($')[0] }}</td>
-                    <td style="text-align: right;">${{ item.split(' ($')[1].replace(')', '') }}</td>
-                </tr>
-                {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <div class="total">
-            Total: ${{ "%.2f"|format(bill.amount) }}
-        </div>
-
-        <div class="footer">
-            Thank you for choosing Limbe Medical.<br>
-            Please pay within 30 days. Checks payable to Limbe Medical Center.
+        <div class="card">
+            <div class="section-title">Preview</div>
+            <div class="table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Line</th>
+                            <th>Code</th>
+                            <th>Description</th>
+                            <th>Qty</th>
+                            <th>Yr</th>
+                            <th>Mh</th>
+                            <th>Day</th>
+                            <th>Fee Chg</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in items %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ row.code }}</td>
+                            <td>{{ row.description }}</td>
+                            <td>{{ row.qty }}</td>
+                            <td>{{ row.yr }}</td>
+                            <td>{{ row.mh }}</td>
+                            <td>{{ row.day }}</td>
+                            <td>MWK {{ "%.2f"|format(row.fee) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="totals">
+                Total: MWK {{ "%.2f"|format(total_amount) }} |
+                Covered: MWK {{ "%.2f"|format(covered_amount) }} |
+                Shortfall: MWK {{ "%.2f"|format(shortfall_amount) }} |
+                Received: MWK {{ "%.2f"|format(received_amount) }} |
+                Balance: MWK {{ "%.2f"|format(balance_amount) }}
+            </div>
         </div>
     </div>
 </body>

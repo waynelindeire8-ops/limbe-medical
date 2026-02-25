@@ -4,11 +4,29 @@ import os
 from werkzeug.utils import secure_filename
 from functools import wraps
 from main import HospitalManagementSystem
-from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord
+from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord, QueueItem
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key'  # Needed for flashing messages
 hms = HospitalManagementSystem()
+
+# Notifications helper
+def notify(subject: str, content: str, recipient_id: str = 'all'):
+    if not hms.settings.get('notifications', True):
+        return
+    msg = Message(
+        message_id=hms.generate_id('msg_'),
+        sender_id='system',
+        sender_name='System',
+        recipient_id=recipient_id,
+        subject=subject,
+        content=content,
+        timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        is_read=False,
+        is_archived=False
+    )
+    hms.messages.append(msg)
+    hms.save_data()
 
 # Seed Users
 def seed_users():
@@ -43,7 +61,71 @@ def require_login():
 
 @app.context_processor
 def inject_user():
-    return dict(current_user=session.get('username'), current_role=session.get('role'))
+    username = session.get('username')
+    role = session.get('role')
+    unread = 0
+    for m in hms.messages:
+        if not m.is_read and (m.recipient_id == username or m.recipient_id == role or m.recipient_id == 'all'):
+            unread += 1
+    return dict(current_user=username, current_role=role, unread_messages_count=unread)
+
+@app.route('/analytics')
+def analytics():
+    # Calculate stats
+    total_patients = len(hms.patients)
+    total_appointments = len(hms.appointments)
+    total_revenue = sum(float(b.amount) for b in hms.bills if b.status == 'Paid')
+    
+    # Appointments by Status
+    status_counts = {'Scheduled': 0, 'Completed': 0, 'Cancelled': 0}
+    for a in hms.appointments:
+        if a.status in status_counts:
+            status_counts[a.status] += 1
+            
+    # Revenue by Month (Last 6 months)
+    revenue_data = {}
+    today = datetime.date.today()
+    for i in range(5, -1, -1):
+        month_date = today - datetime.timedelta(days=i*30)
+        month_key = month_date.strftime("%B")
+        revenue_data[month_key] = 0
+        
+    for bill in hms.bills:
+        if bill.status == 'Paid':
+            try:
+                bill_date = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d").date()
+                if (today - bill_date).days <= 180:
+                    month_key = bill_date.strftime("%B")
+                    if month_key in revenue_data:
+                        revenue_data[month_key] += float(bill.amount)
+            except:
+                pass
+
+    # Top Doctors by Appointments
+    doctor_counts = {}
+    for a in hms.appointments:
+        if a.doctor_id in doctor_counts:
+            doctor_counts[a.doctor_id] += 1
+        else:
+            doctor_counts[a.doctor_id] = 1
+            
+    top_doctors = []
+    for doc_id, count in sorted(doctor_counts.items(), key=lambda x: x[1], reverse=True)[:5]:
+        doc = hms.get_doctor(doc_id)
+        if doc:
+            top_doctors.append({'name': f"Dr. {doc.last_name}", 'count': count})
+
+    return render_template('analytics.html', 
+                           total_patients=total_patients,
+                           total_appointments=total_appointments,
+                           total_revenue=total_revenue,
+                           status_labels=list(status_counts.keys()),
+                           status_data=list(status_counts.values()),
+                           revenue_labels=list(revenue_data.keys()),
+                           revenue_data=list(revenue_data.values()),
+                           top_doctors_labels=[d['name'] for d in top_doctors],
+                           top_doctors_data=[d['count'] for d in top_doctors],
+                           active_page='analytics')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -69,52 +151,158 @@ def logout():
 
 @app.route('/')
 def dashboard():
-    # Statistics
-    total_patients = len(hms.patients)
-    
-    # Count active doctors
-    active_doctors = sum(1 for d in hms.doctors if d.status.lower() == 'active') if hms.doctors else 0
-    
-    # Count today's appointments
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    today_appointments = sum(1 for a in hms.appointments if a.appointment_date == today)
     
-    # Pending lab results (Mock logic)
-    pending_lab_results = 45
-
-    # Recent Appointments
-    recent_appointments = hms.appointments[-4:] if hms.appointments else []
+    # Calculate stats
+    total_patients = len(hms.patients)
+    todays_appointments = len([a for a in hms.appointments if a.appointment_date == today])
+    pending_appointments = len([a for a in hms.appointments if a.status == 'Scheduled'])
+    completed_appointments = len([a for a in hms.appointments if a.status == 'Completed'])
     
-    # Format for display
-    formatted_appointments = []
-    for appt in recent_appointments:
-        doctor_name = "Unknown Doctor"
-        for doc in hms.doctors:
-            if doc.doctor_id == appt.doctor_id:
-                doctor_name = f"Dr. {doc.last_name}"
-                break
-        
-        patient_name = "Unknown Patient"
-        for pat in hms.patients:
-            if pat.patient_id == appt.patient_id:
-                patient_name = f"{pat.first_name} {pat.last_name}"
-                break
-
-        formatted_appointments.append({
-            'patient_name': patient_name,
-            'doctor_name': doctor_name,
-            'time': appt.appointment_time,
-            'type': 'Consultation', # Default
-            'status': appt.status
-        })
-
+    # Get recent appointments
+    recent_appointments = sorted(hms.appointments, key=lambda x: x.appointment_date + ' ' + x.appointment_time, reverse=True)[:5]
+    
+    # Get active queue
+    active_queue = [q for q in hms.queue if q.status != 'Completed']
+    sorted_queue = sorted(active_queue, key=lambda x: x.arrival_time)
+    
     return render_template('dashboard.html', 
                            total_patients=total_patients,
-                           active_doctors=active_doctors,
-                           today_appointments=today_appointments,
-                           pending_lab_results=pending_lab_results,
-                           recent_appointments=formatted_appointments,
+                           todays_appointments=todays_appointments,
+                           pending_appointments=pending_appointments,
+                           completed_appointments=completed_appointments,
+                           recent_appointments=recent_appointments,
+                           queue=sorted_queue,
                            active_page='dashboard')
+
+@app.route('/queue/add/<patient_id>')
+def add_to_queue(patient_id):
+    patient = hms.get_patient(patient_id)
+    if patient:
+        # Check if already in queue
+        if not any(q.patient_id == patient_id and q.status != 'Completed' for q in hms.queue):
+            new_item = QueueItem(
+                queue_id=hms.generate_id('Q'),
+                patient_id=patient.patient_id,
+                patient_name=f"{patient.first_name} {patient.last_name}",
+                doctor_id="Unassigned",
+                status="Waiting",
+                priority="Routine",
+                arrival_time=datetime.datetime.now().strftime("%H:%M"),
+                estimated_wait=hms.estimate_wait_time(''),
+                department='',
+                visit_reason='',
+                special_category='',
+                check_in_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                assigned_doctor_id=''
+            )
+            hms.add_to_queue(new_item)
+            flash(f'{patient.first_name} added to queue.', 'success')
+            notify('Queue update', f"{patient.first_name} {patient.last_name} added to queue", 'receptionist')
+        else:
+            flash('Patient is already in the queue.', 'warning')
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/queue/update/<queue_id>/<status>')
+def update_queue_status(queue_id, status):
+    if hms.update_queue_status(queue_id, status):
+        flash(f'Queue status updated to {status}.', 'success')
+        notify('Queue status', f"{queue_id} -> {status}", 'receptionist')
+    return redirect(url_for('dashboard'))
+
+@app.route('/queue/remove/<queue_id>')
+def remove_from_queue(queue_id):
+    if hms.remove_from_queue(queue_id):
+        flash('Patient removed from queue.', 'success')
+        notify('Queue update', f"Removed from queue: {queue_id}", 'receptionist')
+    return redirect(url_for('dashboard'))
+
+@app.route('/queue/checkin', methods=['GET','POST'])
+def queue_checkin():
+    patients = hms.patients
+    departments = hms.departments or ['General']
+    doctors = hms.doctors
+    urgencies = ['Emergency','Urgent','Routine']
+    specials = ['None','Elderly','Pregnant','Disabled']
+    if request.method == 'POST':
+        pid = request.form.get('patient_id')
+        dept = request.form.get('department') or ''
+        reason = request.form.get('reason') or ''
+        urgency = request.form.get('urgency') or 'Routine'
+        special = request.form.get('special') or 'None'
+        doc_id = request.form.get('doctor_id') or 'Unassigned'
+        p = hms.get_patient(pid)
+        if p:
+            new_item = QueueItem(
+                queue_id=hms.generate_id('Q'),
+                patient_id=p.patient_id,
+                patient_name=f"{p.first_name} {p.last_name}",
+                doctor_id=doc_id,
+                status="Waiting",
+                priority=urgency,
+                arrival_time=datetime.datetime.now().strftime("%H:%M"),
+                estimated_wait=hms.estimate_wait_time(dept),
+                department=dept,
+                visit_reason=reason,
+                special_category=special,
+                check_in_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                assigned_doctor_id=doc_id
+            )
+            hms.add_to_queue(new_item)
+            flash('Patient checked in.', 'success')
+            notify('Queue check-in', f"{new_item.patient_name} for {dept}", 'receptionist')
+            if doc_id and doc_id != 'Unassigned':
+                notify('Queue assigned', f"{new_item.patient_name} -> {doc_id}", 'doctor')
+            return redirect(url_for('queue_dashboard'))
+        flash('Invalid patient.', 'error')
+    return render_template('queue/checkin.html', patients=patients, departments=departments, doctors=doctors, urgencies=urgencies, specials=specials, active_page='queue')
+
+@app.route('/queue/dashboard')
+def queue_dashboard():
+    queues_by_dept = {}
+    for q in hms.queue:
+        d = q.department or 'General'
+        queues_by_dept.setdefault(d, []).append(q)
+    for d in queues_by_dept:
+        queues_by_dept[d] = sorted(queues_by_dept[d], key=lambda x: (x.priority, x.arrival_time))
+    return render_template('queue/dashboard.html', queues_by_dept=queues_by_dept, doctors=hms.doctors, departments=hms.departments or ['General'], active_page='queue')
+
+@app.route('/queue/call/<queue_id>')
+def queue_call(queue_id):
+    if hms.call_patient(queue_id):
+        flash('Patient called.', 'success')
+        notify('Queue call', queue_id, 'receptionist')
+    return redirect(url_for('queue_dashboard'))
+
+@app.route('/queue/transfer/<queue_id>', methods=['POST'])
+def queue_transfer(queue_id):
+    dept = request.form.get('department') or ''
+    doc_id = request.form.get('doctor_id') or ''
+    if hms.transfer_patient(queue_id, dept, doc_id):
+        flash('Patient transferred.', 'success')
+        notify('Queue transfer', f"{queue_id} -> {dept}", 'receptionist')
+    return redirect(url_for('queue_dashboard'))
+
+@app.route('/queue/requeue/<queue_id>')
+def queue_requeue(queue_id):
+    if hms.requeue_patient(queue_id):
+        flash('Patient re-queued.', 'success')
+        notify('Queue requeue', queue_id, 'receptionist')
+    return redirect(url_for('queue_dashboard'))
+
+@app.route('/queue/complete/<queue_id>')
+def queue_complete(queue_id):
+    if hms.update_queue_status(queue_id, 'Completed'):
+        flash('Consultation completed.', 'success')
+        notify('Consultation completed', queue_id, 'cashier')
+    return redirect(url_for('queue_dashboard'))
+
+@app.route('/queue/noshow/<queue_id>')
+def queue_noshow(queue_id):
+    if hms.update_queue_status(queue_id, 'No-show'):
+        flash('Marked as no-show.', 'success')
+        notify('No-show', queue_id, 'receptionist')
+    return redirect(url_for('queue_dashboard'))
 
 @app.route('/patient/<patient_id>')
 def patient_details(patient_id):
@@ -222,22 +410,23 @@ def patients():
 def add_patient():
     if request.method == 'POST':
         try:
-            # Basic validation could be added here
             new_patient = Patient(
-                patient_id=hms.generate_id("P"),
+                patient_id=(request.form.get('patient_id') or hms.generate_id("P")),
                 first_name=request.form['first_name'],
                 last_name=request.form['last_name'],
-                date_of_birth=request.form['dob'],
-                gender=request.form['gender'],
-                phone=request.form['phone'],
-                email=request.form['email'],
-                address=request.form['address'],
-                emergency_contact=request.form['emergency_contact'],
+                date_of_birth=request.form.get('dob',''),
+                gender=request.form.get('gender',''),
+                phone=request.form.get('phone',''),
+                email=request.form.get('email',''),
+                address=request.form.get('address',''),
+                emergency_contact=request.form.get('emergency_contact',''),
                 medical_history="",
                 created_date=datetime.datetime.now().strftime("%Y-%m-%d")
             )
             hms.add_patient(new_patient)
             flash('Patient added successfully!', 'success')
+            notify('Patient added', f"{new_patient.first_name} {new_patient.last_name} ({new_patient.patient_id})", 'admin')
+            notify('Patient added', f"{new_patient.first_name} {new_patient.last_name}", 'receptionist')
             return redirect(url_for('patients'))
         except Exception as e:
             flash(f'Error adding patient: {e}', 'error')
@@ -265,6 +454,7 @@ def edit_patient(patient_id):
                 emergency_contact=request.form['emergency_contact']
             )
             flash('Patient updated successfully!', 'success')
+            notify('Patient updated', patient_id, 'admin')
             return redirect(url_for('patients'))
         except Exception as e:
             flash(f'Error updating patient: {e}', 'error')
@@ -275,6 +465,7 @@ def edit_patient(patient_id):
 def delete_patient(patient_id):
     if hms.delete_patient(patient_id):
         flash('Patient deleted successfully!', 'success')
+        notify('Patient deleted', patient_id, 'admin')
     else:
         flash('Error deleting patient!', 'error')
     return redirect(url_for('patients'))
@@ -298,6 +489,7 @@ def add_doctor():
             )
             hms.add_doctor(new_doctor)
             flash('Doctor added successfully!', 'success')
+            notify('Doctor added', f"{new_doctor.first_name} {new_doctor.last_name} ({new_doctor.doctor_id})", 'admin')
             return redirect(url_for('doctors'))
         except Exception as e:
             flash(f'Error adding doctor: {e}', 'error')
@@ -323,6 +515,7 @@ def edit_doctor(doctor_id):
                 status=request.form['status']
             )
             flash('Doctor updated successfully!', 'success')
+            notify('Doctor updated', doctor_id, 'admin')
             return redirect(url_for('doctors'))
         except Exception as e:
             flash(f'Error updating doctor: {e}', 'error')
@@ -333,6 +526,7 @@ def edit_doctor(doctor_id):
 def delete_doctor(doctor_id):
     if hms.delete_doctor(doctor_id):
         flash('Doctor deleted successfully!', 'success')
+        notify('Doctor deleted', doctor_id, 'admin')
     else:
         flash('Error deleting doctor!', 'error')
     return redirect(url_for('doctors'))
@@ -356,6 +550,8 @@ def schedule_appointment():
             )
             hms.schedule_appointment(new_appointment)
             flash('Appointment scheduled successfully!', 'success')
+            notify('Appointment scheduled', f"{new_appointment.patient_id} -> {new_appointment.doctor_id} {new_appointment.appointment_date} {new_appointment.appointment_time}", 'receptionist')
+            notify('Appointment scheduled', new_appointment.doctor_id, 'doctor')
             return redirect(url_for('view_schedule'))
         except Exception as e:
             flash(f'Error scheduling appointment: {e}', 'error')
@@ -388,6 +584,7 @@ def edit_appointment(appointment_id):
                 status=request.form['status']
             )
             flash('Appointment updated successfully!', 'success')
+            notify('Appointment updated', appointment_id, 'receptionist')
             return redirect(url_for('view_schedule'))
         except Exception as e:
             flash(f'Error updating appointment: {e}', 'error')
@@ -404,6 +601,7 @@ def edit_appointment(appointment_id):
 def delete_appointment(appointment_id):
     if hms.delete_appointment(appointment_id):
         flash('Appointment deleted successfully!', 'success')
+        notify('Appointment deleted', appointment_id, 'receptionist')
     else:
         flash('Error deleting appointment!', 'error')
     return redirect(url_for('view_schedule'))
@@ -437,73 +635,93 @@ def add_department():
             hms.departments.append(dept_name)
             hms.save_data()
             flash(f'Department "{dept_name}" added successfully!', 'success')
+            notify('Department added', dept_name, 'admin')
         else:
             flash(f'Department "{dept_name}" already exists.', 'warning')
     return redirect(url_for('departments'))
 
 @app.route('/messages')
 def messages():
-    # Use real messages from HMS
-    messages_list = []
+    # Get current user details from session
+    current_username = session.get('username')
+    current_role = session.get('role')
     
-    # Sort messages by timestamp (newest first) - assuming simple string sort works for now or just reverse
-    # In a real app, parse dates.
-    sorted_messages = hms.messages[::-1] 
+    # Filter messages where current user is recipient or sender
+    user_messages = []
+    for msg in hms.messages:
+        # Check if message is for this user (by username or role)
+        is_recipient = (msg.recipient_id == current_username) or \
+                      (msg.recipient_id == current_role) or \
+                      (msg.recipient_id == 'all')
+                      
+        is_sender = (msg.sender_id == current_username)
+        
+        if is_recipient or is_sender:
+            user_messages.append(msg)
+            
+    # Sort by timestamp (newest first)
+    sorted_messages = sorted(user_messages, key=lambda x: x.timestamp, reverse=True)
     
+    # Format for display
+    display_messages = []
     for msg in sorted_messages:
-        messages_list.append({
+        display_messages.append({
             'id': msg.message_id,
             'sender': msg.sender_name,
-            'role': 'User', # Simplified
+            'sender_id': msg.sender_id,
+            'role': 'User', # Could look up sender role
             'time': msg.timestamp,
             'preview': msg.subject,
             'content': msg.content,
-            'active': False
+            'active': False,
+            'is_read': msg.is_read,
+            'is_outgoing': (msg.sender_id == current_username)
         })
         
-    # If no messages, maybe show the mock ones for demo purposes if desired, 
-    # but user wants to "send messages", so showing their sent message is more important.
-    # Let's keep the mock ones ONLY if the list is empty, so it doesn't look broken.
-    if not messages_list:
-        # ... (Insert the previous mock logic here if needed, or just leave empty)
-        # Let's re-insert the mock logic for "received" messages simulation
-        import random
-        doctor_messages = [
-             "Patient consultation regarding lab results",
-             "Requesting shift swap for next week",
-             "New protocol for patient admission"
-        ]
-        for i, doctor in enumerate(hms.doctors[:3]):
-             msg_content = random.choice(doctor_messages)
-             messages_list.append({
-                 'id': f'mock_{i}',
-                 'sender': f"Dr. {doctor.first_name} {doctor.last_name}",
-                 'role': getattr(doctor, 'specialization', 'Doctor'),
-                 'time': "10:30 AM",
-                 'preview': msg_content,
-                 'content': f"Hello,\n\n{msg_content}.\n\nBest regards,\nDr. {doctor.last_name}",
-                 'active': False
-             })
-             
-    if messages_list:
-        messages_list[0]['active'] = True
+    if display_messages:
+        display_messages[0]['active'] = True
+    
+    for msg in hms.messages:
+        is_recipient = (msg.recipient_id == current_username) or (msg.recipient_id == current_role) or (msg.recipient_id == 'all')
+        if is_recipient and not msg.is_read:
+            msg.is_read = True
+    hms.save_data()
+        
+    # Get list of potential recipients (all users)
+    recipients = []
+    # Add roles as recipients
+    roles = ['admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'lab_assistant']
+    for r in roles:
+        if r != current_role:
+            recipients.append({'id': r, 'name': f"All {r.title()}s", 'type': 'role'})
+            
+    # Add individual users
+    for user in hms.users:
+        if user.username != current_username:
+            recipients.append({'id': user.username, 'name': user.username, 'type': 'user'})
 
-    return render_template('messages.html', active_page='messages', messages=messages_list)
+    return render_template('messages.html', 
+                           active_page='messages', 
+                           messages=display_messages,
+                           recipients=recipients)
 
 @app.route('/messages/send', methods=['POST'])
 def send_message():
     content = request.form.get('message')
-    recipient = request.form.get('recipient', 'System Admin') # Default recipient
+    recipient_id = request.form.get('recipient')
+    subject = request.form.get('subject', 'No Subject')
     
-    if content:
+    current_username = session.get('username')
+    
+    if content and recipient_id:
         new_msg = Message(
             message_id=hms.generate_id('msg_'),
-            sender_id='current_user', # Placeholder for logged in user
-            sender_name='You', # Placeholder
-            recipient_id='admin',
-            subject=content[:30] + '...' if len(content) > 30 else content,
+            sender_id=current_username,
+            sender_name=current_username, # Ideally fetch full name
+            recipient_id=recipient_id,
+            subject=subject,
             content=content,
-            timestamp=datetime.datetime.now().strftime("%I:%M %p"),
+            timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             is_read=False,
             is_archived=False
         )
@@ -598,86 +816,91 @@ def view_schedule():
         appointments = hms.appointments
     return render_template('view_schedule.html', appointments=appointments, active_page='schedule', search_term=search_term)
 
-@app.route('/analytics')
-def analytics():
-    # Placeholder for analytics
-    return render_template('analytics.html', active_page='analytics')
-
 @app.route('/billing')
 def billing_dashboard():
     # Filter for search if needed
     search_term = request.args.get('search', '').lower()
     
     # Sort bills by date descending (newest first)
-    # Assuming bill_id or created_date can be used for sorting. 
-    # created_date is a string, might need parsing, but lexical sort of YYYY-MM-DD works.
-    
     all_bills = sorted(hms.bills, key=lambda x: x.created_date, reverse=True)
     
-    if search_term:
-        filtered_bills = []
-        for bill in all_bills:
-            patient = hms.get_patient(bill.patient_id)
-            p_name = f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
-            if (search_term in bill.bill_id.lower() or 
-                search_term in p_name.lower() or 
-                search_term in bill.status.lower()):
-                filtered_bills.append(bill)
-        bills_to_show = filtered_bills
-    else:
-        bills_to_show = all_bills
+    # Resolve patient names for display
+    display_bills = []
+    for bill in all_bills:
+        patient = hms.get_patient(bill.patient_id)
+        p_name = f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
+        
+        # Search filter
+        if search_term and not (search_term in bill.bill_id.lower() or 
+                               search_term in p_name.lower() or 
+                               search_term in bill.status.lower()):
+            continue
+            
+        display_bills.append({
+            'bill_id': bill.bill_id,
+            'date': bill.created_date,
+            'patient_name': p_name,
+            'amount': bill.amount,
+            'status': bill.status,
+            'services': bill.services
+        })
 
     # Calculate stats
     total_revenue = sum(b.amount for b in hms.bills if b.status.lower() == 'paid')
     pending_amount = sum(b.amount for b in hms.bills if b.status.lower() == 'pending')
     total_bills = len(hms.bills)
     
-    return render_template('billing/dashboard.html', 
-                           bills=bills_to_show, 
+    return render_template('billing_dashboard.html', 
+                           bills=display_bills, 
+                           patients=hms.patients,
                            total_revenue=total_revenue,
                            pending_amount=pending_amount,
                            total_bills=total_bills,
                            active_page='billing')
 
-@app.route('/billing/create', methods=['GET', 'POST'])
+@app.route('/billing/create', methods=['POST'])
 def create_bill():
-    if request.method == 'POST':
-        try:
-            patient_id = request.form.get('patient_id')
-            items = request.form.getlist('items[]')
-            costs = request.form.getlist('costs[]')
-            
-            # Combine items and calculate total
-            services_list = []
-            total_amount = 0.0
-            
-            for i in range(len(items)):
-                if items[i].strip():
-                    cost = float(costs[i]) if costs[i] else 0.0
-                    services_list.append(f"{items[i]} (${cost:.2f})")
-                    total_amount += cost
-            
-            services_str = ", ".join(services_list)
-            
-            new_bill = Bill(
-                bill_id=hms.generate_id("INV"),
-                patient_id=patient_id,
-                appointment_id="", # Optional linkage
-                amount=total_amount,
-                services=services_str,
-                status="Pending",
-                created_date=datetime.datetime.now().strftime("%Y-%m-%d")
-            )
-            
-            hms.create_bill(new_bill)
-            flash('Bill created successfully!', 'success')
-            return redirect(url_for('billing_dashboard'))
-            
-        except Exception as e:
-            flash(f'Error creating bill: {e}', 'error')
-    
-    patients = hms.patients
-    return render_template('billing/create_bill.html', patients=patients, active_page='billing')
+    try:
+        patient_id = request.form.get('patient_id')
+        services = request.form.get('services')
+        amount = float(request.form.get('amount'))
+        
+        new_bill = Bill(
+            bill_id=hms.generate_id("INV"),
+            patient_id=patient_id,
+            appointment_id="", 
+            amount=amount,
+            services=services,
+            status="Pending",
+            created_date=datetime.datetime.now().strftime("%Y-%m-%d")
+        )
+        
+        hms.create_bill(new_bill)
+        flash('Bill created successfully!', 'success')
+        notify('Bill created', new_bill.bill_id, 'cashier')
+    except Exception as e:
+        flash(f'Error creating bill: {e}', 'error')
+    return redirect(url_for('billing_dashboard'))
+
+@app.route('/billing/payment', methods=['POST'])
+def process_payment():
+    try:
+        bill_id = request.form.get('bill_id')
+        payment_method = request.form.get('payment_method')
+        
+        # Find bill and update status
+        for bill in hms.bills:
+            if bill.bill_id == bill_id:
+                bill.status = "Paid"
+                # Could add payment method to bill model if needed
+                hms.save_data()
+                flash(f'Payment processed for Bill {bill_id}', 'success')
+                notify('Payment processed', bill_id, 'cashier')
+                notify('Payment processed', bill_id, 'admin')
+                break
+    except Exception as e:
+        flash(f'Error processing payment: {e}', 'error')
+    return redirect(url_for('billing_dashboard'))
 
 @app.route('/billing/view/<bill_id>')
 def view_bill(bill_id):
@@ -690,9 +913,11 @@ def view_bill(bill_id):
     return render_template('billing/view_bill.html', bill=bill, patient=patient, active_page='billing')
 
 @app.route('/billing/pay/<bill_id>', methods=['POST'])
-def process_payment(bill_id):
+def pay_bill(bill_id):
     if hms.update_bill_status(bill_id, "Paid"):
         flash('Payment processed successfully!', 'success')
+        notify('Payment processed', bill_id, 'cashier')
+        notify('Payment processed', bill_id, 'admin')
     else:
         flash('Error processing payment', 'error')
     return redirect(url_for('view_bill', bill_id=bill_id))
@@ -703,7 +928,57 @@ def print_invoice(bill_id):
     if not bill:
         return "Bill not found", 404
     patient = hms.get_patient(bill.patient_id)
-    return render_template('billing/invoice.html', bill=bill, patient=patient)
+    scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
+    try:
+        dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
+        yr, mh, day = dt.year, dt.month, dt.day
+    except Exception:
+        yr, mh, day = "", "", ""
+    items = []
+    for raw in (bill.services or "").split(", "):
+        desc = raw
+        amt = 0.0
+        if "($" in raw:
+            try:
+                desc = raw.split(" ($")[0]
+                amt = float(raw.split(" ($")[1].rstrip(")").strip())
+            except Exception:
+                pass
+        items.append({
+            'code': 'SRV',
+            'description': desc,
+            'qty': 1,
+            'yr': yr,
+            'mh': mh,
+            'day': day,
+            'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
+            'award': 0.0
+        })
+    coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
+    try:
+        coverage_percent = float(coverage_percent)
+    except Exception:
+        coverage_percent = 0.0
+    total_amount = float(bill.amount)
+    covered_amount = total_amount * (coverage_percent / 100.0)
+    shortfall_amount = max(total_amount - covered_amount, 0.0)
+    received_amount = total_amount if (bill.status or '').lower() == 'paid' else 0.0
+    balance_amount = max(total_amount - received_amount, 0.0)
+    # populate award per row proportionally
+    for r in items:
+        if r['fee'] > 0:
+            r['award'] = r['fee'] * (coverage_percent / 100.0)
+    return render_template('billing/invoice.html',
+                           bill=bill,
+                           patient=patient,
+                           scheme=scheme,
+                           coverage_percent=int(coverage_percent),
+                           items=items,
+                           total_amount=total_amount,
+                           covered_amount=covered_amount,
+                           shortfall_amount=shortfall_amount,
+                           received_amount=received_amount,
+                           balance_amount=balance_amount)
 
 @app.route('/billing/receipt/<bill_id>')
 def print_receipt(bill_id):
@@ -712,6 +987,70 @@ def print_receipt(bill_id):
         return "Bill not found", 404
     patient = hms.get_patient(bill.patient_id)
     return render_template('billing/receipt.html', bill=bill, patient=patient)
+
+@app.route('/billing/invoice/export/<bill_id>')
+def export_invoice_csv(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        return "Bill not found", 404
+    try:
+        dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
+        yr, mh, day = dt.year, dt.month, dt.day
+    except Exception:
+        yr, mh, day = "", "", ""
+    scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
+    coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
+    try:
+        coverage_percent = float(coverage_percent)
+    except Exception:
+        coverage_percent = 0.0
+    rows = []
+    items = (bill.services or "").split(", ")
+    if not items or items == ['']:
+        items = [f"Total ({bill.amount})"]
+    for idx, raw in enumerate(items, start=1):
+        desc = raw
+        fee = 0.0
+        if "($" in raw:
+            try:
+                desc = raw.split(" ($")[0]
+                fee = float(raw.split(" ($")[1].rstrip(")").strip())
+            except Exception:
+                pass
+        if fee == 0.0 and idx == 1:
+            fee = float(bill.amount)
+        award = fee * (coverage_percent / 100.0)
+        rows.append([idx, 'SRV', desc, 1, yr, mh, day, f"{fee:.2f}", f"{award:.2f}"])
+    import io, csv
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(['LINE','CODE','DESCRIPTION','QTY','YR','MH','DAY','FEE CHG','AWARD'])
+    for r in rows:
+        writer.writerow(r)
+    resp = app.response_class(buf.getvalue(), mimetype='text/csv')
+    resp.headers['Content-Disposition'] = f'attachment; filename=invoice_{bill.bill_id}.csv'
+    return resp
+
+@app.route('/billing/invoice/update/<bill_id>', methods=['POST'])
+def update_invoice_scheme(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        return "Bill not found", 404
+    scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
+    scheme = dict(scheme or {})
+    scheme['provider'] = request.form.get('provider', '')
+    scheme['type'] = request.form.get('type', '')
+    scheme['membership_number'] = request.form.get('membership_number', '')
+    scheme['policy_number'] = request.form.get('policy_number', '')
+    scheme['form_number'] = request.form.get('form_number', '')
+    cp = request.form.get('coverage_percent', '0')
+    try:
+        scheme['coverage_percent'] = float(cp)
+    except Exception:
+        scheme['coverage_percent'] = cp
+    hms.update_patient_scheme(bill.patient_id, scheme)
+    flash('Invoice details updated.', 'success')
+    return redirect(url_for('print_invoice', bill_id=bill_id))
 
 @app.route('/billing/reports')
 def billing_reports():
@@ -773,6 +1112,7 @@ def add_prescription():
             )
             hms.add_prescription(new_rx)
             flash('Prescription added successfully!', 'success')
+            notify('Prescription added', new_rx.prescription_id, 'doctor')
             return redirect(url_for('prescriptions'))
         except Exception as e:
             flash(f'Error adding prescription: {e}', 'error')
@@ -802,6 +1142,7 @@ def edit_prescription(prescription_id):
             )
             hms.update_prescription(updated)
             flash('Prescription updated successfully!', 'success')
+            notify('Prescription updated', prescription_id, 'doctor')
             return redirect(url_for('prescriptions'))
         except Exception as e:
             flash(f'Error updating prescription: {e}', 'error')
@@ -811,6 +1152,7 @@ def edit_prescription(prescription_id):
 def delete_prescription(prescription_id):
     if hms.delete_prescription(prescription_id):
         flash('Prescription deleted successfully!', 'success')
+        notify('Prescription deleted', prescription_id, 'doctor')
     else:
         flash('Error deleting prescription', 'error')
     return redirect(url_for('prescriptions'))
@@ -866,6 +1208,7 @@ def add_medical_record():
     if request.method == 'POST':
         try:
             details = {
+                # Consultation & Exam
                 'main_symptoms': request.form.get('main_symptoms'),
                 'symptoms_duration': request.form.get('symptoms_duration'),
                 'pain_level': request.form.get('pain_level'),
@@ -874,11 +1217,104 @@ def add_medical_record():
                 'heart_rate': request.form.get('heart_rate'),
                 'weight': request.form.get('weight'),
                 'preliminary_diagnosis': request.form.get('preliminary_diagnosis'),
-                # Add placeholders for other tabs if they were in the form
-                'personal_info': request.form.get('personal_info'),
-                'emergency_contact': request.form.get('emergency_contact'),
-                'office_use': request.form.get('office_use'),
-                'authorization_release': request.form.get('authorization_release')
+                
+                # Patient Info & History
+                'problem_start_date': request.form.get('problem_start_date'),
+                'problem_description': request.form.get('problem_description'),
+                'cause_accident': 'cause_accident' in request.form,
+                'cause_work': 'cause_work' in request.form,
+                'cause_gradual': 'cause_gradual' in request.form,
+                'cause_other': 'cause_other' in request.form,
+                'surgery_required': request.form.get('surgery_required'),
+                'surgery_date': request.form.get('surgery_date'),
+                'hospitalizations': request.form.get('hospitalizations'),
+                'medications_history': request.form.get('medications_history'),
+                'allergy_latex': 'allergy_latex' in request.form,
+                'allergy_iodine': 'allergy_iodine' in request.form,
+                'allergy_bromine': 'allergy_bromine' in request.form,
+                'allergy_other': request.form.get('allergy_other'),
+                'cultural_impact': request.form.get('cultural_impact'),
+                'additional_comments': request.form.get('additional_comments'),
+                'soap_subjective': request.form.get('soap_subjective'),
+                
+                # History Checkboxes
+                'hist_breathing': 'hist_breathing' in request.form,
+                'hist_pregnant': 'hist_pregnant' in request.form,
+                'hist_heart': 'hist_heart' in request.form,
+                'hist_skin': 'hist_skin' in request.form,
+                'hist_pacemaker': 'hist_pacemaker' in request.form,
+                'hist_cancer': 'hist_cancer' in request.form,
+                'hist_diabetes': 'hist_diabetes' in request.form,
+                'hist_stroke': 'hist_stroke' in request.form,
+                'hist_bone': 'hist_bone' in request.form,
+                'hist_kidney': 'hist_kidney' in request.form,
+                'hist_liver': 'hist_liver' in request.form,
+                'hist_implants': 'hist_implants' in request.form,
+                'hist_anxiety': 'hist_anxiety' in request.form,
+                'hist_sleep': 'hist_sleep' in request.form,
+                'hist_depression': 'hist_depression' in request.form,
+                'hist_bowel': 'hist_bowel' in request.form,
+                'hist_alcohol': 'hist_alcohol' in request.form,
+                'hist_drug': 'hist_drug' in request.form,
+                'hist_smoking': 'hist_smoking' in request.form,
+                'hist_headaches': 'hist_headaches' in request.form,
+
+                # Personal Info
+                'personal_full_name': request.form.get('personal_full_name'),
+                'place_of_birth': request.form.get('place_of_birth'),
+                'personal_address': request.form.get('personal_address'),
+                'personal_phone': request.form.get('personal_phone'),
+                'personal_email': request.form.get('personal_email'),
+                'id_number': request.form.get('id_number'),
+                'ssn': request.form.get('ssn'),
+                'personal_status': request.form.get('personal_status'),
+                'occupation': request.form.get('occupation'),
+                'retiree': 'retiree' in request.form,
+                'personal_note': request.form.get('personal_note'),
+
+                # Emergency Contact
+                'emergency_contact_name': request.form.get('emergency_contact_name'),
+                'emergency_relationship': request.form.get('emergency_relationship'),
+                'emergency_home_phone': request.form.get('emergency_home_phone'),
+                'emergency_mobile_phone': request.form.get('emergency_mobile_phone'),
+
+                # Office Use
+                'membership_type': request.form.get('membership_type'),
+                'membership_number': request.form.get('membership_number'),
+                'payment_type': request.form.get('payment_type'),
+                'staff_name': request.form.get('staff_name'),
+                'staff_signature': request.form.get('staff_signature'),
+
+                # Authorization Release
+                'requestor_name': request.form.get('requestor_name'),
+                'requestor_address': request.form.get('requestor_address'),
+                'requestor_city': request.form.get('requestor_city'),
+                'requestor_state': request.form.get('requestor_state'),
+                'requestor_zip': request.form.get('requestor_zip'),
+                'requestor_country': request.form.get('requestor_country'),
+                'requestor_phone': request.form.get('requestor_phone'),
+                'requestor_fax': request.form.get('requestor_fax'),
+                'auth_access_records': 'auth_access_records' in request.form,
+                'auth_replace_existing': 'auth_replace_existing' in request.form,
+                'auth_remove_provider': 'auth_remove_provider' in request.form,
+                'disclosure_purpose': request.form.get('disclosure_purpose'),
+                'date_range_from': request.form.get('date_range_from'),
+                'date_range_to': request.form.get('date_range_to'),
+                
+                # Release Info Checkboxes
+                'release_discharge': 'release_discharge' in request.form,
+                'release_operative': 'release_operative' in request.form,
+                'release_consultation': 'release_consultation' in request.form,
+                'release_tissue': 'release_tissue' in request.form,
+                'release_nuclear': 'release_nuclear' in request.form,
+                'release_radiology': 'release_radiology' in request.form,
+                'release_lab': 'release_lab' in request.form,
+                'release_history': 'release_history' in request.form,
+                'release_outpatient': 'release_outpatient' in request.form,
+                'release_pulmonary': 'release_pulmonary' in request.form,
+                'release_nuclear_reports': 'release_nuclear_reports' in request.form,
+                'release_heart': 'release_heart' in request.form,
+                'release_radiology_cd': 'release_radiology_cd' in request.form
             }
             
             new_record = MedicalRecord(
@@ -895,6 +1331,7 @@ def add_medical_record():
             )
             hms.add_medical_record(new_record)
             flash('Medical record added successfully!', 'success')
+            notify('Medical record added', new_record.record_id, 'doctor')
             return redirect(url_for('medical_records'))
         except Exception as e:
             flash(f'Error adding medical record: {e}', 'error')
@@ -939,6 +1376,7 @@ def edit_medical_record(record_id):
             
             hms.update_medical_record(record)
             flash('Medical record updated successfully!', 'success')
+            notify('Medical record updated', record_id, 'doctor')
             return redirect(url_for('medical_records'))
         except Exception as e:
             flash(f'Error updating medical record: {e}', 'error')
@@ -962,9 +1400,32 @@ def view_medical_record(record_id):
 def delete_medical_record(record_id):
     if hms.delete_medical_record(record_id):
         flash('Medical record deleted successfully!', 'success')
+        notify('Medical record deleted', record_id, 'doctor')
     else:
         flash('Error deleting medical record!', 'error')
     return redirect(url_for('medical_records'))
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    if request.method == 'POST':
+        try:
+            hms.settings['theme'] = request.form.get('theme')
+            hms.settings['notifications'] = 'notifications' in request.form
+            hms.settings['auto_backup'] = 'auto_backup' in request.form
+            hms.settings['language'] = request.form.get('language')
+            hms.settings['date_format'] = request.form.get('date_format')
+            hms.settings['server_url'] = request.form.get('server_url')
+            hms.settings['supabase_url'] = request.form.get('supabase_url')
+            hms.settings['supabase_project_id'] = request.form.get('supabase_project_id')
+            hms.settings['supabase_api_key'] = request.form.get('supabase_api_key')
+            hms.settings['supabase_service_role'] = request.form.get('supabase_service_role')
+            
+            hms.save_data()
+            flash('Settings updated successfully!', 'success')
+        except Exception as e:
+            flash(f'Error updating settings: {e}', 'error')
+            
+    return render_template('settings.html', settings=hms.settings, active_page='settings')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

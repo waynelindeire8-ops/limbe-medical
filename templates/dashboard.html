@@ -64,53 +64,78 @@
                     <h3>Today Appointments</h3>
                     <p class="subtext">Scheduled consultations</p>
                     <div class="stat-value">
-                        <h2>{{ today_appointments }}</h2>
+                        <h2>{{ todays_appointments }}</h2>
                         <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +13%</span> -->
                     </div>
                 </div>
                 <div class="card stat-card">
-                    <div class="stat-icon yellow-bg"><i class="fas fa-flask"></i></div>
-                    <h3>Pending lab results</h3>
-                    <p class="subtext">Awaiting review</p>
+                    <div class="stat-icon yellow-bg"><i class="fas fa-hourglass-half"></i></div>
+                    <h3>Waiting Queue</h3>
+                    <p class="subtext">Patients waiting</p>
                     <div class="stat-value">
-                        <h2>{{ pending_lab_results }}</h2>
+                        <h2>{{ queue|length }}</h2>
                         <!-- <span class="badge warning"><i class="fas fa-history"></i> +64%</span> -->
                     </div>
                 </div>
             </div>
 
-            <div class="content-grid">
-                <!-- Recent Appointments -->
+            <div class="content-grid" style="grid-template-columns: 2fr 1fr;">
+                <!-- Queue System -->
                 <div class="card recent-appointments">
                     <div class="card-header">
-                        <h3>Recent Appointment</h3>
-                        <select class="select-sm">
-                            <option>Today</option>
-                        </select>
+                        <h3>Patient Queue</h3>
+                        <span class="badge" style="background: #e8f0fe; color: #4361ee;">{{ queue|length }} Waiting</span>
                     </div>
                     <div class="appointment-list">
-                        {% for appt in recent_appointments %}
-                        <div class="appointment-item">
+                        {% for item in queue %}
+                        <div class="appointment-item" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid {% if item.status == 'Waiting' %}#ffc107{% elif item.status == 'In Consultation' %}#28a745{% else %}#dc3545{% endif %}; padding-left: 15px;">
                             <div class="appt-info">
-                                <h4>{{ appt.patient_name }}</h4>
-                                <p>{{ appt.doctor_name }} - {{ appt.time }}</p>
+                                <h4>{{ item.patient_name }}</h4>
+                                <p style="font-size: 13px; color: #666;">
+                                    <i class="far fa-clock"></i> Arrived: {{ item.arrival_time }} &bull; 
+                                    <span style="font-weight: 500;">{{ item.status }}</span>
+                                </p>
                             </div>
-                            <div class="appt-status">
-                                <span class="type">{{ appt.type }}</span>
-                                <span class="status {{ appt.status|lower }}">{{ appt.status }}</span>
+                            <div class="appt-actions" style="display: flex; gap: 5px;">
+                                {% if item.status == 'Waiting' %}
+                                <a href="{{ url_for('update_queue_status', queue_id=item.queue_id, status='In Consultation') }}" class="btn-sm" style="background: #4361ee; color: white; text-decoration: none;" title="Call Patient"><i class="fas fa-bullhorn"></i> Call</a>
+                                {% elif item.status == 'In Consultation' %}
+                                <a href="{{ url_for('update_queue_status', queue_id=item.queue_id, status='Completed') }}" class="btn-sm" style="background: #28a745; color: white; text-decoration: none;" title="Complete"><i class="fas fa-check"></i> Done</a>
+                                {% endif %}
+                                <a href="{{ url_for('remove_from_queue', queue_id=item.queue_id) }}" class="btn-sm" style="background: #dc3545; color: white; text-decoration: none;" title="Remove" onclick="return confirm('Remove from queue?')"><i class="fas fa-times"></i></a>
                             </div>
                         </div>
                         {% else %}
-                        <div class="appointment-item">
-                            <div class="appt-info">
-                                <p>No recent appointments</p>
-                            </div>
+                        <div class="appointment-item" style="text-align: center; padding: 20px; color: #888;">
+                            <p>No patients in queue</p>
                         </div>
                         {% endfor %}
                     </div>
                 </div>
 
                 <div class="right-column">
+                    <!-- Recent Appointments -->
+                    <div class="card quick-actions" style="margin-bottom: 20px;">
+                        <h3>Recent Appointments</h3>
+                        <div class="appointment-list" style="max-height: 300px; overflow-y: auto;">
+                            {% for appt in recent_appointments %}
+                            <div class="appointment-item" style="padding: 10px 0; border-bottom: 1px solid #eee;">
+                                <div class="appt-info">
+                                    <div style="font-weight: 600; font-size: 14px;">
+                                        {% set patient = hms.get_patient(appt.patient_id) %}
+                                        {{ patient.first_name }} {{ patient.last_name }}
+                                    </div>
+                                    <div style="font-size: 12px; color: #888;">
+                                        {{ appt.appointment_time }} &bull; {{ appt.status }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('add_to_queue', patient_id=appt.patient_id) }}" class="btn-sm" style="background: #e2eafc; color: #4361ee; text-decoration: none; padding: 4px 8px; font-size: 11px;" title="Add to Queue"><i class="fas fa-plus"></i> Queue</a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                     <!-- Quick Actions -->
                     <div class="card quick-actions">
                         <h3>Quick Actions</h3>

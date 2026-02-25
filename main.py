@@ -30,7 +30,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Any
-from models import Patient, Doctor, Appointment, MedicalRecord, Prescription, Bill, InventoryItem, User, Message
+from models import Patient, Doctor, Appointment, MedicalRecord, Prescription, Bill, InventoryItem, User, Message, QueueItem
 
 
 # ==============================
@@ -51,6 +51,8 @@ class HospitalManagementSystem:
         self.bills: List[Bill] = []
         self.inventory: List[InventoryItem] = []
         self.users: List[User] = []
+        self.messages: List[Message] = []
+        self.queue: List[QueueItem] = []
         self.activity: List[Dict[str, Any]] = []
         self.patient_files: Dict[str, List[Dict[str, Any]]] = {}
         self.patient_scheme: Dict[str, Dict[str, Any]] = {}
@@ -99,6 +101,8 @@ class HospitalManagementSystem:
                 'bills': [asdict(b) for b in self.bills],
                 'inventory': [asdict(i) for i in self.inventory],
                 'users': [asdict(u) for u in self.users],
+                'messages': [asdict(m) for m in self.messages],
+                'queue': [asdict(q) for q in self.queue],
                 'settings': self.settings,
                 'activity': self.activity,
                 'patient_files': self.patient_files,
@@ -197,6 +201,7 @@ class HospitalManagementSystem:
         self.inventory = [InventoryItem(**_filter(InventoryItem, i)) for i in data.get('inventory', [])]
         self.users = [User(**u) for u in data.get('users', [])]
         self.messages = [Message(**_filter(Message, m)) for m in data.get('messages', [])]
+        self.queue = [QueueItem(**q) for q in data.get('queue', [])]
         self.departments = data.get('departments', [])
         self.settings = data.get('settings', self.settings)
         self.activity = data.get('activity', [])
@@ -663,6 +668,73 @@ class HospitalManagementSystem:
                     pass
                 return True
         return False
+
+    # ---------- Queue Management ----------
+    def add_to_queue(self, queue_item: QueueItem) -> None:
+        self.queue.append(queue_item)
+        self.save_data()
+
+    def update_queue_status(self, queue_id: str, status: str) -> bool:
+        for item in self.queue:
+            if item.queue_id == queue_id:
+                item.status = status
+                self.save_data()
+                try:
+                    ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    if status.lower() == 'in consultation':
+                        item.consultation_start_time = ts
+                    elif status.lower() == 'completed':
+                        item.consultation_end_time = ts
+                    elif status.lower() == 'no-show':
+                        item.no_show_time = ts
+                except Exception:
+                    pass
+                return True
+        return False
+
+    def remove_from_queue(self, queue_id: str) -> bool:
+        initial_len = len(self.queue)
+        self.queue = [item for item in self.queue if item.queue_id != queue_id]
+        if len(self.queue) < initial_len:
+            self.save_data()
+            return True
+        return False
+
+    def get_queue(self) -> List[QueueItem]:
+        return self.queue
+
+    def call_patient(self, queue_id: str) -> bool:
+        for item in self.queue:
+            if item.queue_id == queue_id:
+                item.called_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                item.status = 'In Consultation'
+                self.save_data()
+                return True
+        return False
+
+    def transfer_patient(self, queue_id: str, department: str, doctor_id: str) -> bool:
+        for item in self.queue:
+            if item.queue_id == queue_id:
+                item.department = department or item.department
+                item.doctor_id = doctor_id or item.doctor_id
+                item.status = 'Waiting'
+                self.save_data()
+                return True
+        return False
+
+    def requeue_patient(self, queue_id: str) -> bool:
+        for item in self.queue:
+            if item.queue_id == queue_id:
+                item.status = 'Waiting'
+                self.save_data()
+                return True
+        return False
+
+    def estimate_wait_time(self, department: str) -> str:
+        per_patient_minutes = 15
+        waiting = [q for q in self.queue if (q.department or '') == (department or '') and (q.status or '').lower() == 'waiting']
+        minutes = len(waiting) * per_patient_minutes
+        return f"{minutes} mins"
 
     def update_settings(self, **kwargs) -> None:
         self.settings.update(kwargs)

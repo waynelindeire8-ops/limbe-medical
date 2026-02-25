@@ -131,7 +131,10 @@
         {% include 'sidebar.html' %}
         
         <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
-            <h2>Messages</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Messages</h2>
+                <button onclick="document.getElementById('new-message-modal').style.display='flex'" class="btn-send" style="float: none;"><i class="fas fa-plus"></i> New Message</button>
+            </div>
             
             <div class="messages-container">
                 <div class="messages-sidebar">
@@ -142,17 +145,23 @@
                         {% for msg in messages %}
                         <li class="message-item {% if msg.active %}active{% endif %}" onclick="selectMessage('{{ msg.id }}')">
                             <div class="message-header">
-                                <span class="sender-name">{{ msg.sender }}</span>
+                                <span class="sender-name">{% if msg.is_outgoing %}To: {{ msg.recipient_id if msg.recipient_id else 'Recipient' }}{% else %}{{ msg.sender }}{% endif %}</span>
                                 <span class="message-time">{{ msg.time }}</span>
                             </div>
-                            <div class="message-preview">{{ msg.preview }}</div>
+                            <div class="message-preview">
+                                {% if msg.is_outgoing %}<i class="fas fa-reply" style="font-size: 10px; margin-right: 5px;"></i>{% endif %}
+                                {{ msg.preview }}
+                            </div>
                             <!-- Hidden data for JS -->
                             <div id="data-{{ msg.id }}" style="display:none;">
-                                <div class="sender">{{ msg.sender }}</div>
+                                <div class="sender">{% if msg.is_outgoing %}To: {{ msg.recipient_id if msg.recipient_id else 'Recipient' }}{% else %}{{ msg.sender }}{% endif %}</div>
                                 <div class="role">{{ msg.role }}</div>
                                 <div class="content">{{ msg.content|replace('\n', '<br>')|safe }}</div>
+                                <div class="raw-sender-id">{{ msg.sender_id }}</div>
                             </div>
                         </li>
+                        {% else %}
+                        <li style="padding: 20px; text-align: center; color: #888;">No messages found.</li>
                         {% endfor %}
                     </ul>
                 </div>
@@ -161,7 +170,7 @@
                     {% if messages %}
                     <div class="content-header">
                         <div>
-                            <h3 style="margin: 0;" id="display-sender">{{ messages[0].sender }}</h3>
+                            <h3 style="margin: 0;" id="display-sender">{% if messages[0].is_outgoing %}To: {{ messages[0].recipient_id if messages[0].recipient_id else 'Recipient' }}{% else %}{{ messages[0].sender }}{% endif %}</h3>
                             <span style="font-size: 13px; color: #666;" id="display-role">{{ messages[0].role }}</span>
                         </div>
                         <div style="color: #888;">
@@ -176,7 +185,8 @@
                     
                     <div class="reply-box">
                         <form action="{{ url_for('send_message') }}" method="post">
-                            <input type="hidden" name="recipient" id="recipient-input" value="{{ messages[0].sender }}">
+                            <input type="hidden" name="recipient" id="recipient-input" value="{{ messages[0].sender_id }}">
+                            <input type="hidden" name="subject" value="Re: {{ messages[0].preview }}">
                             <textarea name="message" rows="3" placeholder="Type your reply..."></textarea>
                             <button type="submit" class="btn-send"><i class="fas fa-paper-plane"></i> Send</button>
                         </form>
@@ -185,24 +195,57 @@
                     <div class="no-message-selected">
                         <i class="fas fa-inbox"></i>
                         <h3>No messages</h3>
-                        <p>Start a conversation by sending a message.</p>
-                        <div class="reply-box" style="width: 100%; border-top: none; margin-top: 20px;">
-                            <form action="{{ url_for('send_message') }}" method="post">
-                                <input type="hidden" name="recipient" value="System Admin">
-                                <textarea name="message" rows="3" placeholder="Type a message to System Admin..."></textarea>
-                                <button type="submit" class="btn-send"><i class="fas fa-paper-plane"></i> Send New</button>
-                            </form>
-                        </div>
+                        <p>Start a conversation by sending a new message.</p>
                     </div>
                     {% endif %}
                 </div>
             </div>
         </main>
     </div>
-    
+
+    <!-- New Message Modal -->
+    <div id="new-message-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
+        <div style="background: white; width: 500px; padding: 25px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0;">New Message</h3>
+                <span onclick="document.getElementById('new-message-modal').style.display='none'" style="cursor: pointer; font-size: 20px;">&times;</span>
+            </div>
+            <form action="{{ url_for('send_message') }}" method="post">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Recipient</label>
+                    <select name="recipient" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" required>
+                        <option value="">Select Recipient...</option>
+                        <optgroup label="Roles">
+                            {% for r in recipients if r.type == 'role' %}
+                            <option value="{{ r.id }}">{{ r.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Users">
+                            {% for u in recipients if u.type == 'user' %}
+                            <option value="{{ u.id }}">{{ u.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Subject</label>
+                    <input type="text" name="subject" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Message subject">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Message</label>
+                    <textarea name="message" rows="5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; resize: vertical;" placeholder="Type your message here..." required></textarea>
+                </div>
+                <div style="text-align: right">
+                    <button type="button" onclick="document.getElementById('new-message-modal').style.display='none'" style="padding: 10px 20px; background: #eee; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">Cancel</button>
+                    <button type="submit" class="btn-send" style="float: none;">Send Message</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         function selectMessage(id) {
-            // Update UI active state
+            // Update active class
             document.querySelectorAll('.message-item').forEach(item => {
                 item.classList.remove('active');
             });
@@ -210,20 +253,16 @@
             
             // Get data
             const dataDiv = document.getElementById('data-' + id);
-            const sender = dataDiv.querySelector('.sender').innerText;
-            const role = dataDiv.querySelector('.role').innerText;
+            const sender = dataDiv.querySelector('.sender').textContent;
+            const role = dataDiv.querySelector('.role').textContent;
             const content = dataDiv.querySelector('.content').innerHTML;
+            const rawSenderId = dataDiv.querySelector('.raw-sender-id').textContent;
             
-            // Update view
-            document.getElementById('display-sender').innerText = sender;
-            document.getElementById('display-role').innerText = role;
+            // Update display
+            document.getElementById('display-sender').textContent = sender;
+            document.getElementById('display-role').textContent = role;
             document.getElementById('display-content').innerHTML = content;
-            
-            // Update hidden recipient input
-            const recipientInput = document.getElementById('recipient-input');
-            if (recipientInput) {
-                recipientInput.value = sender;
-            }
+            document.getElementById('recipient-input').value = rawSenderId;
         }
     </script>
 </body>

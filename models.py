@@ -121,5 +121,39 @@ class Message:
     is_archived: bool
 
 
+@dataclass
+class QueueItem:
+    queue_id: str
+    patient_id: str
+    patient_name: str
+    doctor_id: str
+    doctor_name: str
+    status: str  # Waiting, In Consultation, Completed, Cancelled
+    priority: str # Normal, Urgent, Emergency
+    check_in_time: str
+    estimated_wait: str
+
+
+@dataclass
+class QueueItem:
+    queue_id: str
+    patient_id: str
+    patient_name: str
+    doctor_id: str
+    status: str
+    priority: str
+    arrival_time: str
+    estimated_wait: str
+    department: str = ""
+    visit_reason: str = ""
+    special_category: str = ""
+    check_in_time: str = ""
+    assigned_doctor_id: str = ""
+    called_time: str = ""
+    consultation_start_time: str = ""
+    consultation_end_time: str = ""
+    no_show_time: str = ""
+
+
 # Re-export all models for GUI compatibility
-__all__ = ['Patient', 'Doctor', 'Appointment', 'MedicalRecord', 'Prescription', 'Bill', 'InventoryItem', 'User', 'Message']
+__all__ = ['Patient', 'Doctor', 'Appointment', 'MedicalRecord', 'Prescription', 'Bill', 'InventoryItem', 'User', 'Message', 'QueueItem']

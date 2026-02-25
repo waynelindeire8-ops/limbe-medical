@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 500;
+            color: #666;
+        }
+        .tab.active {
+            border-bottom-color: #4361ee;
+            color: #4361ee;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            max-width: 600px;
+        }
+        .bill-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        .bill-table th, .bill-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .bill-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-pending { background: #fef9c3; color: #854d0e; }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Billing Dashboard</h2>
+                <button onclick="switchTab('create')" class="btn-primary"><i class="fas fa-plus"></i> Create New Bill</button>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid" style="margin-bottom: 30px;">
+                <div class="card stat-card">
+                    <div class="stat-icon green-bg"><i class="fas fa-dollar-sign"></i></div>
+                    <h3>Total Revenue</h3>
+                    <div class="stat-value"><h2>${{ total_revenue }}</h2></div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon red-bg"><i class="fas fa-clock"></i></div>
+                    <h3>Pending Payments</h3>
+                    <div class="stat-value"><h2>${{ pending_amount }}</h2></div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon blue-bg"><i class="fas fa-file-invoice"></i></div>
+                    <h3>Total Bills</h3>
+                    <div class="stat-value"><h2>{{ total_bills }}</h2></div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('search')">Search Bills</div>
+                <div class="tab" onclick="switchTab('create')">Create New Bill</div>
+                <div class="tab" onclick="switchTab('process')">Process Payment</div>
+                <div class="tab" onclick="switchTab('report')">Generate Report</div>
+                <div class="tab" onclick="switchTab('invoice')">Generate Invoice</div>
+            </div>
+
+            <!-- Search Tab -->
+            <div id="search" class="tab-content active">
+                <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+                    <form action="{{ url_for('billing_dashboard') }}" method="get" style="display: flex; gap: 10px; flex: 1;">
+                        <input type="text" name="search" placeholder="Search by Bill ID, Patient Name..." style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; flex: 1;">
+                        <button type="submit" class="btn-primary"><i class="fas fa-search"></i> Search</button>
+                    </form>
+                </div>
+                <table class="bill-table">
+                    <thead>
+                        <tr>
+                            <th>Bill ID</th>
+                            <th>Date</th>
+                            <th>Patient</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bill in bills %}
+                        <tr>
+                            <td>{{ bill.bill_id }}</td>
+                            <td>{{ bill.date }}</td>
+                            <td>{{ bill.patient_name }}</td>
+                            <td>${{ bill.amount }}</td>
+                            <td><span class="status-badge status-{{ bill.status|lower }}">{{ bill.status }}</span></td>
+                            <td>
+                                <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
+                                {% if bill.status == 'Pending' %}
+                                <a href="#" onclick="openPaymentModal('{{ bill.bill_id }}', '{{ bill.amount }}')" style="color: #28a745;" title="Process Payment"><i class="fas fa-credit-card"></i></a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" style="text-align: center; color: #888;">No bills found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Create Bill Tab -->
+            <div id="create" class="tab-content">
+                <div class="form-card">
+                    <h3>Create New Bill</h3>
+                    <form action="{{ url_for('create_bill') }}" method="post">
+                        <div class="form-group">
+                            <label>Select Patient</label>
+                            <select name="patient_id" required>
+                                <option value="">-- Select Patient --</option>
+                                {% for p in patients %}
+                                <option value="{{ p.patient_id }}">{{ p.first_name }} {{ p.last_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Services / Items</label>
+                            <textarea name="services" rows="3" placeholder="Consultation, X-Ray, etc." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Total Amount ($)</label>
+                            <input type="number" name="amount" step="0.01" min="0" required>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%;">Generate Bill</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Process Payment Tab -->
+            <div id="process" class="tab-content">
+                <div class="form-card">
+                    <h3>Process Payment</h3>
+                    <form action="{{ url_for('process_payment') }}" method="post">
+                        <div class="form-group">
+                            <label>Bill ID</label>
+                            <input type="text" name="bill_id" id="payment_bill_id" placeholder="Enter Bill ID" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Method</label>
+                            <select name="payment_method">
+                                <option value="Cash">Cash</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Insurance">Insurance</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%;">Confirm Payment</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div id="report" class="tab-content">
+                <div class="form-card" style="max-width: 800px;">
+                    <h3>Financial Summary</h3>
+                    <p>Total Revenue Collected: <strong>${{ total_revenue }}</strong></p>
+                    <p>Outstanding Pending Payments: <strong>${{ pending_amount }}</strong></p>
+                    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+                    <button onclick="window.print()" class="btn-outline"><i class="fas fa-print"></i> Print Report</button>
+                </div>
+            </div>
+
+            <!-- Generate Invoice Tab -->
+            <div id="invoice" class="tab-content">
+                <div class="form-card" style="max-width: 600px;">
+                    <h3>Generate Invoice</h3>
+                    <div class="form-group">
+                        <label>Bill ID</label>
+                        <input type="text" id="invoice_bill_id" placeholder="Enter Bill ID (e.g., INV1234)" required>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-primary" onclick="openInvoice()" type="button">Open Invoice</button>
+                        <button class="btn-outline" onclick="switchTab('search')" type="button">Back</button>
+                    </div>
+                    <p style="margin-top:10px; color:#666;">Tip: You can copy the Bill ID from the table in Search Bills.</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function openPaymentModal(billId, amount) {
+            switchTab('process');
+            document.getElementById('payment_bill_id').value = billId;
+        }
+        function openInvoice() {
+            const billId = document.getElementById('invoice_bill_id').value.trim();
+            if (!billId) return;
+            const url = '/billing/invoice/' + encodeURIComponent(billId);
+            window.open(url, '_blank');
+        }
+    </script>
+</body>
+</html>
