@@ -88,7 +88,7 @@
                     </div>
                     <div class="appointment-list">
                         {% for item in queue %}
-                        <div class="appointment-item" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid {% if item.status == 'Waiting' %}#ffc107{% elif item.status == 'In Consultation' %}#28a745{% else %}#dc3545{% endif %}; padding-left: 15px;">
+                        <div class="appointment-item {% if item.status == 'Waiting' %}border-waiting{% elif item.status == 'In Consultation' %}border-consult{% else %}border-done{% endif %}" style="display: flex; justify-content: space-between; align-items: center; padding-left: 15px;">
                             <div class="appt-info">
                                 <h4>{{ item.patient_name }}</h4>
                                 <p style="font-size: 13px; color: #666;">
@@ -178,5 +178,10 @@
             </div>
         </main>
     </div>
+    <style>
+        .border-waiting { border-left: 4px solid #ffc107; }
+        .border-consult { border-left: 4px solid #28a745; }
+        .border-done { border-left: 4px solid #dc3545; }
+    </style>
 </body>
 </html>

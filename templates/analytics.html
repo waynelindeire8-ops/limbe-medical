@@ -62,18 +62,24 @@
             <div class="analytics-grid">
                 <div class="chart-card">
                     <h3>Appointment Status</h3>
-                    <canvas id="statusChart"></canvas>
+                    <canvas id="statusChart"
+                            data-labels='{{ status_labels | tojson | safe }}'
+                            data-data='{{ status_data | tojson | safe }}'></canvas>
                 </div>
                 <div class="chart-card">
                     <h3>Revenue Trend (Last 6 Months)</h3>
-                    <canvas id="revenueChart"></canvas>
+                    <canvas id="revenueChart"
+                            data-labels='{{ revenue_labels | tojson | safe }}'
+                            data-data='{{ revenue_data | tojson | safe }}'></canvas>
                 </div>
             </div>
 
             <div class="analytics-grid">
                 <div class="chart-card" style="grid-column: 1 / -1;">
                     <h3>Top Doctors by Appointments</h3>
-                    <canvas id="doctorChart"></canvas>
+                    <canvas id="doctorChart"
+                            data-labels='{{ top_doctors_labels | tojson | safe }}'
+                            data-data='{{ top_doctors_data | tojson | safe }}'></canvas>
                 </div>
             </div>
         </main>
@@ -81,27 +87,33 @@
 
     <script>
         // Appointment Status Chart
-        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        const statusEl = document.getElementById('statusChart');
+        const statusCtx = statusEl.getContext('2d');
+        const statusLabels = JSON.parse(statusEl.dataset.labels || '[]');
+        const statusData = JSON.parse(statusEl.dataset.data || '[]');
         new Chart(statusCtx, {
             type: 'doughnut',
             data: {
-                labels: {{ status_labels | tojson }},
+                labels: statusLabels,
                 datasets: [{
-                    data: {{ status_data | tojson }},
+                    data: statusData,
                     backgroundColor: ['#4cc9f0', '#28a745', '#dc3545']
                 }]
             }
         });
 
         // Revenue Chart
-        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+        const revenueEl = document.getElementById('revenueChart');
+        const revenueCtx = revenueEl.getContext('2d');
+        const revenueLabels = JSON.parse(revenueEl.dataset.labels || '[]');
+        const revenueData = JSON.parse(revenueEl.dataset.data || '[]');
         new Chart(revenueCtx, {
             type: 'line',
             data: {
-                labels: {{ revenue_labels | tojson }},
+                labels: revenueLabels,
                 datasets: [{
                     label: 'Revenue ($)',
-                    data: {{ revenue_data | tojson }},
+                    data: revenueData,
                     borderColor: '#4361ee',
                     tension: 0.4,
                     fill: true,
@@ -116,14 +128,17 @@
         });
 
         // Doctor Chart
-        const doctorCtx = document.getElementById('doctorChart').getContext('2d');
+        const doctorEl = document.getElementById('doctorChart');
+        const doctorCtx = doctorEl.getContext('2d');
+        const doctorLabels = JSON.parse(doctorEl.dataset.labels || '[]');
+        const doctorData = JSON.parse(doctorEl.dataset.data || '[]');
         new Chart(doctorCtx, {
             type: 'bar',
             data: {
-                labels: {{ top_doctors_labels | tojson }},
+                labels: doctorLabels,
                 datasets: [{
                     label: 'Appointments',
-                    data: {{ top_doctors_data | tojson }},
+                    data: doctorData,
                     backgroundColor: '#f72585'
                 }]
             },
