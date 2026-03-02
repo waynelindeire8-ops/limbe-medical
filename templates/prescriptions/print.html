@@ -48,7 +48,7 @@
             <div class="doctor" style="text-align: right;">
                 <strong>Prescribing Doctor</strong><br>
                 Dr. {{ doctor.first_name }} {{ doctor.last_name }}<br>
-                {{ doctor.specialization if doctor.specialization else 'General Practice' }}
+                {{ doctor.specialty if doctor.specialty else 'General Practice' }}
             </div>
         </div>
 

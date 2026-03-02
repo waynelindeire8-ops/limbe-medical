@@ -469,8 +469,10 @@ def edit_patient(patient_id):
 
     if request.method == 'POST':
         try:
+            new_id = request.form.get('patient_id')
             hms.update_patient(
                 patient_id,
+                patient_id=new_id,
                 first_name=request.form['first_name'],
                 last_name=request.form['last_name'],
                 date_of_birth=request.form.get('dob',''),
@@ -481,10 +483,12 @@ def edit_patient(patient_id):
                 emergency_contact=request.form.get('emergency_contact','')
             )
             flash('Patient updated successfully!', 'success')
-            notify('Patient updated', patient_id, 'admin')
+            notify('Patient updated', new_id or patient_id, 'admin')
             return redirect(url_for('patients'))
         except Exception as e:
             flash(f'Error updating patient: {e}', 'error')
+
+    return render_template('edit_patient.html', patient=patient, active_page='patients')
 
 
 @app.route('/delete_patient/<patient_id>')

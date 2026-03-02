@@ -167,6 +167,12 @@ class HospitalManagementSystem:
                 tmp['appointment_time'] = tmp.pop('time')
             return _filter(Appointment, tmp)
 
+        def _normalize_doctor(obj: Dict[str, Any]) -> Dict[str, Any]:
+            tmp = dict(obj)
+            if 'specialization' in tmp and 'specialty' not in tmp:
+                tmp['specialty'] = tmp.pop('specialization')
+            return _filter(Doctor, tmp)
+
         def _normalize_bill(obj: Dict[str, Any]) -> Dict[str, Any]:
             tmp = dict(obj)
             if 'date' in tmp and 'created_date' not in tmp:
@@ -193,7 +199,7 @@ class HospitalManagementSystem:
             return _filter(MedicalRecord, new_record)
 
         self.patients = [Patient(**_filter(Patient, p)) for p in data.get('patients', [])]
-        self.doctors = [Doctor(**_filter(Doctor, d)) for d in data.get('doctors', [])]
+        self.doctors = [Doctor(**_normalize_doctor(d)) for d in data.get('doctors', [])]
         self.appointments = [Appointment(**_normalize_appointment(a)) for a in data.get('appointments', [])]
         self.medical_records = [MedicalRecord(**_normalize_record(m)) for m in data.get('medical_records', [])]
         self.prescriptions = [Prescription(**_filter(Prescription, p)) for p in data.get('prescriptions', [])]
@@ -351,6 +357,41 @@ class HospitalManagementSystem:
         patient = self.get_patient(patient_id)
         if not patient:
             return False
+            
+        new_id = kwargs.get('patient_id')
+        if new_id and new_id != patient_id:
+            # Check if the new ID already exists
+            if self.get_patient(new_id):
+                return False
+                
+            # Update patient ID in other records to maintain reference
+            for a in self.appointments:
+                if a.patient_id == patient_id:
+                    a.patient_id = new_id
+            
+            for m in self.medical_records:
+                if m.patient_id == patient_id:
+                    m.patient_id = new_id
+                    
+            for b in self.bills:
+                if b.patient_id == patient_id:
+                    b.patient_id = new_id
+                    
+            for p in self.prescriptions:
+                if p.patient_id == patient_id:
+                    p.patient_id = new_id
+            
+            for q in self.queue:
+                if q.patient_id == patient_id:
+                    q.patient_id = new_id
+            
+            # Update keys in dictionaries
+            if patient_id in self.patient_files:
+                self.patient_files[new_id] = self.patient_files.pop(patient_id)
+            
+            if patient_id in self.patient_scheme:
+                self.patient_scheme[new_id] = self.patient_scheme.pop(patient_id)
+                
         for key, value in kwargs.items():
             if hasattr(patient, key):
                 setattr(patient, key, value)

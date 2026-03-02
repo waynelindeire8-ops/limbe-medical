@@ -24,11 +24,11 @@ class Doctor:
     doctor_id: str
     first_name: str
     last_name: str
-    specialization: str
+    specialty: str
     phone: str
     email: str
-    schedule: str
     status: str
+    schedule: str = ""
 
 
 @dataclass
