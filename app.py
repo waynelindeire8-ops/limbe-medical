@@ -424,6 +424,15 @@ def add_patient():
                 created_date=datetime.datetime.now().strftime("%Y-%m-%d")
             )
             hms.add_patient(new_patient)
+            sp = request.form.get('scheme_provider','').strip()
+            st = request.form.get('scheme_type','').strip()
+            if sp or st:
+                existing = hms.get_patient_scheme(new_patient.patient_id) if hasattr(hms,'get_patient_scheme') else {}
+                scheme = dict(existing or {})
+                if sp: scheme['provider'] = sp
+                if st: scheme['type'] = st
+                if hasattr(hms, 'update_patient_scheme'):
+                    hms.update_patient_scheme(new_patient.patient_id, scheme)
             flash('Patient added successfully!', 'success')
             notify('Patient added', f"{new_patient.first_name} {new_patient.last_name} ({new_patient.patient_id})", 'admin')
             notify('Patient added', f"{new_patient.first_name} {new_patient.last_name}", 'receptionist')
@@ -446,12 +455,12 @@ def edit_patient(patient_id):
                 patient_id,
                 first_name=request.form['first_name'],
                 last_name=request.form['last_name'],
-                date_of_birth=request.form['dob'],
-                gender=request.form['gender'],
-                phone=request.form['phone'],
-                email=request.form['email'],
-                address=request.form['address'],
-                emergency_contact=request.form['emergency_contact']
+                date_of_birth=request.form.get('dob',''),
+                gender=request.form.get('gender',''),
+                phone=request.form.get('phone',''),
+                email=request.form.get('email',''),
+                address=request.form.get('address',''),
+                emergency_contact=request.form.get('emergency_contact','')
             )
             flash('Patient updated successfully!', 'success')
             notify('Patient updated', patient_id, 'admin')
@@ -459,7 +468,6 @@ def edit_patient(patient_id):
         except Exception as e:
             flash(f'Error updating patient: {e}', 'error')
 
-    return render_template('edit_patient.html', patient=patient, active_page='patients')
 
 @app.route('/delete_patient/<patient_id>')
 def delete_patient(patient_id):
