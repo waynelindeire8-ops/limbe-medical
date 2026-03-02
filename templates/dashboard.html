@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <!-- Using Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -164,15 +165,16 @@
                         <div class="card-header">
                             <h3>Patient Analytics</h3>
                             <div class="toggle-group">
-                                <button>7 Days</button>
-                                <button class="active">30 Days</button>
-                                <button>90 Days</button>
+                                <button onclick="setRange(7)">7 Days</button>
+                                <button class="active" onclick="setRange(30)">30 Days</button>
+                                <button onclick="setRange(90)">90 Days</button>
                             </div>
                         </div>
-                        <div class="chart-placeholder">
-                            <p>Chart component will be integrated here</p>
-                            <small>Patient registration and appointment trends.</small>
-                        </div>
+                        <canvas id="patientChart"
+                                data-labels='{{ chart_labels | tojson | safe }}'
+                                data-regs='{{ chart_patient_reg | tojson | safe }}'
+                                data-appts='{{ chart_appointments | tojson | safe }}'
+                                style="width: 100%; height: 260px;"></canvas>
                     </div>
                 </div>
             </div>
@@ -183,5 +185,40 @@
         .border-consult { border-left: 4px solid #28a745; }
         .border-done { border-left: 4px solid #dc3545; }
     </style>
+    <script>
+        let range = 30;
+        function setRange(r) {
+            range = r;
+            document.querySelectorAll('.toggle-group button').forEach(b => b.classList.remove('active'));
+            const idx = r === 7 ? 0 : r === 30 ? 1 : 2;
+            document.querySelectorAll('.toggle-group button')[idx].classList.add('active');
+            renderChart();
+        }
+        let chartInstance = null;
+        function renderChart() {
+            const el = document.getElementById('patientChart');
+            const labels = JSON.parse(el.dataset.labels || '[]');
+            const regs = JSON.parse(el.dataset.regs || '[]');
+            const appts = JSON.parse(el.dataset.appts || '[]');
+            const start = Math.max(labels.length - range, 0);
+            const L = labels.slice(start);
+            const R = regs.slice(start);
+            const A = appts.slice(start);
+            const ctx = el.getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: L,
+                    datasets: [
+                        { label: 'Registrations', data: R, borderColor: '#4361ee', backgroundColor: 'rgba(67,97,238,0.1)', tension: 0.3, fill: true },
+                        { label: 'Appointments', data: A, borderColor: '#f72585', backgroundColor: 'rgba(247,37,133,0.1)', tension: 0.3, fill: true }
+                    ]
+                },
+                options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: true } } }
+            });
+        }
+        document.addEventListener('DOMContentLoaded', renderChart);
+    </script>
 </body>
 </html>

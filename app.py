@@ -165,7 +165,22 @@ def dashboard():
     # Get active queue
     active_queue = [q for q in hms.queue if q.status != 'Completed']
     sorted_queue = sorted(active_queue, key=lambda x: x.arrival_time)
-    
+    # Charts
+    days = 90
+    base = datetime.date.today()
+    chart_labels = [(base - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days-1, -1, -1)]
+    reg_map = {}
+    for p in hms.patients:
+        d = (getattr(p,'created_date','') or '')
+        if d:
+            reg_map[d] = reg_map.get(d,0) + 1
+    appt_map = {}
+    for a in hms.appointments:
+        d = getattr(a,'appointment_date','') or ''
+        if d:
+            appt_map[d] = appt_map.get(d,0) + 1
+    chart_patient_reg = [reg_map.get(d,0) for d in chart_labels]
+    chart_appointments = [appt_map.get(d,0) for d in chart_labels]
     return render_template('dashboard.html', 
                            total_patients=total_patients,
                            todays_appointments=todays_appointments,
@@ -173,6 +188,9 @@ def dashboard():
                            completed_appointments=completed_appointments,
                            recent_appointments=recent_appointments,
                            queue=sorted_queue,
+                           chart_labels=chart_labels,
+                           chart_patient_reg=chart_patient_reg,
+                           chart_appointments=chart_appointments,
                            active_page='dashboard')
 
 @app.route('/queue/add/<patient_id>')
