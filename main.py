@@ -123,7 +123,8 @@ class HospitalManagementSystem:
 
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
-        except Exception:
+        except Exception as e:
+            print(f"[ERROR] Failed to save data: {e}")
             pass
 
     def load_data(self) -> None:
@@ -353,48 +354,59 @@ class HospitalManagementSystem:
             or search_term in p.patient_id.lower()
         ]
 
-    def update_patient(self, patient_id: str, **kwargs) -> bool:
-        patient = self.get_patient(patient_id)
+    def update_patient(self, old_id: str, **kwargs) -> bool:
+        # Find the patient
+        patient = self.get_patient(old_id)
         if not patient:
+            print(f"[ERROR] update_patient: Patient {old_id} not found.")
             return False
             
         new_id = kwargs.get('patient_id')
-        if new_id and new_id != patient_id:
-            # Check if the new ID already exists
-            if self.get_patient(new_id):
+        if new_id and new_id != old_id:
+            # Check if the new ID already exists in ANOTHER patient
+            existing = self.get_patient(new_id)
+            if existing and existing != patient:
+                print(f"[ERROR] update_patient: New ID {new_id} already exists.")
                 return False
                 
             # Update patient ID in other records to maintain reference
+            print(f"[DEBUG] update_patient: Changing ID from {old_id} to {new_id}")
             for a in self.appointments:
-                if a.patient_id == patient_id:
+                if a.patient_id == old_id:
                     a.patient_id = new_id
             
             for m in self.medical_records:
-                if m.patient_id == patient_id:
+                if m.patient_id == old_id:
                     m.patient_id = new_id
                     
             for b in self.bills:
-                if b.patient_id == patient_id:
+                if b.patient_id == old_id:
                     b.patient_id = new_id
                     
             for p in self.prescriptions:
-                if p.patient_id == patient_id:
+                if p.patient_id == old_id:
                     p.patient_id = new_id
             
             for q in self.queue:
-                if q.patient_id == patient_id:
+                if q.patient_id == old_id:
                     q.patient_id = new_id
             
             # Update keys in dictionaries
-            if patient_id in self.patient_files:
-                self.patient_files[new_id] = self.patient_files.pop(patient_id)
+            if old_id in self.patient_files:
+                self.patient_files[new_id] = self.patient_files.pop(old_id)
             
-            if patient_id in self.patient_scheme:
-                self.patient_scheme[new_id] = self.patient_scheme.pop(patient_id)
+            if old_id in self.patient_scheme:
+                self.patient_scheme[new_id] = self.patient_scheme.pop(old_id)
                 
+        # Update patient attributes
         for key, value in kwargs.items():
             if hasattr(patient, key):
                 setattr(patient, key, value)
+        
+        # Explicitly update ID if it changed and wasn't in kwargs (though it should be)
+        if new_id:
+            patient.patient_id = new_id
+            
         self.save_data()
         return True
 

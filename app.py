@@ -181,6 +181,15 @@ def dashboard():
             appt_map[d] = appt_map.get(d,0) + 1
     chart_patient_reg = [reg_map.get(d,0) for d in chart_labels]
     chart_appointments = [appt_map.get(d,0) for d in chart_labels]
+    
+    # Get last 5 system notifications for the current user
+    username = session.get('username')
+    role = session.get('role')
+    system_notifications = [m for m in hms.messages 
+                           if m.sender_id == 'system' and 
+                           (m.recipient_id == username or m.recipient_id == role or m.recipient_id == 'all')]
+    system_notifications = sorted(system_notifications, key=lambda x: x.timestamp, reverse=True)[:5]
+    
     return render_template('dashboard.html', 
                            total_patients=total_patients,
                            todays_appointments=todays_appointments,
@@ -191,6 +200,7 @@ def dashboard():
                            chart_labels=chart_labels,
                            chart_patient_reg=chart_patient_reg,
                            chart_appointments=chart_appointments,
+                           system_notifications=system_notifications,
                            active_page='dashboard')
 
 @app.route('/queue/add/<patient_id>')
@@ -469,23 +479,41 @@ def edit_patient(patient_id):
 
     if request.method == 'POST':
         try:
-            new_id = request.form.get('patient_id')
-            hms.update_patient(
-                patient_id,
-                patient_id=new_id,
-                first_name=request.form['first_name'],
-                last_name=request.form['last_name'],
-                date_of_birth=request.form.get('dob',''),
-                gender=request.form.get('gender',''),
-                phone=request.form.get('phone',''),
-                email=request.form.get('email',''),
-                address=request.form.get('address',''),
-                emergency_contact=request.form.get('emergency_contact','')
-            )
-            flash('Patient updated successfully!', 'success')
-            notify('Patient updated', new_id or patient_id, 'admin')
-            return redirect(url_for('patients'))
+            # Get original patient object for validation
+            patient = hms.get_patient(patient_id)
+            if not patient:
+                flash('Patient not found!', 'error')
+                return redirect(url_for('patients'))
+
+            new_id = request.form.get('patient_id', '').strip()
+            
+            # Prepare update data
+            update_data = {
+                'patient_id': new_id,
+                'first_name': request.form.get('first_name'),
+                'last_name': request.form.get('last_name'),
+                'date_of_birth': request.form.get('dob',''),
+                'gender': request.form.get('gender',''),
+                'phone': request.form.get('phone',''),
+                'email': request.form.get('email',''),
+                'address': request.form.get('address',''),
+                'emergency_contact': request.form.get('emergency_contact','')
+            }
+            
+            # Filter out None values to avoid overwriting with empty
+            update_data = {k: v for k, v in update_data.items() if v is not None}
+            
+            success = hms.update_patient(patient_id, **update_data)
+            print(f"[DEBUG] edit_patient: update_patient success={success}")
+            if success:
+                flash('Patient updated successfully!', 'success')
+                notify('Patient updated', new_id or patient_id, 'admin')
+                return redirect(url_for('patients'))
+            else:
+                print(f"[ERROR] edit_patient: update_patient failed for {patient_id}")
+                flash('Error updating patient: ID might already be in use.', 'error')
         except Exception as e:
+            print(f"[ERROR] edit_patient exception: {e}")
             flash(f'Error updating patient: {e}', 'error')
 
     return render_template('edit_patient.html', patient=patient, active_page='patients')

@@ -31,8 +31,44 @@
                     <a href="{{ url_for('analytics') }}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-chart-line"></i> Analytics</a>
                     {% endif %}
                     
-                    <div class="icon-btn"><i class="fas fa-envelope"></i></div>
-                    <div class="icon-btn"><i class="fas fa-bell"></i></div>
+                    <a href="{{ url_for('messages') }}" class="icon-btn" title="Messages" style="text-decoration: none; position: relative;">
+                        <i class="fas fa-envelope"></i>
+                        {% if unread_messages_count and unread_messages_count > 0 %}
+                        <span class="badge-dot"></span>
+                        {% endif %}
+                    </a>
+
+                    <div class="dropdown">
+                        <div class="icon-btn dropdown-toggle" id="notificationBtn" title="Notifications" style="position: relative;">
+                            <i class="fas fa-bell"></i>
+                            {% set unread_notifications = system_notifications|selectattr('is_read', 'equalto', false)|list %}
+                            {% if unread_notifications|length > 0 %}
+                            <span class="badge-dot"></span>
+                            {% endif %}
+                        </div>
+                        <div class="dropdown-menu" id="notificationMenu">
+                            <div class="dropdown-header">
+                                <h3>Notifications</h3>
+                                <a href="{{ url_for('messages') }}">View All</a>
+                            </div>
+                            <div class="dropdown-content">
+                                {% if system_notifications %}
+                                    {% for note in system_notifications %}
+                                    <div class="dropdown-item {% if not note.is_read %}unread{% endif %}">
+                                        <div class="note-icon"><i class="fas fa-info-circle"></i></div>
+                                        <div class="note-info">
+                                            <p class="note-subject">{{ note.subject }}</p>
+                                            <p class="note-time">{{ note.timestamp }}</p>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="dropdown-empty">No new notifications</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="user-profile" title="Role: {{ current_role|title }}">
                         <span style="margin-right: 10px; font-weight: bold;">{{ current_user }}</span>
                         <img src="https://ui-avatars.com/api/?name={{ current_user }}&background=random" alt="User">
@@ -184,6 +220,40 @@
         .border-waiting { border-left: 4px solid #ffc107; }
         .border-consult { border-left: 4px solid #28a745; }
         .border-done { border-left: 4px solid #dc3545; }
+        
+        /* Dropdown Styles */
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-menu {
+            position: absolute; right: 0; top: 50px; width: 300px;
+            background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: none; z-index: 1000; overflow: hidden;
+        }
+        .dropdown-menu.show { display: block; }
+        .dropdown-header {
+            padding: 15px; border-bottom: 1px solid #eee;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .dropdown-header h3 { font-size: 16px; margin: 0; }
+        .dropdown-header a { font-size: 13px; color: #4361ee; text-decoration: none; }
+        .dropdown-content { max-height: 350px; overflow-y: auto; }
+        .dropdown-item {
+            padding: 12px 15px; border-bottom: 1px solid #f8f9fa;
+            display: flex; gap: 12px; transition: background 0.2s;
+        }
+        .dropdown-item:hover { background: #f8f9fa; }
+        .dropdown-item.unread { background: #f0f7ff; }
+        .note-icon {
+            width: 35px; height: 35px; border-radius: 50%; background: #e8f0fe;
+            display: flex; align-items: center; justify-content: center; color: #4361ee;
+        }
+        .note-info p { margin: 0; }
+        .note-subject { font-size: 14px; font-weight: 500; color: #333; }
+        .note-time { font-size: 11px; color: #999; margin-top: 4px !important; }
+        .dropdown-empty { padding: 30px; text-align: center; color: #999; font-size: 14px; }
+        .badge-dot {
+            position: absolute; top: 8px; right: 8px; width: 10px; height: 10px;
+            background: #f72585; border: 2px solid white; border-radius: 50%;
+        }
     </style>
     <script>
         let range = 30;
@@ -219,6 +289,19 @@
             });
         }
         document.addEventListener('DOMContentLoaded', renderChart);
+        
+        // Toggle Notifications
+        const notificationBtn = document.getElementById('notificationBtn');
+        const notificationMenu = document.getElementById('notificationMenu');
+        
+        notificationBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notificationMenu.classList.toggle('show');
+        });
+        
+        document.addEventListener('click', () => {
+            notificationMenu.classList.remove('show');
+        });
     </script>
 </body>
 </html>
