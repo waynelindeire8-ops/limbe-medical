@@ -158,6 +158,7 @@ def dashboard():
     todays_appointments = len([a for a in hms.appointments if a.appointment_date == today])
     pending_appointments = len([a for a in hms.appointments if a.status == 'Scheduled'])
     completed_appointments = len([a for a in hms.appointments if a.status == 'Completed'])
+    active_doctors = len(hms.get_available_doctors())
     
     # Get recent appointments
     recent_appointments = sorted(hms.appointments, key=lambda x: x.appointment_date + ' ' + x.appointment_time, reverse=True)[:5]
@@ -192,6 +193,7 @@ def dashboard():
     
     return render_template('dashboard.html', 
                            total_patients=total_patients,
+                           active_doctors=active_doctors,
                            todays_appointments=todays_appointments,
                            pending_appointments=pending_appointments,
                            completed_appointments=completed_appointments,
