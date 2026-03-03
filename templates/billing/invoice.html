@@ -19,10 +19,16 @@
         thead th { background: #0b2e67; color: #fff; padding: 8px; font-weight: 600; font-size: 12px; text-transform: uppercase; }
         tbody td { padding: 8px; border-bottom: 1px solid #eee; font-size: 13px; }
         .row-actions { display: flex; gap: 12px; justify-content: flex-end; }
-        .btn { padding: 10px 18px; border-radius: 4px; border: 1px solid #0b2e67; background: #0b2e67; color: #fff; cursor: pointer; }
-        .btn-outline { padding: 10px 18px; border-radius: 4px; border: 1px solid #0b2e67; background: #fff; color: #0b2e67; cursor: pointer; }
+        .btn { padding: 10px 18px; border-radius: 4px; border: 1px solid #0b2e67; background: #0b2e67; color: #fff; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; font-weight: 600; }
+        .btn-outline { padding: 10px 18px; border-radius: 4px; border: 1px solid #0b2e67; background: #fff; color: #0b2e67; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; font-weight: 600; }
         .totals { font-weight: 600; padding: 8px; text-align: right; color: #222; }
         .section-title { font-size: 14px; color: #444; margin-bottom: 6px; }
+        
+        /* Editable table inputs */
+        .table-input { width: 100%; border: none; background: transparent; padding: 4px; font-size: 13px; font-family: inherit; color: inherit; outline: none; }
+        .table-input:focus { background: #eef2f7; border-radius: 2px; }
+        .table-input.num { text-align: right; }
+        
         @media print { .no-print { display: none; } body { padding: 0; background: #fff; } .card { border: none; } }
     </style>
 </head>
@@ -37,8 +43,8 @@
             </div>
         </div>
 
-        <div class="card">
-            <form action="{{ url_for('update_invoice_scheme', bill_id=bill.bill_id) }}" method="post">
+        <form action="{{ url_for('update_invoice_scheme', bill_id=bill.bill_id) }}" method="post">
+            <div class="card">
                 <div class="grid">
                     <div>
                         <div class="field"><label>Patient:</label><input class="value" value="{{ patient.first_name }} {{ patient.last_name }}" readonly></div>
@@ -53,55 +59,60 @@
                         <div class="field"><label>Type:</label><input name="type" class="value" value="{{ scheme.type or '' }}"></div>
                         <div class="field"><label>Member No:</label><input name="membership_number" class="value" value="{{ scheme.membership_number or '' }}"></div>
                         <div class="field"><label>Policy No:</label><input name="policy_number" class="value" value="{{ scheme.policy_number or '' }}"></div>
-                        <div class="field"><label>Coverage %:</label><input name="coverage_percent" class="value" value="{{ coverage_percent }}"></div>
+                        <div class="field"><label>Coverage %:</label><input name="coverage_percent" id="coverage_percent" class="value" value="{{ coverage_percent }}"></div>
                     </div>
                 </div>
-                <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+            </div>
+
+            <div class="card">
+                <div class="header">
+                    <div class="section-title">Details</div>
+                    <div class="no-print totals" style="margin: 0; padding: 0; font-size: 12px; color: #666;">
+                        * Awards are calculated automatically based on Fee and Coverage %
+                    </div>
+                </div>
+                <div class="table">
+                    <table id="detailsTable">
+                        <thead>
+                            <tr>
+                                <th>LINE</th>
+                                <th>CODE</th>
+                                <th>DESCRIPTION</th>
+                                <th>QTY</th>
+                                <th>YR</th>
+                                <th>MH</th>
+                                <th>DAY</th>
+                                <th>FEE CHG</th>
+                                <th>AWARD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in items %}
+                            <tr class="item-row">
+                                <td>{{ loop.index }}</td>
+                                <td><input type="text" name="item_code[]" class="table-input" value="{{ row.code }}"></td>
+                                <td><input type="text" name="item_desc[]" class="table-input" value="{{ row.description }}"></td>
+                                <td><input type="number" name="item_qty[]" class="table-input num qty-input" value="{{ row.qty }}"></td>
+                                <td><input type="text" name="item_yr[]" class="table-input num" value="{{ row.yr }}"></td>
+                                <td><input type="text" name="item_mh[]" class="table-input num" value="{{ row.mh }}"></td>
+                                <td><input type="text" name="item_day[]" class="table-input num" value="{{ row.day }}"></td>
+                                <td><input type="number" step="0.01" name="item_fee[]" class="table-input num fee-input" value="{{ "%.2f"|format(row.fee) }}"></td>
+                                <td><input type="number" step="0.01" name="item_award[]" class="table-input num award-input" value="{{ "%.2f"|format(row.award) }}" readonly></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top:15px; display:flex; justify-content:flex-end;">
                     <button type="submit" class="btn">Save Changes</button>
                 </div>
-            </form>
-        </div>
-
-        <div class="card">
-            <div class="section-title">Details</div>
-            <div class="table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>LINE</th>
-                            <th>CODE</th>
-                            <th>DESCRIPTION</th>
-                            <th>QTY</th>
-                            <th>YR</th>
-                            <th>MH</th>
-                            <th>DAY</th>
-                            <th>FEE CHG</th>
-                            <th>AWARD</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in items %}
-                        <tr>
-                            <td>{{ loop.index }}</td>
-                            <td>{{ row.code }}</td>
-                            <td>{{ row.description }}</td>
-                            <td>{{ row.qty }}</td>
-                            <td>{{ row.yr }}</td>
-                            <td>{{ row.mh }}</td>
-                            <td>{{ row.day }}</td>
-                            <td>MWK {{ "%.2f"|format(row.fee) }}</td>
-                            <td>MWK {{ "%.2f"|format(row.award) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
             </div>
-        </div>
+        </form>
 
         <div class="card">
             <div class="section-title">Preview</div>
             <div class="table">
-                <table>
+                <table id="previewTable">
                     <thead>
                         <tr>
                             <th>Line</th>
@@ -116,21 +127,21 @@
                     </thead>
                     <tbody>
                         {% for row in items %}
-                        <tr>
+                        <tr class="preview-row">
                             <td>{{ loop.index }}</td>
-                            <td>{{ row.code }}</td>
-                            <td>{{ row.description }}</td>
-                            <td>{{ row.qty }}</td>
-                            <td>{{ row.yr }}</td>
-                            <td>{{ row.mh }}</td>
-                            <td>{{ row.day }}</td>
-                            <td>MWK {{ "%.2f"|format(row.fee) }}</td>
+                            <td class="p-code">{{ row.code }}</td>
+                            <td class="p-desc">{{ row.description }}</td>
+                            <td class="p-qty">{{ row.qty }}</td>
+                            <td class="p-yr">{{ row.yr }}</td>
+                            <td class="p-mh">{{ row.mh }}</td>
+                            <td class="p-day">{{ row.day }}</td>
+                            <td class="p-fee">MWK {{ "%.2f"|format(row.fee) }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            <div class="totals">
+            <div class="totals" id="summaryTotals">
                 Total: MWK {{ "%.2f"|format(total_amount) }} |
                 Covered: MWK {{ "%.2f"|format(covered_amount) }} |
                 Shortfall: MWK {{ "%.2f"|format(shortfall_amount) }} |
@@ -139,5 +150,69 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const coverageInput = document.getElementById('coverage_percent');
+            const detailsTable = document.getElementById('detailsTable');
+            const summaryTotals = document.getElementById('summaryTotals');
+            const isPaid = "{{ bill.status|lower }}" === 'paid';
+
+            function updateCalculations() {
+                let coverage = parseFloat(coverageInput.value) || 0;
+                let totalFee = 0;
+                let totalAward = 0;
+
+                const rows = detailsTable.querySelectorAll('.item-row');
+                const previewRows = document.querySelectorAll('.preview-row');
+
+                rows.forEach((row, index) => {
+                    const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+                    const fee = parseFloat(row.querySelector('.fee-input').value) || 0;
+                    const awardInput = row.querySelector('.award-input');
+                    
+                    const rowTotalFee = fee; // Assuming fee is already total for that row, or fee * qty? 
+                    // Based on existing logic, bill.amount is sum of fees.
+                    
+                    const award = rowTotalFee * (coverage / 100);
+                    awardInput.value = award.toFixed(2);
+
+                    totalFee += rowTotalFee;
+                    totalAward += award;
+
+                    // Sync to preview
+                    if (previewRows[index]) {
+                        previewRows[index].querySelector('.p-code').textContent = row.querySelector('[name="item_code[]"]').value;
+                        previewRows[index].querySelector('.p-desc').textContent = row.querySelector('[name="item_desc[]"]').value;
+                        previewRows[index].querySelector('.p-qty').textContent = qty;
+                        previewRows[index].querySelector('.p-yr').textContent = row.querySelector('[name="item_yr[]"]').value;
+                        previewRows[index].querySelector('.p-mh').textContent = row.querySelector('[name="item_mh[]"]').value;
+                        previewRows[index].querySelector('.p-day').textContent = row.querySelector('[name="item_day[]"]').value;
+                        previewRows[index].querySelector('.p-fee').textContent = 'MWK ' + rowTotalFee.toFixed(2);
+                    }
+                });
+
+                const shortfall = Math.max(totalFee - totalAward, 0);
+                const received = isPaid ? totalFee : 0;
+                const balance = Math.max(totalFee - received, 0);
+
+                summaryTotals.innerHTML = `
+                    Total: MWK ${totalFee.toFixed(2)} |
+                    Covered: MWK ${totalAward.toFixed(2)} |
+                    Shortfall: MWK ${shortfall.toFixed(2)} |
+                    Received: MWK ${received.toFixed(2)} |
+                    Balance: MWK ${balance.toFixed(2)}
+                `;
+            }
+
+            // Listen for changes
+            coverageInput.addEventListener('input', updateCalculations);
+            detailsTable.addEventListener('input', function(e) {
+                if (e.target.classList.contains('table-input')) {
+                    updateCalculations();
+                }
+            });
+        });
+    </script>
 </body>
 </html>

@@ -989,40 +989,55 @@ def print_invoice(bill_id):
         yr, mh, day = dt.year, dt.month, dt.day
     except Exception:
         yr, mh, day = "", "", ""
+    
     items = []
-    for raw in (bill.services or "").split(", "):
-        desc = raw
-        amt = 0.0
-        if "($" in raw:
-            try:
-                desc = raw.split(" ($")[0]
-                amt = float(raw.split(" ($")[1].rstrip(")").strip())
-            except Exception:
-                pass
-        items.append({
-            'code': 'SRV',
-            'description': desc,
-            'qty': 1,
-            'yr': yr,
-            'mh': mh,
-            'day': day,
-            'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
-            'award': 0.0
-        })
+    # Check if bill.services is JSON
+    if bill.services.startswith('[') and bill.services.endswith(']'):
+        try:
+            items = json.loads(bill.services)
+        except Exception:
+            items = []
+    
+    if not items:
+        # Fallback to old comma-separated format
+        for raw in (bill.services or "").split(", "):
+            desc = raw
+            amt = 0.0
+            if "($" in raw:
+                try:
+                    desc = raw.split(" ($")[0]
+                    amt = float(raw.split(" ($")[1].rstrip(")").strip())
+                except Exception:
+                    pass
+            items.append({
+                'code': 'SRV',
+                'description': desc,
+                'qty': 1,
+                'yr': yr,
+                'mh': mh,
+                'day': day,
+                'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
+                'award': 0.0
+            })
+    
     coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
     try:
         coverage_percent = float(coverage_percent)
     except Exception:
         coverage_percent = 0.0
+    
     total_amount = float(bill.amount)
     covered_amount = total_amount * (coverage_percent / 100.0)
     shortfall_amount = max(total_amount - covered_amount, 0.0)
     received_amount = total_amount if (bill.status or '').lower() == 'paid' else 0.0
     balance_amount = max(total_amount - received_amount, 0.0)
-    # populate award per row proportionally
+    
+    # Recalculate awards proportionally if not already provided
     for r in items:
-        if r['fee'] > 0:
-            r['award'] = r['fee'] * (coverage_percent / 100.0)
+        if r.get('award') is None or r.get('award') == 0:
+            if r.get('fee', 0) > 0:
+                r['award'] = float(r['fee']) * (coverage_percent / 100.0)
+                
     return render_template('billing/invoice.html',
                            bill=bill,
                            patient=patient,
@@ -1048,34 +1063,71 @@ def export_invoice_csv(bill_id):
     bill = hms.get_bill(bill_id)
     if not bill:
         return "Bill not found", 404
-    try:
-        dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
-        yr, mh, day = dt.year, dt.month, dt.day
-    except Exception:
-        yr, mh, day = "", "", ""
+    
     scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
     coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
     try:
         coverage_percent = float(coverage_percent)
     except Exception:
         coverage_percent = 0.0
+    
+    items = []
+    # Check if bill.services is JSON
+    if bill.services.startswith('[') and bill.services.endswith(']'):
+        try:
+            items = json.loads(bill.services)
+        except Exception:
+            items = []
+    
+    if not items:
+        try:
+            dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
+            yr, mh, day = dt.year, dt.month, dt.day
+        except Exception:
+            yr, mh, day = "", "", ""
+            
+        # Fallback to old comma-separated format
+        raw_items = (bill.services or "").split(", ")
+        if not raw_items or raw_items == ['']:
+            raw_items = [f"Total ({bill.amount})"]
+            
+        for idx, raw in enumerate(raw_items, start=1):
+            desc = raw
+            fee = 0.0
+            if "($" in raw:
+                try:
+                    desc = raw.split(" ($")[0]
+                    fee = float(raw.split(" ($")[1].rstrip(")").strip())
+                except Exception:
+                    pass
+            if fee == 0.0 and idx == 1:
+                fee = float(bill.amount)
+            award = fee * (coverage_percent / 100.0)
+            items.append({
+                'code': 'SRV',
+                'description': desc,
+                'qty': 1,
+                'yr': yr,
+                'mh': mh,
+                'day': day,
+                'fee': fee,
+                'award': award
+            })
+    
     rows = []
-    items = (bill.services or "").split(", ")
-    if not items or items == ['']:
-        items = [f"Total ({bill.amount})"]
-    for idx, raw in enumerate(items, start=1):
-        desc = raw
-        fee = 0.0
-        if "($" in raw:
-            try:
-                desc = raw.split(" ($")[0]
-                fee = float(raw.split(" ($")[1].rstrip(")").strip())
-            except Exception:
-                pass
-        if fee == 0.0 and idx == 1:
-            fee = float(bill.amount)
-        award = fee * (coverage_percent / 100.0)
-        rows.append([idx, 'SRV', desc, 1, yr, mh, day, f"{fee:.2f}", f"{award:.2f}"])
+    for idx, item in enumerate(items, start=1):
+        rows.append([
+            idx, 
+            item.get('code', 'SRV'), 
+            item.get('description', ''), 
+            item.get('qty', 1), 
+            item.get('yr', ''), 
+            item.get('mh', ''), 
+            item.get('day', ''), 
+            f"{float(item.get('fee', 0)):.2f}", 
+            f"{float(item.get('award', 0)):.2f}"
+        ])
+    
     import io, csv
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -1091,6 +1143,8 @@ def update_invoice_scheme(bill_id):
     bill = hms.get_bill(bill_id)
     if not bill:
         return "Bill not found", 404
+    
+    # Update Scheme info
     scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
     scheme = dict(scheme or {})
     scheme['provider'] = request.form.get('provider', '')
@@ -1100,10 +1154,54 @@ def update_invoice_scheme(bill_id):
     scheme['form_number'] = request.form.get('form_number', '')
     cp = request.form.get('coverage_percent', '0')
     try:
-        scheme['coverage_percent'] = float(cp)
+        coverage_percent = float(cp)
+        scheme['coverage_percent'] = coverage_percent
     except Exception:
-        scheme['coverage_percent'] = cp
+        coverage_percent = 0.0
+        scheme['coverage_percent'] = 0.0
     hms.update_patient_scheme(bill.patient_id, scheme)
+    
+    # Update Bill Items
+    item_codes = request.form.getlist('item_code[]')
+    item_descs = request.form.getlist('item_desc[]')
+    item_qtys = request.form.getlist('item_qty[]')
+    item_yrs = request.form.getlist('item_yr[]')
+    item_mhs = request.form.getlist('item_mh[]')
+    item_days = request.form.getlist('item_day[]')
+    item_fees = request.form.getlist('item_fee[]')
+    
+    if item_descs and item_fees:
+        new_items = []
+        new_total = 0.0
+        for i in range(len(item_descs)):
+            desc = item_descs[i].strip()
+            if not desc: continue
+            
+            try: f = float(item_fees[i])
+            except Exception: f = 0.0
+            
+            try: q = int(item_qtys[i])
+            except Exception: q = 1
+            
+            # Recalculate award based on updated coverage percent
+            award = f * (coverage_percent / 100.0)
+            
+            new_items.append({
+                'code': item_codes[i] if i < len(item_codes) else 'SRV',
+                'description': desc,
+                'qty': q,
+                'yr': item_yrs[i] if i < len(item_yrs) else '',
+                'mh': item_mhs[i] if i < len(item_mhs) else '',
+                'day': item_days[i] if i < len(item_days) else '',
+                'fee': f,
+                'award': award
+            })
+            new_total += f
+        
+        bill.services = json.dumps(new_items)
+        bill.amount = new_total
+        hms.save_data()
+        
     flash('Invoice details updated.', 'success')
     return redirect(url_for('print_invoice', bill_id=bill_id))
 
