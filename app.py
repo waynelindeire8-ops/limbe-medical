@@ -451,18 +451,11 @@ def add_patient():
                 address=request.form.get('address',''),
                 emergency_contact=request.form.get('emergency_contact',''),
                 medical_history="",
-                created_date=datetime.datetime.now().strftime("%Y-%m-%d")
+                created_date=datetime.datetime.now().strftime("%Y-%m-%d"),
+                scheme_provider=request.form.get('scheme_provider',''),
+                scheme_type=request.form.get('scheme_type','')
             )
             hms.add_patient(new_patient)
-            sp = request.form.get('scheme_provider','').strip()
-            st = request.form.get('scheme_type','').strip()
-            if sp or st:
-                existing = hms.get_patient_scheme(new_patient.patient_id) if hasattr(hms,'get_patient_scheme') else {}
-                scheme = dict(existing or {})
-                if sp: scheme['provider'] = sp
-                if st: scheme['type'] = st
-                if hasattr(hms, 'update_patient_scheme'):
-                    hms.update_patient_scheme(new_patient.patient_id, scheme)
             flash('Patient added successfully!', 'success')
             notify('Patient added', f"{new_patient.first_name} {new_patient.last_name} ({new_patient.patient_id})", 'admin')
             notify('Patient added', f"{new_patient.first_name} {new_patient.last_name}", 'receptionist')
@@ -499,7 +492,9 @@ def edit_patient(patient_id):
                 'phone': request.form.get('phone',''),
                 'email': request.form.get('email',''),
                 'address': request.form.get('address',''),
-                'emergency_contact': request.form.get('emergency_contact','')
+                'emergency_contact': request.form.get('emergency_contact',''),
+                'scheme_provider': request.form.get('scheme_provider',''),
+                'scheme_type': request.form.get('scheme_type','')
             }
             
             # Filter out None values to avoid overwriting with empty

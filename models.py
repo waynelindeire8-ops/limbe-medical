@@ -17,6 +17,8 @@ class Patient:
     emergency_contact: str
     medical_history: str
     created_date: str
+    scheme_provider: str = ""
+    scheme_type: str = ""
 
 
 @dataclass
