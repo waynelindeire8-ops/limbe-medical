@@ -1220,6 +1220,113 @@ def billing_reports():
     
     return render_template('billing/reports.html', revenue_data=sorted_revenue, active_page='billing')
 
+@app.route('/inventory')
+def inventory():
+    search_term = request.args.get('search', '').lower()
+    category = request.args.get('category', '')
+    
+    items = hms.inventory
+    
+    if search_term:
+        items = [i for i in items if search_term in i.name.lower() or search_term in i.item_id.lower()]
+    
+    if category:
+        items = [i for i in items if i.category == category]
+        
+    categories = sorted(list(set([i.category for i in hms.inventory if i.category])))
+    
+    return render_template('inventory/inventory.html', 
+                           items=items, 
+                           categories=categories,
+                           active_page='inventory', 
+                           search_term=search_term,
+                           selected_category=category)
+
+@app.route('/inventory/add', methods=['GET', 'POST'])
+def add_inventory_item():
+    if request.method == 'POST':
+        try:
+            # Use item_id from form if provided, else generate
+            item_id = request.form.get('item_id', '').strip() or hms.generate_id('INV')
+            
+            new_item = InventoryItem(
+                item_id=item_id,
+                name=request.form['name'],
+                category=request.form['category'],
+                quantity=int(request.form['quantity']),
+                unit_price=float(request.form['unit_price']),
+                supplier=request.form.get('supplier', ''),
+                expiry_date=request.form.get('expiry_date', ''),
+                min_quantity=int(request.form.get('min_quantity', 0)),
+                dosage_form=request.form.get('dosage_form', ''),
+                strength=request.form.get('strength', ''),
+                batch_number=request.form.get('batch_number', ''),
+                notes=request.form.get('notes', '')
+            )
+            hms.inventory.append(new_item)
+            hms.save_data()
+            flash('Inventory item added successfully!', 'success')
+            notify('Inventory update', f"Added: {new_item.name} ({new_item.item_id})", 'admin')
+            return redirect(url_for('inventory'))
+        except Exception as e:
+            flash(f'Error adding inventory item: {e}', 'error')
+            
+    return render_template('inventory/add_inventory.html', active_page='inventory')
+
+@app.route('/inventory/edit/<item_id>', methods=['GET', 'POST'])
+def edit_inventory_item(item_id):
+    item = next((i for i in hms.inventory if i.item_id == item_id), None)
+    if not item:
+        flash('Item not found!', 'error')
+        return redirect(url_for('inventory'))
+        
+    if request.method == 'POST':
+        try:
+            item.name = request.form['name']
+            item.category = request.form['category']
+            item.quantity = int(request.form['quantity'])
+            item.unit_price = float(request.form['unit_price'])
+            item.supplier = request.form.get('supplier', '')
+            item.expiry_date = request.form.get('expiry_date', '')
+            item.min_quantity = int(request.form.get('min_quantity', 0))
+            item.dosage_form = request.form.get('dosage_form', '')
+            item.strength = request.form.get('strength', '')
+            item.batch_number = request.form.get('batch_number', '')
+            item.notes = request.form.get('notes', '')
+            
+            hms.save_data()
+            flash('Inventory item updated successfully!', 'success')
+            return redirect(url_for('inventory'))
+        except Exception as e:
+            flash(f'Error updating inventory item: {e}', 'error')
+            
+    return render_template('inventory/edit_inventory.html', item=item, active_page='inventory')
+
+@app.route('/inventory/delete/<item_id>')
+def delete_inventory_item(item_id):
+    for i, item in enumerate(hms.inventory):
+        if item.item_id == item_id:
+            del hms.inventory[i]
+            hms.save_data()
+            flash('Item deleted successfully!', 'success')
+            return redirect(url_for('inventory'))
+    flash('Item not found!', 'error')
+    return redirect(url_for('inventory'))
+
+@app.route('/api/inventory/search')
+def api_search_inventory():
+    query = request.args.get('q', '').lower()
+    results = []
+    for item in hms.inventory:
+        if query in item.name.lower() or query in item.item_id.lower():
+            results.append({
+                'id': item.item_id,
+                'name': item.name,
+                'price': item.unit_price,
+                'category': item.category
+            })
+    return jsonify(results[:10])
+
 @app.route('/prescriptions')
 def prescriptions():
     search_term = request.args.get('search', '').lower()

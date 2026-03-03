@@ -50,6 +50,10 @@
         {% if current_role in ['admin', 'cashier'] %}
         <a href="{{ url_for('billing_dashboard') }}" class="menu-item {% if active_page == 'billing' %}active{% endif %}" title="Billing"><i class="fas fa-file-invoice-dollar"></i></a>
         {% endif %}
+
+        {% if current_role in ['admin', 'doctor', 'nurse', 'pharmacist'] %}
+        <a href="{{ url_for('inventory') }}" class="menu-item {% if active_page == 'inventory' %}active{% endif %}" title="Inventory"><i class="fas fa-boxes"></i></a>
+        {% endif %}
         
         {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
         <a href="{{ url_for('prescriptions') }}" class="menu-item {% if active_page == 'prescriptions' %}active{% endif %}" title="Prescriptions"><i class="fas fa-capsules"></i></a>

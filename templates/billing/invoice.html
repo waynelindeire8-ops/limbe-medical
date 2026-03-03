@@ -29,6 +29,16 @@
         .table-input:focus { background: #eef2f7; border-radius: 2px; }
         .table-input.num { text-align: right; }
         
+        .btn-add-row { background: #28a745; border-color: #28a745; margin-right: auto; }
+        .btn-remove { color: #dc3545; cursor: pointer; border: none; background: none; font-size: 16px; }
+        
+        /* Suggestions */
+        .suggestions-container { position: relative; width: 100%; }
+        .suggestions-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 1000; max-height: 200px; overflow-y: auto; display: none; }
+        .suggestion-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+        .suggestion-item:hover { background: #f8f9fa; }
+        .suggestion-item:last-child { border-bottom: none; }
+        
         @media print { .no-print { display: none; } body { padding: 0; background: #fff; } .card { border: none; } }
     </style>
 </head>
@@ -82,31 +92,39 @@
                                 <th>YR</th>
                                 <th>MH</th>
                                 <th>DAY</th>
-                                <th>FEE CHG</th>
-                                <th>AWARD</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in items %}
-                            <tr class="item-row">
-                                <td>{{ loop.index }}</td>
-                                <td><input type="text" name="item_code[]" class="table-input" value="{{ row.code }}"></td>
-                                <td><input type="text" name="item_desc[]" class="table-input" value="{{ row.description }}"></td>
-                                <td><input type="number" name="item_qty[]" class="table-input num qty-input" value="{{ row.qty }}"></td>
-                                <td><input type="text" name="item_yr[]" class="table-input num" value="{{ row.yr }}"></td>
-                                <td><input type="text" name="item_mh[]" class="table-input num" value="{{ row.mh }}"></td>
-                                <td><input type="text" name="item_day[]" class="table-input num" value="{{ row.day }}"></td>
-                                <td><input type="number" step="0.01" name="item_fee[]" class="table-input num fee-input" value="{{ "%.2f"|format(row.fee) }}"></td>
-                                <td><input type="number" step="0.01" name="item_award[]" class="table-input num award-input" value="{{ "%.2f"|format(row.award) }}" readonly></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                <div style="margin-top:15px; display:flex; justify-content:flex-end;">
-                    <button type="submit" class="btn">Save Changes</button>
-                </div>
-            </div>
+                                 <th>FEE CHG</th>
+                                 <th>AWARD</th>
+                                 <th class="no-print" style="width: 40px;"></th>
+                             </tr>
+                         </thead>
+                         <tbody id="invoiceItemsBody">
+                             {% for row in items %}
+                             <tr class="item-row">
+                                 <td class="line-number">{{ loop.index }}</td>
+                                 <td>
+                                     <div class="suggestions-container">
+                                         <input type="text" name="item_code[]" class="table-input code-input" value="{{ row.code }}" autocomplete="off">
+                                         <div class="suggestions-list"></div>
+                                     </div>
+                                 </td>
+                                 <td><input type="text" name="item_desc[]" class="table-input desc-input" value="{{ row.description }}"></td>
+                                 <td><input type="number" name="item_qty[]" class="table-input num qty-input" value="{{ row.qty }}"></td>
+                                 <td><input type="text" name="item_yr[]" class="table-input num" value="{{ row.yr }}"></td>
+                                 <td><input type="text" name="item_mh[]" class="table-input num" value="{{ row.mh }}"></td>
+                                 <td><input type="text" name="item_day[]" class="table-input num" value="{{ row.day }}"></td>
+                                 <td><input type="number" step="0.01" name="item_fee[]" class="table-input num fee-input" value="{{ "%.2f"|format(row.fee) }}"></td>
+                                 <td><input type="number" step="0.01" name="item_award[]" class="table-input num award-input" value="{{ "%.2f"|format(row.award) }}" readonly></td>
+                                 <td class="no-print"><button type="button" class="btn-remove" title="Remove row"><i class="fas fa-trash"></i></button></td>
+                             </tr>
+                             {% endfor %}
+                         </tbody>
+                     </table>
+                 </div>
+                 <div style="margin-top:15px; display:flex; gap: 10px;">
+                     <button type="button" class="btn btn-add-row" id="addRowBtn"><i class="fas fa-plus"></i> Add Line</button>
+                     <button type="submit" class="btn">Save Changes</button>
+                 </div>
+             </div>
         </form>
 
         <div class="card">
@@ -156,6 +174,9 @@
             const coverageInput = document.getElementById('coverage_percent');
             const detailsTable = document.getElementById('detailsTable');
             const summaryTotals = document.getElementById('summaryTotals');
+            const addRowBtn = document.getElementById('addRowBtn');
+            const invoiceItemsBody = document.getElementById('invoiceItemsBody');
+            const previewTableBody = document.querySelector('#previewTable tbody');
             const isPaid = "{{ bill.status|lower }}" === 'paid';
 
             function updateCalculations() {
@@ -163,33 +184,44 @@
                 let totalFee = 0;
                 let totalAward = 0;
 
-                const rows = detailsTable.querySelectorAll('.item-row');
-                const previewRows = document.querySelectorAll('.preview-row');
+                const rows = invoiceItemsBody.querySelectorAll('.item-row');
+                
+                // Clear and rebuild preview table
+                previewTableBody.innerHTML = '';
 
                 rows.forEach((row, index) => {
+                    const lineNo = index + 1;
+                    row.querySelector('.line-number').textContent = lineNo;
+
+                    const code = row.querySelector('[name="item_code[]"]').value;
+                    const desc = row.querySelector('[name="item_desc[]"]').value;
                     const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+                    const yr = row.querySelector('[name="item_yr[]"]').value;
+                    const mh = row.querySelector('[name="item_mh[]"]').value;
+                    const day = row.querySelector('[name="item_day[]"]').value;
                     const fee = parseFloat(row.querySelector('.fee-input').value) || 0;
                     const awardInput = row.querySelector('.award-input');
                     
-                    const rowTotalFee = fee; // Assuming fee is already total for that row, or fee * qty? 
-                    // Based on existing logic, bill.amount is sum of fees.
-                    
-                    const award = rowTotalFee * (coverage / 100);
+                    const award = fee * (coverage / 100);
                     awardInput.value = award.toFixed(2);
 
-                    totalFee += rowTotalFee;
+                    totalFee += fee;
                     totalAward += award;
 
-                    // Sync to preview
-                    if (previewRows[index]) {
-                        previewRows[index].querySelector('.p-code').textContent = row.querySelector('[name="item_code[]"]').value;
-                        previewRows[index].querySelector('.p-desc').textContent = row.querySelector('[name="item_desc[]"]').value;
-                        previewRows[index].querySelector('.p-qty').textContent = qty;
-                        previewRows[index].querySelector('.p-yr').textContent = row.querySelector('[name="item_yr[]"]').value;
-                        previewRows[index].querySelector('.p-mh').textContent = row.querySelector('[name="item_mh[]"]').value;
-                        previewRows[index].querySelector('.p-day').textContent = row.querySelector('[name="item_day[]"]').value;
-                        previewRows[index].querySelector('.p-fee').textContent = 'MWK ' + rowTotalFee.toFixed(2);
-                    }
+                    // Add to preview
+                    const pRow = document.createElement('tr');
+                    pRow.className = 'preview-row';
+                    pRow.innerHTML = `
+                        <td>${lineNo}</td>
+                        <td class="p-code">${code}</td>
+                        <td class="p-desc">${desc}</td>
+                        <td class="p-qty">${qty}</td>
+                        <td class="p-yr">${yr}</td>
+                        <td class="p-mh">${mh}</td>
+                        <td class="p-day">${day}</td>
+                        <td class="p-fee">MWK ${fee.toFixed(2)}</td>
+                    `;
+                    previewTableBody.appendChild(pRow);
                 });
 
                 const shortfall = Math.max(totalFee - totalAward, 0);
@@ -205,11 +237,94 @@
                 `;
             }
 
+            // Add Row
+            addRowBtn.addEventListener('click', function() {
+                const newRow = document.createElement('tr');
+                newRow.className = 'item-row';
+                newRow.innerHTML = `
+                    <td class="line-number"></td>
+                    <td>
+                        <div class="suggestions-container">
+                            <input type="text" name="item_code[]" class="table-input code-input" value="SRV" autocomplete="off">
+                            <div class="suggestions-list"></div>
+                        </div>
+                    </td>
+                    <td><input type="text" name="item_desc[]" class="table-input desc-input" value=""></td>
+                    <td><input type="number" name="item_qty[]" class="table-input num qty-input" value="1"></td>
+                    <td><input type="text" name="item_yr[]" class="table-input num" value=""></td>
+                    <td><input type="text" name="item_mh[]" class="table-input num" value=""></td>
+                    <td><input type="text" name="item_day[]" class="table-input num" value=""></td>
+                    <td><input type="number" step="0.01" name="item_fee[]" class="table-input num fee-input" value="0.00"></td>
+                    <td><input type="number" step="0.01" name="item_award[]" class="table-input num award-input" value="0.00" readonly></td>
+                    <td class="no-print"><button type="button" class="btn-remove" title="Remove row"><i class="fas fa-trash"></i></button></td>
+                `;
+                invoiceItemsBody.appendChild(newRow);
+                updateCalculations();
+            });
+
+            // Remove Row (Delegated)
+            invoiceItemsBody.addEventListener('click', function(e) {
+                if (e.target.closest('.btn-remove')) {
+                    const row = e.target.closest('.item-row');
+                    if (invoiceItemsBody.querySelectorAll('.item-row').length > 1) {
+                        row.remove();
+                        updateCalculations();
+                    } else {
+                        alert("Invoice must have at least one line item.");
+                    }
+                }
+            });
+
             // Listen for changes
             coverageInput.addEventListener('input', updateCalculations);
             detailsTable.addEventListener('input', function(e) {
                 if (e.target.classList.contains('table-input')) {
                     updateCalculations();
+                }
+                
+                // Inventory lookup logic
+                if (e.target.classList.contains('code-input')) {
+                    const input = e.target;
+                    const query = input.value.trim();
+                    const container = input.closest('.suggestions-container');
+                    const list = container.querySelector('.suggestions-list');
+                    const row = input.closest('.item-row');
+
+                    if (query.length < 1) {
+                        list.style.display = 'none';
+                        return;
+                    }
+
+                    fetch(`/api/inventory/search?q=${encodeURIComponent(query)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.length > 0) {
+                                list.innerHTML = '';
+                                data.forEach(item => {
+                                    const div = document.createElement('div');
+                                    div.className = 'suggestion-item';
+                                    div.innerHTML = `<strong>${item.id}</strong> - ${item.name} (MWK ${item.price})`;
+                                    div.onclick = function() {
+                                        input.value = item.id;
+                                        row.querySelector('.desc-input').value = item.name;
+                                        row.querySelector('.fee-input').value = item.price.toFixed(2);
+                                        list.style.display = 'none';
+                                        updateCalculations();
+                                    };
+                                    list.appendChild(div);
+                                });
+                                list.style.display = 'block';
+                            } else {
+                                list.style.display = 'none';
+                            }
+                        });
+                }
+            });
+
+            // Close suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.suggestions-container')) {
+                    document.querySelectorAll('.suggestions-list').forEach(l => l.style.display = 'none');
                 }
             });
         });
