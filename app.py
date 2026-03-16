@@ -345,7 +345,22 @@ def patient_details(patient_id):
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
     
-    files = hms.patient_files.get(patient_id, [])
+    # Retrieve files and normalize keys for template
+    raw_files = hms.patient_files.get(patient_id, [])
+    files = []
+    for f in raw_files:
+        # Handle different key names from legacy data
+        filename = f.get('filename') or f.get('file_name')
+        file_path = f.get('file_path') or f.get('path')
+        upload_date = f.get('upload_date') or f.get('uploaded_at') or 'Unknown'
+        
+        if filename:
+            files.append({
+                'filename': filename,
+                'file_path': file_path,
+                'upload_date': upload_date
+            })
+
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
     
