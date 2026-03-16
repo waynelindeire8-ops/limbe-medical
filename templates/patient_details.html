@@ -187,37 +187,26 @@
                             <button type="submit" class="btn-upload"><i class="fas fa-upload"></i> Upload</button>
                         </form>
 
-                        <ul class="file-list">
+                        <div class="file-list">
                             {% for file in files %}
-                            <li class="file-item">
-                                {% set is_image = file.file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')) %}
+                            <div class="file-item">
+                                <div class="file-icon"><i class="fas fa-file-alt"></i></div>
                                 <div class="file-info">
-                                    {% if is_image %}
-                                        <i class="fas fa-file-image file-icon" style="color: #4cc9f0; cursor: pointer;" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')"></i>
-                                        <div>
-                                            <div style="font-weight: 500; cursor: pointer; color: #4361ee;" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')">{{ file.file_name }}</div>
-                                            <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
-                                        </div>
-                                    {% else %}
-                                        <i class="fas fa-file-alt file-icon"></i>
-                                        <div>
-                                            <div style="font-weight: 500;">{{ file.file_name }}</div>
-                                            <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
-                                        </div>
-                                    {% endif %}
+                                    <a href="{{ url_for('serve_patient_file', patient_id=patient.patient_id, filename=file.filename) }}" target="_blank" style="text-decoration: none; color: inherit;">
+                                        <div class="file-name">{{ file.filename }}</div>
+                                    </a>
+                                    <div class="file-meta">{{ file.upload_date }}</div>
                                 </div>
                                 <div class="file-actions">
-                                    {% if is_image %}
-                                    <button type="button" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')" title="Preview" style="background:none; border:none; cursor:pointer; color: #4361ee; margin-right: 5px;"><i class="fas fa-eye"></i></button>
-                                    {% endif %}
-                                    <a href="{{ url_for('download_file', path=file.path) }}" title="Download" style="color: #4361ee; margin-right: 10px;"><i class="fas fa-download"></i></a>
-                                    <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.path) }}" title="Delete" style="color: #dc3545;" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
+                                    <a href="{{ url_for('serve_patient_file', patient_id=patient.patient_id, filename=file.filename) }}" target="_blank" title="View"><i class="fas fa-eye"></i></a>
+                                    <a href="{{ url_for('serve_patient_file', patient_id=patient.patient_id, filename=file.filename) }}" download title="Download"><i class="fas fa-download"></i></a>
+                                    <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.filename) }}" class="delete" title="Delete" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
                                 </div>
-                            </li>
+                            </div>
                             {% else %}
-                            <li style="padding: 10px; text-align: center; color: #888;">No files uploaded yet.</li>
+                            <p style="color: #888; text-align: center; padding: 20px;">No files uploaded yet.</p>
                             {% endfor %}
-                        </ul>
+                        </div>
                     </div>
 
                     <!-- Medical Records -->

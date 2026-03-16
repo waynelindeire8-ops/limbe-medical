@@ -61,8 +61,12 @@ def put_supabase_json(data: dict) -> bool:
         json_str = json.dumps(data)
         # Upload to storage
         # We need to overwrite if it exists.
-        client.storage.from_(bucket).upload(object_path, json_str.encode(), {"upsert": "true"})
-        return True
+        response = client.storage.from_(bucket).upload(object_path, json_str.encode(), {"upsert": "true"})
+        if response.status_code == 200:
+             return True
+        else:
+             print(f"Error saving data to Supabase: Status code {response.status_code}")
+             return False
     except Exception as e:
         print(f"Error saving data to Supabase: {e}")
         return False

@@ -3,6 +3,10 @@ import datetime
 import os
 from werkzeug.utils import secure_filename
 from functools import wraps
+from dotenv import load_dotenv
+
+load_dotenv() # Load variables from .env
+
 from main import HospitalManagementSystem
 from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord, QueueItem
 
@@ -351,6 +355,28 @@ def patient_details(patient_id):
                            appointments=appointments, 
                            medical_records=medical_records,
                            active_page='patients')
+
+@app.route('/patient_files/<patient_id>/<filename>')
+def serve_patient_file(patient_id, filename):
+    try:
+        # Construct path to the file in the attachments directory
+        # The path stored in hms.patient_files is relative, e.g. "attachments/patient_id/filename"
+        # But here we need to serve it.
+        
+        # Security check: ensure filename is safe
+        filename = secure_filename(filename)
+        
+        # Base directory for attachments
+        base_dir = os.path.dirname(os.path.abspath(hms.data_file))
+        patient_dir = os.path.join(base_dir, 'attachments', patient_id)
+        
+        if os.path.exists(os.path.join(patient_dir, filename)):
+            return send_from_directory(patient_dir, filename)
+        else:
+            return "File not found", 404
+    except Exception as e:
+        print(f"Error serving file: {e}")
+        return str(e), 500
 
 @app.route('/patient/<patient_id>/upload_file', methods=['POST'])
 def upload_patient_file(patient_id):
