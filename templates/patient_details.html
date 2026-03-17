@@ -199,7 +199,7 @@
                                 </div>
                                 <div class="file-actions">
                                     <a href="{{ file.public_url }}" target="_blank" title="View"><i class="fas fa-eye"></i></a>
-                                    <a href="{{ file.public_url }}" download title="Download"><i class="fas fa-download"></i></a>
+                                    <a href="{{ file.public_url }}" download="{{ file.file_name }}" title="Download"><i class="fas fa-download"></i></a>
                                     <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.path) }}" class="delete" title="Delete" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
                                 </div>
                             </div>

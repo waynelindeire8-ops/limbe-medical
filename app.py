@@ -338,6 +338,8 @@ def queue_noshow(queue_id):
         notify('No-show', queue_id, 'receptionist')
     return redirect(url_for('queue_dashboard'))
 
+from supabase_data_manager import get_public_url
+
 @app.route('/patient/<patient_id>')
 def patient_details(patient_id):
     patient = hms.get_patient(patient_id)
@@ -345,7 +347,35 @@ def patient_details(patient_id):
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
     
-    files = hms.patient_files.get(patient_id, [])
+    # Retrieve files and ensure public_url exists for each
+    raw_files = hms.patient_files.get(patient_id, [])
+    files = []
+    for f in raw_files:
+        if isinstance(f, dict):
+            # Normalize keys
+            fname = f.get('file_name') or f.get('filename') or 'Unnamed File'
+            path = f.get('path') or f.get('file_path')
+            uploaded_at = f.get('uploaded_at') or f.get('upload_date') or 'Unknown'
+            public_url = f.get('public_url')
+            
+            # If public_url is missing but path exists, try to generate it
+            if not public_url and path:
+                # If path looks like it might be in Supabase (patient_id/filename)
+                if '/' in path and not path.startswith('attachments/'):
+                    public_url = get_public_url(path)
+                elif path.startswith('attachments/'):
+                    # Legacy local file - might not be in Supabase
+                    # Try to generate anyway, in case it was migrated manually
+                    supabase_path = path.replace('attachments/', '')
+                    public_url = get_public_url(supabase_path)
+            
+            files.append({
+                'file_name': fname,
+                'path': path,
+                'public_url': public_url or '#', # Fallback to # if no URL
+                'uploaded_at': uploaded_at
+            })
+    
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
     
