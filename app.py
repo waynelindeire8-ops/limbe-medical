@@ -359,12 +359,13 @@ def patient_details(patient_id):
             
             # If public_url is missing or incorrect, regenerate it
             if path and (not public_url or not public_url.startswith('http')):
-                # Ensure the path has the 'attachment/' prefix for URL generation
-                if not path.startswith('attachment/'):
-                    # This handles legacy data that might just be 'patient_id/filename.jpg'
-                    path_for_url = f"attachment/{path}"
-                else:
+                # Robust check for existing prefixes to avoid double-prefixing
+                if path.startswith('attachments/') or path.startswith('attachment/'):
                     path_for_url = path
+                else:
+                    # Prepend 'attachments/' as confirmed by user (plural)
+                    path_for_url = f"attachments/{path}"
+                
                 public_url = get_public_url(path_for_url)
             
             files.append({

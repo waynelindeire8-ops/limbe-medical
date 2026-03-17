@@ -226,8 +226,8 @@ class HospitalManagementSystem:
         for src in file_paths:
             try:
                 name = os.path.basename(src)
-                # Corrected path with 'attachment' prefix
-                supabase_path = f"attachment/{patient_id}/{name}"
+                # Corrected path with 'attachments' prefix (plural)
+                supabase_path = f"attachments/{patient_id}/{name}"
                 
                 if upload_file_to_supabase(src, supabase_path):
                     public_url = get_public_url(supabase_path)
