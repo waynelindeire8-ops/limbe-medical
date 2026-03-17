@@ -345,35 +345,7 @@ def patient_details(patient_id):
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
     
-    # Retrieve files and normalize keys for template
-    raw_files = hms.patient_files.get(patient_id, [])
-    files = []
-    for f in raw_files:
-        # Debug: ensure we handle different data types or missing keys
-        if isinstance(f, dict):
-            # Try every possible key for filename and path
-            filename = f.get('filename') or f.get('file_name') or f.get('name')
-            file_path = f.get('file_path') or f.get('path') or f.get('rel_path')
-            upload_date = f.get('upload_date') or f.get('uploaded_at') or f.get('date') or 'Unknown'
-            
-            # If still no filename, try to extract from path
-            if not filename and file_path:
-                filename = os.path.basename(file_path)
-            
-            if filename:
-                files.append({
-                    'filename': filename,
-                    'file_path': file_path,
-                    'upload_date': upload_date
-                })
-        elif isinstance(f, str):
-            # Handle if it's just a string path
-            files.append({
-                'filename': os.path.basename(f),
-                'file_path': f,
-                'upload_date': 'Unknown'
-            })
-
+    files = hms.patient_files.get(patient_id, [])
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
     
@@ -383,30 +355,6 @@ def patient_details(patient_id):
                            appointments=appointments, 
                            medical_records=medical_records,
                            active_page='patients')
-
-@app.route('/patient_files/<patient_id>/<filename>')
-def serve_patient_file(patient_id, filename):
-    try:
-        # Construct path to the file in the attachments directory
-        filename = secure_filename(filename)
-        
-        # Check multiple possible locations for the file
-        base_dir = os.path.dirname(os.path.abspath(hms.data_file))
-        
-        # Location 1: root/attachments/patient_id/filename
-        path1 = os.path.join(base_dir, 'attachments', patient_id)
-        if os.path.exists(os.path.join(path1, filename)):
-            return send_from_directory(path1, filename)
-            
-        # Location 2: root/uploads/patient_id/filename (where my previous fix saved it)
-        path2 = os.path.join(os.getcwd(), 'uploads', patient_id)
-        if os.path.exists(os.path.join(path2, filename)):
-            return send_from_directory(path2, filename)
-            
-        return f"File not found in {path1} or {path2}", 404
-    except Exception as e:
-        print(f"Error serving file: {e}")
-        return str(e), 500
 
 @app.route('/patient/<patient_id>/upload_file', methods=['POST'])
 def upload_patient_file(patient_id):
@@ -421,20 +369,19 @@ def upload_patient_file(patient_id):
     
     if file:
         filename = secure_filename(file.filename)
-        # Create a temporary path to save the uploaded file before passing to HMS
-        # HMS expects file paths to copy from
-        upload_folder = os.path.join(os.getcwd(), 'uploads')
-        os.makedirs(upload_folder, exist_ok=True)
-        temp_path = os.path.join(upload_folder, filename)
-        file.save(temp_path)
+        temp_dir = os.path.join(os.getcwd(), 'temp_uploads')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, filename)
         
         try:
-            hms.add_patient_files(patient_id, [temp_path])
-            flash('File uploaded successfully!', 'success')
+            file.save(temp_path)
+            if hms.add_patient_files(patient_id, [temp_path]):
+                flash('File uploaded successfully to Supabase!', 'success')
+            else:
+                flash('Failed to upload file to Supabase.', 'error')
         except Exception as e:
             flash(f'Error uploading file: {e}', 'error')
         finally:
-            # Clean up temp file
             if os.path.exists(temp_path):
                 os.remove(temp_path)
                 
@@ -444,9 +391,10 @@ def upload_patient_file(patient_id):
 def delete_patient_file(patient_id):
     rel_path = request.args.get('path')
     if hms.delete_patient_file(patient_id, rel_path):
-        flash('File deleted successfully!', 'success')
+        flash('File deleted successfully from Supabase!', 'success')
     else:
-        flash('Error deleting file!', 'error')
+        flash('Error deleting file from Supabase!', 'error')
+    return redirect(url_for('patient_details', patient_id=patient_id))
     return redirect(url_for('patient_details', patient_id=patient_id))
 
 @app.route('/download_file')

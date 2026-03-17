@@ -219,66 +219,53 @@ class HospitalManagementSystem:
         added = 0
         if not patient_id or not file_paths:
             return added
-        base_dir = os.path.dirname(os.path.abspath(self.data_file))
-        dest_dir = os.path.join(base_dir, 'attachments', patient_id)
-        try:
-            os.makedirs(dest_dir, exist_ok=True)
-        except Exception:
-            pass
+        
         entries = self.patient_files.get(patient_id, [])
         ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
         for src in file_paths:
             try:
                 name = os.path.basename(src)
-                dest = os.path.join(dest_dir, name)
-                if os.path.exists(dest):
-                    root, ext = os.path.splitext(name)
-                    name = f"{root}_{int(datetime.datetime.now().timestamp())}{ext}"
-                    dest = os.path.join(dest_dir, name)
-                shutil.copy2(src, dest)
-                rel_path = os.path.relpath(dest, base_dir)
-                sup_id = ''
-                # Placeholder: local copy made; integrate Supabase Storage upload when configured
-                entries.append({
-                    'file_name': name,
-                    'path': rel_path,
-                    'uploaded_at': ts,
-                    'source_appointment_id': source_appointment_id or '',
-                    'source_record_id': source_record_id or '',
-                    'supabase_file_id': sup_id
-                })
-                added += 1
+                supabase_path = f"{patient_id}/{name}"
+                
+                if upload_file_to_supabase(src, supabase_path):
+                    public_url = get_public_url(supabase_path)
+                    entries.append({
+                        'file_name': name,
+                        'path': supabase_path,
+                        'public_url': public_url,
+                        'uploaded_at': ts,
+                        'source_appointment_id': source_appointment_id or '',
+                        'source_record_id': source_record_id or ''
+                    })
+                    added += 1
+                else:
+                    print(f"[WARN] Failed to upload file '{src}' to Supabase.")
             except Exception as e:
-                print(f"[WARN] Failed to add file '{src}': {e}")
+                print(f"[WARN] Failed to process file '{src}': {e}")
+                
         self.patient_files[patient_id] = entries
         self.save_data()
-        try:
-            self.add_activity(None, 'attach_files', 'patient', patient_id, f"{added} file(s)")
-        except Exception:
-            pass
         return added
 
     def delete_patient_file(self, patient_id: str, rel_path: str) -> bool:
         if not patient_id or not rel_path:
             return False
-        base_dir = os.path.dirname(os.path.abspath(self.data_file))
-        abs_path = os.path.join(base_dir, rel_path)
+            
         entries = self.patient_files.get(patient_id, []) or []
-        new_entries = [e for e in entries if e.get('path') != rel_path]
-        if len(new_entries) == len(entries):
+        file_to_delete = next((e for e in entries if e.get('path') == rel_path), None)
+        
+        if not file_to_delete:
             return False
-        try:
-            if os.path.exists(abs_path):
-                os.remove(abs_path)
-        except Exception as e:
-            print(f"[WARN] Failed to delete file '{abs_path}': {e}")
-        self.patient_files[patient_id] = new_entries
-        self.save_data()
-        try:
-            self.add_activity(None, 'delete_file', 'patient', patient_id, rel_path)
-        except Exception:
-            pass
-        return True
+            
+        if delete_file_from_supabase(rel_path):
+            new_entries = [e for e in entries if e.get('path') != rel_path]
+            self.patient_files[patient_id] = new_entries
+            self.save_data()
+            return True
+        else:
+            print(f"[WARN] Failed to delete file '{rel_path}' from Supabase.")
+            return False
 
     def rename_patient_file(self, patient_id: str, rel_path: str, new_name: str) -> bool:
         if not patient_id or not rel_path or not (new_name or '').strip():
