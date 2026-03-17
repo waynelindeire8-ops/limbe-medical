@@ -56,17 +56,46 @@ def put_supabase_json(data: dict) -> bool:
         return False
     try:
         bucket = os.environ.get("SUPABASE_BUCKET", "hospital")
-        # Default to hospital_data.json to match the file in the bucket
         object_path = os.environ.get("SUPABASE_OBJECT_PATH", "hospital_data.json")
         json_str = json.dumps(data)
-        # Upload to storage
-        # We need to overwrite if it exists.
         response = client.storage.from_(bucket).upload(object_path, json_str.encode(), {"upsert": "true"})
-        if response.status_code == 200:
-             return True
-        else:
-             print(f"Error saving data to Supabase: Status code {response.status_code}")
-             return False
+        return response.status_code == 200
     except Exception as e:
         print(f"Error saving data to Supabase: {e}")
         return False
+
+def upload_file_to_supabase(local_path: str, supabase_path: str) -> bool:
+    client = get_supabase_client()
+    if not client:
+        return False
+    try:
+        bucket = os.environ.get("SUPABASE_BUCKET", "hospital")
+        with open(local_path, 'rb') as f:
+            response = client.storage.from_(bucket).upload(supabase_path, f, {"upsert": "true"})
+        return response.status_code == 200
+    except Exception as e:
+        print(f"Error uploading to Supabase: {e}")
+        return False
+
+def delete_file_from_supabase(supabase_path: str) -> bool:
+    client = get_supabase_client()
+    if not client:
+        return False
+    try:
+        bucket = os.environ.get("SUPABASE_BUCKET", "hospital")
+        response = client.storage.from_(bucket).remove([supabase_path])
+        return response.status_code == 200
+    except Exception as e:
+        print(f"Error deleting from Supabase: {e}")
+        return False
+
+def get_public_url(supabase_path: str) -> str:
+    client = get_supabase_client()
+    if not client:
+        return ""
+    try:
+        bucket = os.environ.get("SUPABASE_BUCKET", "hospital")
+        return client.storage.from_(bucket).get_public_url(supabase_path)
+    except Exception as e:
+        print(f"Error getting public URL: {e}")
+        return ""

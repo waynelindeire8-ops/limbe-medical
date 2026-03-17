@@ -17,7 +17,7 @@ try:
 except Exception:
     def load_dotenv():
         return False
-from supabase_data_manager import get_supabase_json, put_supabase_json
+from supabase_data_manager import get_supabase_json, put_supabase_json, upload_file_to_supabase, delete_file_from_supabase, get_public_url
 
 load_dotenv()
 import datetime
