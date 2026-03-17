@@ -349,16 +349,29 @@ def patient_details(patient_id):
     raw_files = hms.patient_files.get(patient_id, [])
     files = []
     for f in raw_files:
-        # Handle different key names from legacy data
-        filename = f.get('filename') or f.get('file_name')
-        file_path = f.get('file_path') or f.get('path')
-        upload_date = f.get('upload_date') or f.get('uploaded_at') or 'Unknown'
-        
-        if filename:
+        # Debug: ensure we handle different data types or missing keys
+        if isinstance(f, dict):
+            # Try every possible key for filename and path
+            filename = f.get('filename') or f.get('file_name') or f.get('name')
+            file_path = f.get('file_path') or f.get('path') or f.get('rel_path')
+            upload_date = f.get('upload_date') or f.get('uploaded_at') or f.get('date') or 'Unknown'
+            
+            # If still no filename, try to extract from path
+            if not filename and file_path:
+                filename = os.path.basename(file_path)
+            
+            if filename:
+                files.append({
+                    'filename': filename,
+                    'file_path': file_path,
+                    'upload_date': upload_date
+                })
+        elif isinstance(f, str):
+            # Handle if it's just a string path
             files.append({
-                'filename': filename,
-                'file_path': file_path,
-                'upload_date': upload_date
+                'filename': os.path.basename(f),
+                'file_path': f,
+                'upload_date': 'Unknown'
             })
 
     appointments = hms.get_patient_appointments(patient_id)
@@ -375,20 +388,22 @@ def patient_details(patient_id):
 def serve_patient_file(patient_id, filename):
     try:
         # Construct path to the file in the attachments directory
-        # The path stored in hms.patient_files is relative, e.g. "attachments/patient_id/filename"
-        # But here we need to serve it.
-        
-        # Security check: ensure filename is safe
         filename = secure_filename(filename)
         
-        # Base directory for attachments
+        # Check multiple possible locations for the file
         base_dir = os.path.dirname(os.path.abspath(hms.data_file))
-        patient_dir = os.path.join(base_dir, 'attachments', patient_id)
         
-        if os.path.exists(os.path.join(patient_dir, filename)):
-            return send_from_directory(patient_dir, filename)
-        else:
-            return "File not found", 404
+        # Location 1: root/attachments/patient_id/filename
+        path1 = os.path.join(base_dir, 'attachments', patient_id)
+        if os.path.exists(os.path.join(path1, filename)):
+            return send_from_directory(path1, filename)
+            
+        # Location 2: root/uploads/patient_id/filename (where my previous fix saved it)
+        path2 = os.path.join(os.getcwd(), 'uploads', patient_id)
+        if os.path.exists(os.path.join(path2, filename)):
+            return send_from_directory(path2, filename)
+            
+        return f"File not found in {path1} or {path2}", 404
     except Exception as e:
         print(f"Error serving file: {e}")
         return str(e), 500

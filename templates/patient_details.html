@@ -193,14 +193,14 @@
                                 <div class="file-icon"><i class="fas fa-file-alt"></i></div>
                                 <div class="file-info">
                                     <a href="{{ url_for('serve_patient_file', patient_id=patient.patient_id, filename=file.filename) }}" target="_blank" style="text-decoration: none; color: inherit;">
-                                        <div class="file-name">{{ file.filename }}</div>
+                                        <div class="file-name" style="font-weight: 500; color: #333;">{{ file.filename or 'Unnamed File' }}</div>
                                     </a>
-                                    <div class="file-meta">{{ file.upload_date }}</div>
+                                    <div class="file-meta" style="font-size: 12px; color: #888;">{{ file.upload_date }}</div>
                                 </div>
                                 <div class="file-actions">
                                     <a href="{{ url_for('serve_patient_file', patient_id=patient.patient_id, filename=file.filename) }}" target="_blank" title="View"><i class="fas fa-eye"></i></a>
                                     <a href="{{ url_for('serve_patient_file', patient_id=patient.patient_id, filename=file.filename) }}" download title="Download"><i class="fas fa-download"></i></a>
-                                    <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.filename) }}" class="delete" title="Delete" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
+                                    <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.file_path) }}" class="delete" title="Delete" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
                                 </div>
                             </div>
                             {% else %}
