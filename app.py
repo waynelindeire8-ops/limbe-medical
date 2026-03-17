@@ -352,27 +352,25 @@ def patient_details(patient_id):
     files = []
     for f in raw_files:
         if isinstance(f, dict):
-            # Normalize keys
             fname = f.get('file_name') or f.get('filename') or 'Unnamed File'
             path = f.get('path') or f.get('file_path')
             uploaded_at = f.get('uploaded_at') or f.get('upload_date') or 'Unknown'
             public_url = f.get('public_url')
             
-            # If public_url is missing but path exists, try to generate it
-            if not public_url and path:
-                # If path looks like it might be in Supabase (patient_id/filename)
-                if '/' in path and not path.startswith('attachments/'):
-                    public_url = get_public_url(path)
-                elif path.startswith('attachments/'):
-                    # Legacy local file - might not be in Supabase
-                    # Try to generate anyway, in case it was migrated manually
-                    supabase_path = path.replace('attachments/', '')
-                    public_url = get_public_url(supabase_path)
+            # If public_url is missing or incorrect, regenerate it
+            if path and (not public_url or not public_url.startswith('http')):
+                # Ensure the path has the 'attachment/' prefix for URL generation
+                if not path.startswith('attachment/'):
+                    # This handles legacy data that might just be 'patient_id/filename.jpg'
+                    path_for_url = f"attachment/{path}"
+                else:
+                    path_for_url = path
+                public_url = get_public_url(path_for_url)
             
             files.append({
                 'file_name': fname,
                 'path': path,
-                'public_url': public_url or '#', # Fallback to # if no URL
+                'public_url': public_url or '#', 
                 'uploaded_at': uploaded_at
             })
     
