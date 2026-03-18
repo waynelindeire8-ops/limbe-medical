@@ -82,8 +82,22 @@ class HospitalManagementSystem:
             self.data_file = onedrive_path
 
         self.load_data()
+        self._activate_admins()
 
     # ---------- Utility ----------
+    def _activate_admins(self) -> None:
+        """Ensure all admins are active and verified by default."""
+        admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
+        changed = False
+        for user in self.users:
+            if (user.role or '').strip().lower() in admin_roles:
+                if not user.is_active or not user.is_verified:
+                    user.is_active = True
+                    user.is_verified = True
+                    changed = True
+        if changed:
+            self.save_data()
+
     @staticmethod
     def generate_id(prefix: str) -> str:
         """Generate a unique ID with a prefix."""
@@ -844,8 +858,8 @@ class HospitalManagementSystem:
             password_salt=creds['salt'],
             password_hash=creds['hash'],
             role=r,
-            is_verified=False,
-            is_active=False
+            is_verified=(r in admin_roles),
+            is_active=(r in admin_roles)
         )
         self.users.append(user)
         self.save_data()
