@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Limbe Health Management System</title>
+    <title>Two-Factor Authentication - Limbe Health</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -89,6 +89,8 @@
             border-radius: 6px;
             font-size: 16px;
             transition: border-color 0.3s;
+            letter-spacing: 2px;
+            text-align: center;
         }
         
         input:focus {
@@ -114,73 +116,70 @@
         }
         
         .alert {
-            padding: 10px;
+            padding: 12px;
             border-radius: 6px;
             margin-bottom: 20px;
             font-size: 14px;
         }
         
         .alert-error {
-            background-color: #ffebee;
-            color: #c62828;
-            border: 1px solid #ffcdd2;
+            background-color: #ffe5ec;
+            color: var(--danger-color);
+            border: 1px solid #ffb3c6;
         }
         
         .alert-success {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            border: 1px solid #c8e6c9;
+            background-color: #e7f9fd;
+            color: #0077b6;
+            border: 1px solid #ade8f4;
         }
-        
-        .footer-text {
+
+        .back-to-login {
             margin-top: 20px;
-            font-size: 14px;
+            display: block;
             color: var(--gray-text);
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back-to-login:hover {
+            color: var(--primary-color);
         }
     </style>
 </head>
 <body>
     <div class="login-container">
         <div class="logo">
-            <i class="fas fa-heartbeat"></i>
+            <i class="fas fa-shield-alt"></i>
         </div>
-        <h2>Welcome Back</h2>
-        <p class="subtitle">Sign in to your account</p>
+        <h2>Verify Identity</h2>
+        <p class="subtitle">Please enter the 6-digit code from your Google Authenticator app.</p>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
+                    <div class="alert alert-{{ category if category != 'error' else 'error' }}">
                         {{ message }}
                     </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
         
-        <form action="{{ url_for('login') }}" method="POST">
+        <form action="{{ url_for('verify_2fa') }}" method="POST">
             <div class="form-group">
-                <label for="username">Username</label>
+                <label for="code">Verification Code</label>
                 <div class="input-group">
-                    <i class="fas fa-user"></i>
-                    <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                    <i class="fas fa-key"></i>
+                    <input type="text" id="code" name="code" placeholder="000000" maxlength="6" pattern="\d{6}" required autofocus>
                 </div>
             </div>
             
-            <div class="form-group">
-                <label for="password">Password</label>
-                <div class="input-group">
-                    <i class="fas fa-lock"></i>
-                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
-                </div>
-            </div>
-            
-            <button type="submit">Sign In</button>
+            <button type="submit">Verify & Log In</button>
         </form>
-        
-        <div class="footer-text">
-            <p><a href="{{ url_for('register') }}" style="color: inherit; text-decoration: none;">Don't have an account? Register</a></p>
-            <p style="margin-top: 10px;">Protected System. Authorized Personnel Only.</p>
-        </div>
+
+        <a href="{{ url_for('logout') }}" class="back-to-login">
+            <i class="fas fa-arrow-left"></i> Back to Login
+        </a>
     </div>
 </body>
 </html>

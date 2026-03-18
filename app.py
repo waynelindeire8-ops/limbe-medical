@@ -1,6 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, send_file
 import datetime
 import os
+import io
+import urllib.parse
+import qrcode
+import pyotp
+import base64
 from werkzeug.utils import secure_filename
 from functools import wraps
 from dotenv import load_dotenv
@@ -57,9 +62,61 @@ def seed_users():
 
 seed_users()
 
+def process_patient_files(patient_id):
+    """Retrieve files for a patient and ensure each has a valid public_url."""
+    raw_files = hms.patient_files.get(patient_id, [])
+    processed_files = []
+    
+    # Base URL for public attachments
+    storage_base = "https://qiudxdvssvkbpoovwpbr.supabase.co/storage/v1/object/public/attachments/"
+    
+    for f in raw_files:
+        if isinstance(f, dict):
+            fname = f.get('file_name') or f.get('filename') or 'Unnamed File'
+            path = f.get('path') or f.get('file_path')
+            uploaded_at = f.get('uploaded_at') or f.get('upload_date') or 'Unknown'
+            
+            if not path:
+                continue
+                
+            # Sanitize path: force forward slashes and remove double slashes
+            clean_p = path.replace('\\', '/')
+            while '//' in clean_p:
+                clean_p = clean_p.replace('//', '/')
+            
+            # Pattern 1: No prefix (just patient_id/file.jpg)
+            # This is our new standard
+            p1 = clean_p
+            if p1.startswith('attachments/'):
+                p1 = p1.replace('attachments/', '', 1)
+            elif p1.startswith('attachment/'):
+                p1 = p1.replace('attachment/', '', 1)
+                
+            # Pattern 2: With 'attachments/' prefix
+            # Some older files might actually be stored with the prefix in the key
+            p2 = f"attachments/{p1}"
+            
+            # URL encode both potential paths
+            def encode_path(p):
+                return '/'.join([urllib.parse.quote(part) for part in p.split('/')])
+            
+            url1 = storage_base + encode_path(p1)
+            url2 = storage_base + encode_path(p2)
+            url3 = url_for('serve_file', path=path)
+            
+            processed_files.append({
+                'file_name': fname,
+                'path': path,
+                'public_url': url1, # Primary attempt
+                'fallback_url_supabase': url2, # Fallback for Supabase
+                'fallback_url_local': url3, # Fallback for local/OneDrive
+                'uploaded_at': uploaded_at
+            })
+    return processed_files
+
 @app.before_request
 def require_login():
-    allowed_routes = ['login', 'static']
+    allowed_routes = ['login', 'static', 'register']
     if request.endpoint not in allowed_routes and 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -138,13 +195,19 @@ def login():
         password = request.form['password']
         user = hms.authenticate(username, password)
         if user:
+            if user.otp_enabled:
+                # Store user_id temporarily for 2FA verification
+                session['temp_user_id'] = user.user_id
+                session['temp_username'] = user.username
+                return redirect(url_for('verify_2fa'))
+            
             session['user_id'] = user.user_id
             session['username'] = user.username
             session['role'] = user.role
             flash(f'Welcome back, {user.username}!', 'success')
             return redirect(url_for('dashboard'))
         else:
-            flash('Invalid username or password', 'error')
+            flash('Invalid username or password, or account not activated.', 'error')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -152,6 +215,170 @@ def logout():
     session.clear()
     flash('Logged out successfully', 'success')
     return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        # Default role is 'user', can be changed by admin later
+        if hms.register_user(username, password, role='user'):
+            flash('Registration successful! Please wait for an admin to activate your account.', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash('Username already exists.', 'error')
+    return render_template('register.html')
+
+@app.route('/verify_2fa', methods=['GET', 'POST'])
+def verify_2fa():
+    if 'temp_user_id' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        code = request.form.get('code')
+        username = session.get('temp_username')
+        if hms.verify_otp(username, code):
+            user_id = session.pop('temp_user_id')
+            username = session.pop('temp_username')
+            user = next((u for u in hms.users if u.user_id == user_id), None)
+            if user:
+                session['user_id'] = user.user_id
+                session['username'] = user.username
+                session['role'] = user.role
+                flash(f'Welcome back, {user.username}!', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                flash('An error occurred. Please log in again.', 'error')
+                return redirect(url_for('login'))
+        else:
+            flash('Invalid 2FA code', 'error')
+            
+    return render_template('verify_2fa.html')
+
+@app.route('/setup_2fa', methods=['GET', 'POST'])
+def setup_2fa():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    username = session.get('username')
+    user = next((u for u in hms.users if u.username == username), None)
+    
+    if request.method == 'POST':
+        code = request.form.get('code')
+        if hms.verify_otp(username, code):
+            hms.enable_otp(username)
+            flash('2FA enabled successfully!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid code. Please try again.', 'error')
+            
+    # Generate secret if not already present
+    secret = hms.generate_otp_secret(username)
+    # Generate provisioning URI for QR code
+    otp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name="Limbe Medical Clinic")
+    
+    # Generate QR code image as base64
+    img = qrcode.make(otp_uri)
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    qr_base64 = base64.b64encode(buffered.getvalue()).decode()
+    
+    return render_template('setup_2fa.html', qr_code=qr_base64, secret=secret, otp_enabled=user.otp_enabled, active_page='setup_2fa')
+
+@app.route('/disable_2fa', methods=['POST'])
+def disable_2fa():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    username = session.get('username')
+    hms.disable_otp(username)
+    flash('2FA disabled successfully.', 'success')
+    return redirect(url_for('dashboard'))
+
+@app.route('/admin/users')
+def admin_users():
+    if 'user_id' not in session or not hms.require_admin(session.get('username')):
+        flash('You do not have permission to access this page.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    users = hms.users
+    return render_template('admin_users.html', users=users, active_page='admin_users')
+
+@app.route('/admin/users/activate/<username>')
+def activate_user(username):
+    if 'user_id' not in session or not hms.require_admin(session.get('username')):
+        flash('You do not have permission to perform this action.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if hms.activate_user(username, session.get('username')):
+        flash(f'User {username} has been activated.', 'success')
+    else:
+        flash(f'Could not activate user {username}.', 'error')
+    
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/deactivate/<username>')
+def deactivate_user(username):
+    if 'user_id' not in session or not hms.require_admin(session.get('username')):
+        flash('You do not have permission to perform this action.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if hms.deactivate_user(username, session.get('username')):
+        flash(f'User {username} has been deactivated.', 'success')
+    else:
+        flash(f'Could not deactivate user {username}.', 'error')
+    
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/verify/<username>')
+def verify_user(username):
+    if 'user_id' not in session or not hms.require_admin(session.get('username')):
+        flash('You do not have permission to perform this action.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if hms.verify_user(username, session.get('username')):
+        flash(f'User {username} has been verified.', 'success')
+    else:
+        flash(f'Could not verify user {username}.', 'error')
+    
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/unverify/<username>')
+def unverify_user(username):
+    if 'user_id' not in session or not hms.require_admin(session.get('username')):
+        flash('You do not have permission to perform this action.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if hms.unverify_user(username, session.get('username')):
+        flash(f'User {username} has been unverified.', 'success')
+    else:
+        flash(f'Could not unverify user {username}.', 'error')
+    
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/enable_2fa/<username>')
+def enable_user_2fa(username):
+    if 'user_id' not in session or not hms.require_admin(session.get('username')):
+        flash('You do not have permission to perform this action.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # This will generate the secret and the user will be prompted to set up 2FA on next login
+    hms.generate_otp_secret(username)
+    hms.enable_otp(username)
+    flash(f'2FA has been enabled for user {username}. They will be required to set it up on their next login.', 'success')
+    
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/disable_2fa/<username>')
+def disable_user_2fa(username):
+    if 'user_id' not in session or not hms.require_admin(session.get('username')):
+        flash('You do not have permission to perform this action.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    hms.disable_otp(username)
+    flash(f'2FA has been disabled for user {username}.', 'success')
+    
+    return redirect(url_for('admin_users'))
 
 @app.route('/')
 def dashboard():
@@ -165,11 +392,11 @@ def dashboard():
     active_doctors = len(hms.get_available_doctors())
     
     # Get recent appointments
-    recent_appointments = sorted(hms.appointments, key=lambda x: x.appointment_date + ' ' + x.appointment_time, reverse=True)[:5]
+    recent_appointments = sorted(hms.appointments, key=lambda x: (x.appointment_date or "") + ' ' + (x.appointment_time or ""), reverse=True)[:5]
     
     # Get active queue
-    active_queue = [q for q in hms.queue if q.status != 'Completed']
-    sorted_queue = sorted(active_queue, key=lambda x: x.arrival_time)
+    active_queue = [q for q in hms.queue if (q.status or "").lower() != 'completed']
+    sorted_queue = sorted(active_queue, key=lambda x: (x.arrival_time or ""))
     # Charts
     days = 90
     base = datetime.date.today()
@@ -338,7 +565,38 @@ def queue_noshow(queue_id):
         notify('No-show', queue_id, 'receptionist')
     return redirect(url_for('queue_dashboard'))
 
-from supabase_data_manager import get_public_url
+from supabase_data_manager import get_public_url, download_file_from_supabase
+
+@app.route('/download_file')
+def download_file():
+    path = request.args.get('path')
+    if not path:
+        return "File not found", 404
+        
+    # Sanitize path for Supabase
+    clean_path = path.replace('\\', '/')
+    if clean_path.startswith('attachments/'):
+        clean_path = clean_path.replace('attachments/', '', 1)
+    elif clean_path.startswith('attachment/'):
+        clean_path = clean_path.replace('attachment/', '', 1)
+        
+    # Fetch file data from Supabase
+    file_data = download_file_from_supabase(clean_path)
+    if not file_data:
+        return "Error downloading file from storage", 500
+        
+    # Create a BytesIO object from the binary data
+    file_stream = io.BytesIO(file_data)
+    
+    # Get filename for the download
+    filename = os.path.basename(clean_path)
+    
+    # Send the file to the user as an attachment
+    return send_file(
+        file_stream,
+        as_attachment=True,
+        download_name=filename
+    )
 
 @app.route('/patient/<patient_id>')
 def patient_details(patient_id):
@@ -347,33 +605,8 @@ def patient_details(patient_id):
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
     
-    # Retrieve files and ensure public_url exists for each
-    raw_files = hms.patient_files.get(patient_id, [])
-    files = []
-    for f in raw_files:
-        if isinstance(f, dict):
-            fname = f.get('file_name') or f.get('filename') or 'Unnamed File'
-            path = f.get('path') or f.get('file_path')
-            uploaded_at = f.get('uploaded_at') or f.get('upload_date') or 'Unknown'
-            public_url = f.get('public_url')
-            
-            # If public_url is missing or incorrect, regenerate it
-            if path and (not public_url or not public_url.startswith('http')):
-                # Robust check for existing prefixes to avoid double-prefixing
-                if path.startswith('attachments/') or path.startswith('attachment/'):
-                    path_for_url = path
-                else:
-                    # Prepend 'attachments/' as confirmed by user (plural)
-                    path_for_url = f"attachments/{path}"
-                
-                public_url = get_public_url(path_for_url)
-            
-            files.append({
-                'file_name': fname,
-                'path': path,
-                'public_url': public_url or '#', 
-                'uploaded_at': uploaded_at
-            })
+    # Retrieve files and ensure public_url exists for each using helper
+    files = process_patient_files(patient_id)
     
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
@@ -426,39 +659,30 @@ def delete_patient_file(patient_id):
     return redirect(url_for('patient_details', patient_id=patient_id))
     return redirect(url_for('patient_details', patient_id=patient_id))
 
-@app.route('/download_file')
-def download_file():
-    path = request.args.get('path')
-    if not path:
-        return "File not found", 404
-        
-    # Security check: ensure path is within attachments
-    base_dir = os.path.dirname(os.path.abspath(hms.data_file))
-    abs_path = os.path.join(base_dir, path)
-    
-    if not os.path.exists(abs_path):
-        return "File not found", 404
-        
-    directory = os.path.dirname(abs_path)
-    filename = os.path.basename(abs_path)
-    return send_from_directory(directory, filename, as_attachment=True)
-
 @app.route('/serve_file')
 def serve_file():
     path = request.args.get('path')
     if not path:
         return "File not found", 404
         
-    # Security check: ensure path is within attachments
+    # Security check: ensure path is within allowed directories
+    # We check both the main data directory and potential OneDrive paths
     base_dir = os.path.dirname(os.path.abspath(hms.data_file))
-    abs_path = os.path.join(base_dir, path)
     
-    if not os.path.exists(abs_path):
-        return "File not found", 404
-        
-    directory = os.path.dirname(abs_path)
-    filename = os.path.basename(abs_path)
-    return send_from_directory(directory, filename)
+    # Try to find the file in multiple locations
+    possible_paths = [
+        os.path.join(base_dir, path),
+        os.path.join(base_dir, 'attachments', path),
+        os.path.abspath(path) # Absolute path check (use with caution, but needed for OneDrive sometimes)
+    ]
+    
+    for abs_path in possible_paths:
+        if os.path.exists(abs_path) and os.path.isfile(abs_path):
+            directory = os.path.dirname(abs_path)
+            filename = os.path.basename(abs_path)
+            return send_from_directory(directory, filename)
+            
+    return "File not found", 404
 
 @app.route('/patients')
 def patients():
@@ -658,7 +882,7 @@ def edit_appointment(appointment_id):
     
     # Get current patient details and files
     current_patient = hms.get_patient(appointment.patient_id)
-    patient_files = hms.patient_files.get(appointment.patient_id, []) if current_patient else []
+    patient_files = process_patient_files(appointment.patient_id) if current_patient else []
 
     if request.method == 'POST':
         try:

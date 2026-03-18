@@ -64,38 +64,65 @@ def put_supabase_json(data: dict) -> bool:
         print(f"Error saving data to Supabase: {e}")
         return False
 
-def upload_file_to_supabase(local_path: str, supabase_path: str) -> bool:
+def upload_file_to_supabase(local_path: str, supabase_path: str, bucket: str = "attachments") -> bool:
     client = get_supabase_client()
     if not client:
         return False
     try:
-        bucket = os.environ.get("SUPABASE_BUCKET", "hospital")
+        # Sanitize path: force forward slashes and remove bucket name prefix
+        clean_path = supabase_path.replace('\\', '/')
+        if clean_path.startswith(f"{bucket}/"):
+            clean_path = clean_path.replace(f"{bucket}/", "", 1)
+            
         with open(local_path, 'rb') as f:
-            response = client.storage.from_(bucket).upload(supabase_path, f, {"upsert": "true"})
+            response = client.storage.from_(bucket).upload(clean_path, f, {"upsert": "true"})
         return response.status_code == 200
     except Exception as e:
         print(f"Error uploading to Supabase: {e}")
         return False
 
-def delete_file_from_supabase(supabase_path: str) -> bool:
+def delete_file_from_supabase(supabase_path: str, bucket: str = "attachments") -> bool:
     client = get_supabase_client()
     if not client:
         return False
     try:
-        bucket = os.environ.get("SUPABASE_BUCKET", "hospital")
-        response = client.storage.from_(bucket).remove([supabase_path])
+        # Sanitize path: force forward slashes and remove bucket name prefix
+        clean_path = supabase_path.replace('\\', '/')
+        if clean_path.startswith(f"{bucket}/"):
+            clean_path = clean_path.replace(f"{bucket}/", "", 1)
+            
+        response = client.storage.from_(bucket).remove([clean_path])
         return response.status_code == 200
     except Exception as e:
         print(f"Error deleting from Supabase: {e}")
         return False
 
-def get_public_url(supabase_path: str) -> str:
+def download_file_from_supabase(supabase_path: str, bucket: str = "attachments") -> bytes:
+    client = get_supabase_client()
+    if not client:
+        return None
+    try:
+        # Sanitize path: force forward slashes and remove bucket name prefix
+        clean_path = supabase_path.replace('\\', '/')
+        if clean_path.startswith(f"{bucket}/"):
+            clean_path = clean_path.replace(f"{bucket}/", "", 1)
+            
+        return client.storage.from_(bucket).download(clean_path)
+    except Exception as e:
+        print(f"Error downloading from Supabase: {e}")
+        return None
+
+def get_public_url(supabase_path: str, bucket: str = "attachments") -> str:
     client = get_supabase_client()
     if not client:
         return ""
     try:
-        bucket = os.environ.get("SUPABASE_BUCKET", "hospital")
-        return client.storage.from_(bucket).get_public_url(supabase_path)
+        # Sanitize path: force forward slashes and remove bucket name prefix
+        clean_path = supabase_path.replace('\\', '/')
+        if clean_path.startswith(f"{bucket}/"):
+            clean_path = clean_path.replace(f"{bucket}/", "", 1)
+            
+        return client.storage.from_(bucket).get_public_url(clean_path)
     except Exception as e:
         print(f"Error getting public URL: {e}")
         return ""

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Limbe Health Management System</title>
+    <title>Register - Limbe Health Management System</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -114,55 +114,61 @@
         }
         
         .alert {
-            padding: 10px;
+            padding: 12px;
             border-radius: 6px;
             margin-bottom: 20px;
             font-size: 14px;
         }
         
         .alert-error {
-            background-color: #ffebee;
-            color: #c62828;
-            border: 1px solid #ffcdd2;
+            background-color: #ffe5ec;
+            color: var(--danger-color);
+            border: 1px solid #ffb3c6;
         }
         
         .alert-success {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            border: 1px solid #c8e6c9;
+            background-color: #e7f9fd;
+            color: #0077b6;
+            border: 1px solid #ade8f4;
         }
-        
-        .footer-text {
+
+        .login-link {
             margin-top: 20px;
-            font-size: 14px;
+            display: block;
             color: var(--gray-text);
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .login-link:hover {
+            color: var(--primary-color);
         }
     </style>
 </head>
 <body>
     <div class="login-container">
         <div class="logo">
-            <i class="fas fa-heartbeat"></i>
+            <i class="fas fa-user-plus"></i>
         </div>
-        <h2>Welcome Back</h2>
-        <p class="subtitle">Sign in to your account</p>
+        <h2>Create Account</h2>
+        <p class="subtitle">Join the Limbe Health Management System.</p>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
+                    <div class="alert alert-{{ category if category != 'error' else 'error' }}">
                         {{ message }}
                     </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
         
-        <form action="{{ url_for('login') }}" method="POST">
+        <form action="{{ url_for('register') }}" method="POST">
             <div class="form-group">
                 <label for="username">Username</label>
                 <div class="input-group">
                     <i class="fas fa-user"></i>
-                    <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                    <input type="text" id="username" name="username" placeholder="Choose a username" required autofocus>
                 </div>
             </div>
             
@@ -170,17 +176,16 @@
                 <label for="password">Password</label>
                 <div class="input-group">
                     <i class="fas fa-lock"></i>
-                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                    <input type="password" id="password" name="password" placeholder="Choose a password" required>
                 </div>
             </div>
             
-            <button type="submit">Sign In</button>
+            <button type="submit">Register</button>
         </form>
-        
-        <div class="footer-text">
-            <p><a href="{{ url_for('register') }}" style="color: inherit; text-decoration: none;">Don't have an account? Register</a></p>
-            <p style="margin-top: 10px;">Protected System. Authorized Personnel Only.</p>
-        </div>
+
+        <a href="{{ url_for('login') }}" class="login-link">
+            Already have an account? Log in
+        </a>
     </div>
 </body>
 </html>

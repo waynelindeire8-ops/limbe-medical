@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - User Management</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --success-color: #4cc9f0;
+            --danger-color: #f72585;
+            --light-bg: #f8f9fa;
+            --dark-text: #212529;
+            --gray-text: #6c757d;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light-bg);
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: var(--dark-text);
+            margin-bottom: 20px;
+        }
+        
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .user-table th, .user-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        
+        .user-table th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-inactive {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-verified {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+        
+        .status-unverified {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .actions a {
+            color: var(--primary-color);
+            text-decoration: none;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        
+        .actions a:hover {
+            text-decoration: underline;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>User Management</h1>
+        
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Verified</th>
+                    <th>2FA Enabled</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.role }}</td>
+                    <td>
+                        <span class="status-badge {{ 'status-active' if user.is_active else 'status-inactive' }}">
+                            {{ 'Active' if user.is_active else 'Inactive' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="status-badge {{ 'status-verified' if user.is_verified else 'status-unverified' }}">
+                            {{ 'Verified' if user.is_verified else 'Unverified' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="status-badge {{ 'status-active' if user.otp_enabled else 'status-inactive' }}">
+                            {{ 'Enabled' if user.otp_enabled else 'Disabled' }}
+                        </span>
+                    </td>
+                    <td class="actions">
+                        {% if user.is_active %}
+                            <a href="{{ url_for('deactivate_user', username=user.username) }}" class="btn btn-danger">Deactivate</a>
+                        {% else %}
+                            <a href="{{ url_for('activate_user', username=user.username) }}" class="btn btn-success">Activate</a>
+                        {% endif %}
+                        
+                        {% if user.is_verified %}
+                            <a href="{{ url_for('unverify_user', username=user.username) }}" class="btn btn-danger">Unverify</a>
+                        {% else %}
+                            <a href="{{ url_for('verify_user', username=user.username) }}" class="btn btn-success">Verify</a>
+                        {% endif %}
+
+                        {% if user.otp_enabled %}
+                            <a href="{{ url_for('disable_user_2fa', username=user.username) }}" class="btn btn-danger">Disable 2FA</a>
+                        {% else %}
+                            <a href="{{ url_for('enable_user_2fa', username=user.username) }}" class="btn btn-success">Enable 2FA</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

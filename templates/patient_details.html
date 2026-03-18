@@ -198,7 +198,7 @@
                                     <div class="file-meta" style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
                                 </div>
                                 <div class="file-actions">
-                                    <a href="{{ file.public_url }}" target="_blank" title="View"><i class="fas fa-eye"></i></a>
+                                    <a href="javascript:void(0)" onclick="openPreview('{{ file.public_url }}', '{{ file.file_name }}', '{{ file.fallback_url_supabase }}', '{{ file.fallback_url_local }}')" title="View"><i class="fas fa-eye"></i></a>
                                     <a href="{{ file.public_url }}" download="{{ file.file_name }}" title="Download"><i class="fas fa-download"></i></a>
                                     <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.path) }}" class="delete" title="Delete" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
                                 </div>
@@ -282,18 +282,33 @@
     <!-- Image Preview Modal -->
     <div id="imagePreviewModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8);">
       <span class="close" onclick="closePreview()" style="position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
-      <img class="modal-content" id="previewImage" style="margin: auto; display: block; width: 80%; max-width: 700px; margin-top: 50px;">
+      <img class="modal-content" id="previewImage" style="margin: auto; display: block; width: 80%; max-width: 700px; margin-top: 50px;" onerror="tryFallback(this)">
       <div id="caption" style="margin: auto; display: block; width: 80%; max-width: 700px; text-align: center; color: #ccc; padding: 10px 0;"></div>
     </div>
 
     <script>
-    function openPreview(path, filename) {
+    let fallbackUrls = [];
+
+    function openPreview(public_url, filename, ...fallbacks) {
         var modal = document.getElementById("imagePreviewModal");
         var modalImg = document.getElementById("previewImage");
         var captionText = document.getElementById("caption");
+        
+        fallbackUrls = fallbacks.filter(Boolean); // Store non-empty fallback URLs
         modal.style.display = "block";
-        modalImg.src = "{{ url_for('serve_file') }}?path=" + encodeURIComponent(path);
+        modalImg.src = public_url;
         captionText.innerHTML = filename;
+    }
+
+    function tryFallback(img) {
+        if (fallbackUrls.length > 0) {
+            let nextUrl = fallbackUrls.shift();
+            console.log("Image load failed, trying next fallback URL:", nextUrl);
+            img.src = nextUrl;
+        } else {
+            console.error("All fallback URLs failed to load.");
+            img.src = ""; // Optional: show a placeholder for broken image
+        }
     }
 
     function closePreview() {

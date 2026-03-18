@@ -12,6 +12,7 @@ import os
 import json
 import re
 import uuid
+import pyotp
 try:
     from dotenv import load_dotenv
 except Exception:
@@ -206,9 +207,9 @@ class HospitalManagementSystem:
         self.prescriptions = [Prescription(**_filter(Prescription, p)) for p in data.get('prescriptions', [])]
         self.bills = [Bill(**_normalize_bill(b)) for b in data.get('bills', [])]
         self.inventory = [InventoryItem(**_filter(InventoryItem, i)) for i in data.get('inventory', [])]
-        self.users = [User(**u) for u in data.get('users', [])]
+        self.users = [User(**_filter(User, u)) for u in data.get('users', [])]
         self.messages = [Message(**_filter(Message, m)) for m in data.get('messages', [])]
-        self.queue = [QueueItem(**q) for q in data.get('queue', [])]
+        self.queue = [QueueItem(**_filter(QueueItem, q)) for q in data.get('queue', [])]
         self.departments = data.get('departments', [])
         self.settings = data.get('settings', self.settings)
         self.activity = data.get('activity', [])
@@ -226,8 +227,10 @@ class HospitalManagementSystem:
         for src in file_paths:
             try:
                 name = os.path.basename(src)
-                # Corrected path with 'attachments' prefix (plural)
-                supabase_path = f"attachments/{patient_id}/{name}"
+                # Ensure path uses forward slashes and has no 'attachments' prefix, and no double slashes
+                supabase_path = f"{patient_id}/{name}".replace('\\', '/')
+                while '//' in supabase_path:
+                    supabase_path = supabase_path.replace('//', '/')
                 
                 if upload_file_to_supabase(src, supabase_path):
                     public_url = get_public_url(supabase_path)
@@ -254,18 +257,38 @@ class HospitalManagementSystem:
             return False
             
         entries = self.patient_files.get(patient_id, []) or []
-        file_to_delete = next((e for e in entries if e.get('path') == rel_path), None)
+        # Flexible match: normalize backslashes and double slashes and compare
+        norm_rel = rel_path.replace('\\', '/')
+        while '//' in norm_rel:
+            norm_rel = norm_rel.replace('//', '/')
+        
+        def normalize(p):
+            p = (p or '').replace('\\', '/')
+            while '//' in p:
+                p = p.replace('//', '/')
+            return p
+
+        file_to_delete = next((e for e in entries if normalize(e.get('path')) == norm_rel), None)
         
         if not file_to_delete:
             return False
             
-        if delete_file_from_supabase(rel_path):
-            new_entries = [e for e in entries if e.get('path') != rel_path]
+        # Sanitize path for Supabase (replace backslashes with forward slashes)
+        supabase_path = norm_rel
+        # Remove bucket name prefix if it exists
+        if supabase_path.startswith('attachments/'):
+            supabase_path = supabase_path.replace('attachments/', '', 1)
+        elif supabase_path.startswith('attachment/'):
+            supabase_path = supabase_path.replace('attachment/', '', 1)
+            
+        if delete_file_from_supabase(supabase_path):
+            # Update local list (also with flexible matching)
+            new_entries = [e for e in entries if normalize(e.get('path')) != norm_rel]
             self.patient_files[patient_id] = new_entries
             self.save_data()
             return True
         else:
-            print(f"[WARN] Failed to delete file '{rel_path}' from Supabase.")
+            print(f"[WARN] Failed to delete file '{supabase_path}' from Supabase.")
             return False
 
     def rename_patient_file(self, patient_id: str, rel_path: str, new_name: str) -> bool:
@@ -292,7 +315,7 @@ class HospitalManagementSystem:
         except Exception as e:
             print(f"[WARN] Failed to rename file '{abs_path}' -> '{new_abs}': {e}")
             return False
-        new_rel = os.path.relpath(new_abs, base_dir)
+        new_rel = os.path.relpath(new_abs, base_dir).replace('\\', '/')
         entry['file_name'] = new_name
         entry['path'] = new_rel
         self.save_data()
@@ -820,7 +843,9 @@ class HospitalManagementSystem:
             username=username,
             password_salt=creds['salt'],
             password_hash=creds['hash'],
-            role=r
+            role=r,
+            is_verified=False,
+            is_active=False
         )
         self.users.append(user)
         self.save_data()
@@ -830,10 +855,47 @@ class HospitalManagementSystem:
         user = next((u for u in self.users if u.username.lower() == username.lower()), None)
         if not user:
             return None
+        
+        if not user.is_active or not user.is_verified:
+            return None
+            
         creds = self._hash_password(password, user.password_salt)
         if creds['hash'] == user.password_hash:
             return user
         return None
+
+    def generate_otp_secret(self, username: str) -> Optional[str]:
+        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
+        if not user:
+            return None
+        if not user.otp_secret:
+            user.otp_secret = pyotp.random_base32()
+            self.save_data()
+        return user.otp_secret
+
+    def verify_otp(self, username: str, code: str) -> bool:
+        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
+        if not user or not user.otp_secret:
+            return False
+        totp = pyotp.TOTP(user.otp_secret)
+        return totp.verify(code)
+
+    def enable_otp(self, username: str) -> bool:
+        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
+        if not user or not user.otp_secret:
+            return False
+        user.otp_enabled = True
+        self.save_data()
+        return True
+
+    def disable_otp(self, username: str) -> bool:
+        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
+        if not user:
+            return False
+        user.otp_enabled = False
+        user.otp_secret = ""
+        self.save_data()
+        return True
 
     def add_activity(self, actor: Optional[str], action: str, entity: str, entity_id: str, summary: str) -> None:
         entry = {
@@ -866,6 +928,51 @@ class HospitalManagementSystem:
             self.add_activity(actor_username, 'update_role', 'user', user.user_id, f"{user.username}: {old_role} -> {user.role}")
         except Exception:
             pass
+        return True
+
+    def require_admin(self, actor_username: str) -> bool:
+        admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
+        actor = next((u for u in self.users if u.username.lower() == actor_username.lower()), None)
+        return actor and (actor.role or '').strip().lower() in admin_roles
+
+    def activate_user(self, target_username: str, actor_username: str) -> bool:
+        if not self.require_admin(actor_username):
+            return False
+        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
+        if not user:
+            return False
+        user.is_active = True
+        self.save_data()
+        return True
+
+    def deactivate_user(self, target_username: str, actor_username: str) -> bool:
+        if not self.require_admin(actor_username):
+            return False
+        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
+        if not user:
+            return False
+        user.is_active = False
+        self.save_data()
+        return True
+
+    def verify_user(self, target_username: str, actor_username: str) -> bool:
+        if not self.require_admin(actor_username):
+            return False
+        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
+        if not user:
+            return False
+        user.is_verified = True
+        self.save_data()
+        return True
+
+    def unverify_user(self, target_username: str, actor_username: str) -> bool:
+        if not self.require_admin(actor_username):
+            return False
+        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
+        if not user:
+            return False
+        user.is_verified = False
+        self.save_data()
         return True
 
     def _resolve_onedrive_base(self) -> Optional[str]:

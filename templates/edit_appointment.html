@@ -151,7 +151,7 @@
                                 <div style="font-size: 11px; color: #888;">{{ file.uploaded_at }}</div>
                             </div>
                         </div>
-                        <a href="{{ url_for('download_file', path=file.path) }}" title="Download" style="color: #4361ee;"><i class="fas fa-download"></i></a>
+                        <a href="{{ file.public_url }}" download="{{ file.file_name }}" title="Download" style="color: #4361ee;"><i class="fas fa-download"></i></a>
                     </li>
                     {% else %}
                     <li style="padding: 10px; text-align: center; color: #888; font-style: italic;">No files attached to this patient.</li>

@@ -103,49 +103,40 @@ class InventoryItem:
 
 @dataclass
 class User:
-    user_id: str
-    username: str
-    password_salt: str
-    password_hash: str
-    role: str
+    user_id: str = ""
+    username: str = ""
+    password_salt: str = ""
+    password_hash: str = ""
+    role: str = ""
+    otp_secret: str = ""
+    otp_enabled: bool = False
+    is_verified: bool = False
+    is_active: bool = False
 
 
 @dataclass
 class Message:
-    message_id: str
-    sender_id: str
-    sender_name: str
-    recipient_id: str
-    subject: str
-    content: str
-    timestamp: str
-    is_read: bool
-    is_archived: bool
+    message_id: str = ""
+    sender_id: str = ""
+    sender_name: str = ""
+    recipient_id: str = ""
+    subject: str = ""
+    content: str = ""
+    timestamp: str = ""
+    is_read: bool = False
+    is_archived: bool = False
 
 
 @dataclass
 class QueueItem:
-    queue_id: str
-    patient_id: str
-    patient_name: str
-    doctor_id: str
-    doctor_name: str
-    status: str  # Waiting, In Consultation, Completed, Cancelled
-    priority: str # Normal, Urgent, Emergency
-    check_in_time: str
-    estimated_wait: str
-
-
-@dataclass
-class QueueItem:
-    queue_id: str
-    patient_id: str
-    patient_name: str
-    doctor_id: str
-    status: str
-    priority: str
-    arrival_time: str
-    estimated_wait: str
+    queue_id: str = ""
+    patient_id: str = ""
+    patient_name: str = ""
+    doctor_id: str = ""
+    status: str = "Waiting"
+    priority: str = "Normal"
+    arrival_time: str = ""
+    estimated_wait: str = ""
     department: str = ""
     visit_reason: str = ""
     special_category: str = ""
@@ -155,6 +146,7 @@ class QueueItem:
     consultation_start_time: str = ""
     consultation_end_time: str = ""
     no_show_time: str = ""
+
 
 
 # Re-export all models for GUI compatibility
