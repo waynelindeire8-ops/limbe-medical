@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, send_file, jsonify
 import datetime
 import os
 import io
+import json
 import urllib.parse
 import qrcode
 import pyotp
@@ -610,12 +611,14 @@ def patient_details(patient_id):
     
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
+    scheme = hms.get_patient_scheme(patient_id)
     
     return render_template('patient_details.html', 
                            patient=patient, 
                            files=files, 
                            appointments=appointments, 
                            medical_records=medical_records,
+                           scheme=scheme,
                            active_page='patients')
 
 @app.route('/patient/<patient_id>/upload_file', methods=['POST'])
@@ -713,6 +716,27 @@ def add_patient():
                 scheme_type=request.form.get('scheme_type','')
             )
             hms.add_patient(new_patient)
+            
+            # Save scheme info
+            scheme_info = {
+                'provider': request.form.get('scheme_provider', ''),
+                'type': request.form.get('scheme_type', ''),
+                'membership_number': request.form.get('membership_number', ''),
+                'form_number': request.form.get('form_number', ''),
+                'coverage_percent': 0.0,
+                'age': request.form.get('age', ''),
+                'principal_member': request.form.get('principal_member', ''),
+                'relationship': request.form.get('relationship', '')
+            }
+            
+            cp = request.form.get('coverage_percent', '0')
+            try:
+                scheme_info['coverage_percent'] = float(cp)
+            except:
+                pass
+                
+            hms.update_patient_scheme(new_patient.patient_id, scheme_info)
+            
             flash('Patient added successfully!', 'success')
             notify('Patient added', f"{new_patient.first_name} {new_patient.last_name} ({new_patient.patient_id})", 'admin')
             notify('Patient added', f"{new_patient.first_name} {new_patient.last_name}", 'receptionist')
@@ -729,19 +753,13 @@ def edit_patient(patient_id):
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
 
+    scheme = hms.get_patient_scheme(patient_id)
+
     if request.method == 'POST':
         try:
-            # Get original patient object for validation
-            patient = hms.get_patient(patient_id)
-            if not patient:
-                flash('Patient not found!', 'error')
-                return redirect(url_for('patients'))
-
-            new_id = request.form.get('patient_id', '').strip()
-            
             # Prepare update data
             update_data = {
-                'patient_id': new_id,
+                'patient_id': request.form.get('patient_id', '').strip(),
                 'first_name': request.form.get('first_name'),
                 'last_name': request.form.get('last_name'),
                 'date_of_birth': request.form.get('dob',''),
@@ -758,19 +776,35 @@ def edit_patient(patient_id):
             update_data = {k: v for k, v in update_data.items() if v is not None}
             
             success = hms.update_patient(patient_id, **update_data)
-            print(f"[DEBUG] edit_patient: update_patient success={success}")
+            
             if success:
+                # Update scheme info as well
+                new_scheme = dict(scheme or {})
+                new_scheme['provider'] = request.form.get('scheme_provider', '')
+                new_scheme['type'] = request.form.get('scheme_type', '')
+                new_scheme['membership_number'] = request.form.get('membership_number', '')
+                new_scheme['form_number'] = request.form.get('form_number', '')
+                new_scheme['age'] = request.form.get('age', '')
+                new_scheme['principal_member'] = request.form.get('principal_member', '')
+                new_scheme['relationship'] = request.form.get('relationship', '')
+                
+                cp = request.form.get('coverage_percent', '0')
+                try:
+                    new_scheme['coverage_percent'] = float(cp)
+                except:
+                    new_scheme['coverage_percent'] = 0.0
+                
+                hms.update_patient_scheme(update_data.get('patient_id') or patient_id, new_scheme)
+                
                 flash('Patient updated successfully!', 'success')
-                notify('Patient updated', new_id or patient_id, 'admin')
-                return redirect(url_for('patients'))
+                notify('Patient updated', update_data.get('patient_id') or patient_id, 'admin')
+                return redirect(url_for('patient_details', patient_id=update_data.get('patient_id') or patient_id))
             else:
-                print(f"[ERROR] edit_patient: update_patient failed for {patient_id}")
                 flash('Error updating patient: ID might already be in use.', 'error')
         except Exception as e:
-            print(f"[ERROR] edit_patient exception: {e}")
             flash(f'Error updating patient: {e}', 'error')
 
-    return render_template('edit_patient.html', patient=patient, active_page='patients')
+    return render_template('edit_patient.html', patient=patient, scheme=scheme, active_page='patients')
 
 
 @app.route('/delete_patient/<patient_id>')
@@ -1070,7 +1104,7 @@ def general_reports():
          revenue = sum(bill.amount for bill in hms.bills)
     else:
          # Mock revenue based on completed appointments
-         revenue = sum(150 for a in hms.appointments if a.status == 'Completed')
+         revenue = sum(15000 for a in hms.appointments if a.status == 'Completed')
 
     # Department counts for the table
     department_counts = {}
@@ -1233,6 +1267,233 @@ def pay_bill(bill_id):
     else:
         flash('Error processing payment', 'error')
     return redirect(url_for('view_bill', bill_id=bill_id))
+
+@app.route('/billing/invoice/print/<bill_id>')
+def print_invoice_formatted(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        return "Bill not found", 404
+    patient = hms.get_patient(bill.patient_id)
+    scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
+    
+    items = []
+    # Check if bill.services is JSON
+    if bill.services.startswith('[') and bill.services.endswith(']'):
+        try:
+            items = json.loads(bill.services)
+        except Exception:
+            items = []
+    
+    if not items:
+        # Fallback logic for items (same as print_invoice)
+        try:
+            dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
+            yr, mh, day = dt.year, dt.month, dt.day
+        except Exception:
+            yr, mh, day = "", "", ""
+        
+        for raw in (bill.services or "").split(", "):
+            desc = raw
+            amt = 0.0
+            if "($" in raw:
+                try:
+                    desc = raw.split(" ($")[0]
+                    amt = float(raw.split(" ($")[1].rstrip(")").strip())
+                except Exception:
+                    pass
+            items.append({
+                'code': 'SRV',
+                'description': desc,
+                'qty': 1,
+                'yr': yr,
+                'mh': mh,
+                'day': day,
+                'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
+                'award': 0.0
+            })
+    
+    coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
+    try:
+        coverage_percent = float(coverage_percent)
+    except Exception:
+        coverage_percent = 0.0
+    
+    total_amount = float(bill.amount)
+    covered_amount = total_amount * (coverage_percent / 100.0)
+    shortfall_amount = max(total_amount - covered_amount, 0.0)
+    
+    return render_template('billing/print_invoice.html',
+                           bill=bill,
+                           patient=patient,
+                           scheme=scheme,
+                           coverage_percent=int(coverage_percent),
+                           items=items,
+                           total_amount=total_amount,
+                           covered_amount=covered_amount,
+                           shortfall_amount=shortfall_amount)
+
+@app.route('/billing/summary', methods=['GET'])
+def billing_summary():
+    # Filters for summary bill
+    provider = request.args.get('provider', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
+    bills_to_show = []
+    total_sum = 0.0
+    
+    for bill in hms.bills:
+        # Basic filtering logic
+        match = True
+        if provider:
+            scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
+            if scheme.get('provider', '').lower() != provider.lower():
+                match = False
+        
+        if date_from and bill.created_date < date_from:
+            match = False
+        if date_to and bill.created_date > date_to:
+            match = False
+            
+        if match:
+            # Enrich bill with patient name and scheme info for the summary table
+            patient = hms.get_patient(bill.patient_id)
+            scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
+            
+            # Simple column parsing (like CON, DRUG, LAB) if needed
+            con_amt = 0.0
+            drug_amt = 0.0
+            lab_amt = 0.0
+            
+            if bill.services.startswith('[') and bill.services.endswith(']'):
+                try:
+                    items = json.loads(bill.services)
+                    for itm in items:
+                        desc = itm.get('description', '').lower()
+                        fee = float(itm.get('fee', 0))
+                        if 'consult' in desc: con_amt += fee
+                        elif 'lab' in desc or 'test' in desc: lab_amt += fee
+                        else: drug_amt += fee # Default to drug for simplicity
+                except: pass
+
+            bill_data = {
+                'bill_id': bill.bill_id,
+                'created_date': bill.created_date,
+                'patient_name': f"{patient.first_name} {patient.last_name}" if patient else 'Unknown',
+                'membership_number': scheme.get('membership_number', ''),
+                'form_number': scheme.get('form_number', ''),
+                'branch': scheme.get('branch', ''), # If we had branch info
+                'patient_id': bill.patient_id,
+                'amount': float(bill.amount),
+                'con_amt': con_amt,
+                'drug_amt': drug_amt,
+                'lab_amt': lab_amt
+            }
+            bills_to_show.append(bill_data)
+            total_sum += float(bill.amount)
+            
+    title = f"{provider.upper() if provider else 'ALL'} MEDICAL BILL SUMMARY"
+    if date_from and date_to:
+        title += f" FROM {date_from} TO {date_to}"
+    elif date_from:
+        title += f" SINCE {date_from}"
+    elif date_to:
+        title += f" UNTIL {date_to}"
+        
+    p_lower = provider.lower()
+    return render_template('billing/summary_bill.html', 
+                           bills=bills_to_show, 
+                           total_sum=total_sum, 
+                           title=title,
+                           show_date=(p_lower != 'reserve bank'),
+                           show_member_info=(p_lower in ['national bank', 'reserve bank', 'masm', 'precious']),
+                           show_id_no=(p_lower == 'azam tv'),
+                           show_detailed_cols=(p_lower in ['bakhresa', 'electrical enterprises', 'azam tv']))
+
+@app.route('/billing/invoice/detailed/<bill_id>')
+def print_invoice_detailed(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        return "Bill not found", 404
+    patient = hms.get_patient(bill.patient_id)
+    scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
+    
+    items = []
+    if bill.services.startswith('[') and bill.services.endswith(']'):
+        try:
+            items = json.loads(bill.services)
+        except Exception:
+            items = []
+    
+    if not items:
+        # Fallback for legacy format
+        try:
+            dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
+            yr, mh, day = dt.year, dt.month, dt.day
+        except:
+            yr, mh, day = "", "", ""
+        
+        for raw in (bill.services or "").split(", "):
+            desc = raw
+            amt = 0.0
+            if "($" in raw:
+                try:
+                    desc = raw.split(" ($")[0]
+                    amt = float(raw.split(" ($")[1].rstrip(")").strip())
+                except:
+                    pass
+            items.append({
+                'code': 'SRV',
+                'description': desc,
+                'qty': 1,
+                'yr': yr, 'mh': mh, 'day': day,
+                'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
+                'award': 0.0
+            })
+            
+    total_amount = float(bill.amount)
+    
+    return render_template('billing/invoice_detailed.html',
+                           bill=bill,
+                           patient=patient,
+                           scheme=scheme,
+                           items=items,
+                           total_amount=total_amount)
+
+@app.route('/billing/statement', methods=['GET'])
+def billing_statement():
+    client_name = request.args.get('client', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    
+    # Filter bills for this client/company
+    statement_items = []
+    running_balance = 0.0
+    
+    for bill in hms.bills:
+        scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
+        # If client matches scheme provider or if it's explicitly mentioned in the bill
+        if client_name and scheme.get('provider', '').lower() != client_name.lower():
+            continue
+            
+        if date_from and bill.created_date < date_from:
+            continue
+        if date_to and bill.created_date > date_to:
+            continue
+            
+        amt = float(bill.amount)
+        running_balance += amt
+        statement_items.append({
+            'date': bill.created_date,
+            'invoice_no': bill.bill_id,
+            'amount': amt,
+            'balance': running_balance
+        })
+        
+    return render_template('billing/statement_of_account.html',
+                           client_name=client_name or 'Valued Client',
+                           current_date=datetime.datetime.now().strftime("%Y-%m-%d"),
+                           items=statement_items)
 
 @app.route('/billing/invoice/<bill_id>')
 def print_invoice(bill_id):
@@ -1409,6 +1670,9 @@ def update_invoice_scheme(bill_id):
     scheme['membership_number'] = request.form.get('membership_number', '')
     scheme['policy_number'] = request.form.get('policy_number', '')
     scheme['form_number'] = request.form.get('form_number', '')
+    scheme['age'] = request.form.get('age', '')
+    scheme['principal_member'] = request.form.get('principal_member', '')
+    scheme['relationship'] = request.form.get('relationship', '')
     cp = request.form.get('coverage_percent', '0')
     try:
         coverage_percent = float(cp)

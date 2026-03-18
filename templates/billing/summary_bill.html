@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title or 'Medical Bill Summary' }} - Limbe Medical Clinic</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background: #fff;
+            font-size: 13px;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 5px;
+        }
+        .header h1 {
+            margin: 0;
+            text-transform: uppercase;
+            font-size: 20px;
+        }
+        .bill-title {
+            text-align: left;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 15px;
+        }
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .summary-table th {
+            border: 1px solid #000;
+            padding: 6px 4px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            background-color: #f2f2f2;
+        }
+        .summary-table td {
+            border: 1px solid #000;
+            padding: 6px 4px;
+            font-size: 11px;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .total-row {
+            font-weight: bold;
+            background-color: #f2f2f2;
+        }
+        .no-print {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .btn-print {
+            background-color: #0b2e67;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="no-print">
+            <button class="btn-print" onclick="window.print()">Print Summary</button>
+            <a href="{{ url_for('billing_dashboard') }}" style="margin-left: 10px; text-decoration: none; color: #0b2e67;">Back to Dashboard</a>
+        </div>
+
+        <div class="header">
+            <h1>Limbe Medical Clinic</h1>
+        </div>
+
+        <div class="bill-title">
+            {{ title or 'Medical Bill Summary' }}
+        </div>
+
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">Inv No</th>
+                    {% if show_date %}
+                    <th style="width: 80px;">Date</th>
+                    {% endif %}
+                    {% if show_member_info %}
+                    <th style="width: 100px;">Member No</th>
+                    <th style="width: 100px;">Form No</th>
+                    {% endif %}
+                    <th>Name of Patient</th>
+                    {% if show_branch %}
+                    <th style="width: 100px;">Branch</th>
+                    {% endif %}
+                    {% if show_id_no %}
+                    <th style="width: 100px;">ID No</th>
+                    {% endif %}
+                    {% if show_detailed_cols %}
+                    <th style="width: 60px;">CON</th>
+                    <th style="width: 60px;">DRUG</th>
+                    <th style="width: 60px;">LAB</th>
+                    {% endif %}
+                    <th style="width: 100px;" class="text-right">Amount (MWK)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bill in bills %}
+                <tr>
+                    <td>{{ bill.bill_id }}</td>
+                    {% if show_date %}
+                    <td>{{ bill.created_date }}</td>
+                    {% endif %}
+                    {% if show_member_info %}
+                    <td>{{ bill.membership_number or 'N/A' }}</td>
+                    <td>{{ bill.form_number or 'N/A' }}</td>
+                    {% endif %}
+                    <td>{{ bill.patient_name }}</td>
+                    {% if show_branch %}
+                    <td>{{ bill.branch or '' }}</td>
+                    {% endif %}
+                    {% if show_id_no %}
+                    <td>{{ bill.patient_id }}</td>
+                    {% endif %}
+                    {% if show_detailed_cols %}
+                    <td class="text-right">{{ "%.2f"|format(bill.con_amt or 0) }}</td>
+                    <td class="text-right">{{ "%.2f"|format(bill.drug_amt or 0) }}</td>
+                    <td class="text-right">{{ "%.2f"|format(bill.lab_amt or 0) }}</td>
+                    {% endif %}
+                    <td class="text-right">{{ "%.2f"|format(bill.amount) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    {% set colspan = 2 %}
+                    {% if show_date %}{% set colspan = colspan + 1 %}{% endif %}
+                    {% if show_member_info %}{% set colspan = colspan + 2 %}{% endif %}
+                    {% if show_branch %}{% set colspan = colspan + 1 %}{% endif %}
+                    {% if show_id_no %}{% set colspan = colspan + 1 %}{% endif %}
+                    {% if show_detailed_cols %}{% set colspan = colspan + 3 %}{% endif %}
+                    <td colspan="{{ colspan - 1 }}" class="text-right">TOTAL (MK)</td>
+                    <td class="text-right">{{ "%.2f"|format(total_sum) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="margin-top: 50px; font-size: 11px;">
+            <p>Certified Correct:</p>
+            <div style="width: 200px; border-top: 1px solid #000; margin-top: 40px;">
+                Authorized Signature
+            </div>
+        </div>
+    </div>
+</body>
+</html>

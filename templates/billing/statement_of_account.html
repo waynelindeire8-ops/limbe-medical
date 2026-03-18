@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statement of Account - {{ client_name }}</title>
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Times New Roman', serif; margin: 0; padding: 0; color: #000; background: #fff; font-size: 14px; }
+        .container { width: 100%; max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { margin: 0; text-transform: uppercase; font-size: 22px; }
+        .header p { margin: 2px 0; font-size: 13px; font-weight: bold; }
+        
+        .date-section { text-align: right; margin-bottom: 20px; font-weight: bold; }
+        .to-section { margin-bottom: 30px; font-weight: bold; }
+        .to-section p { margin: 2px 0; }
+
+        .statement-title { text-align: center; margin-bottom: 20px; text-decoration: underline; font-weight: bold; font-size: 16px; text-transform: uppercase; }
+
+        .statement-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+        .statement-table th, .statement-table td { border: 1px solid #000; padding: 10px; text-align: left; }
+        .statement-table th { background-color: #f2f2f2; text-transform: uppercase; font-size: 12px; }
+        
+        .text-right { text-align: right; }
+        
+        .signature-section { margin-top: 60px; }
+        .sig-row { display: flex; justify-content: space-between; margin-bottom: 40px; align-items: flex-end; }
+        .sig-box { width: 300px; }
+        .sig-line { border-bottom: 1px dotted #000; margin-bottom: 5px; }
+        .sig-label { display: flex; justify-content: space-between; font-weight: bold; }
+
+        .no-print { margin: 20px 0; text-align: center; }
+        .btn-print { background-color: #0b2e67; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        @media print { .no-print { display: none; } body { padding: 0; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="no-print">
+            <button class="btn-print" onclick="window.print()">Print Statement</button>
+            <a href="{{ url_for('billing_dashboard') }}" style="margin-left: 10px; text-decoration: none; color: #0b2e67;">Back</a>
+        </div>
+
+        <div class="header">
+            <h1>Limbe Medical Clinic</h1>
+            <p>DR W. V. NGWIRA-MBBS (MW) DRCOG, MRCGP (UK)</p>
+            <p>Realty House, Churchill Road, P.O. Box 5911 Limbe</p>
+            <p>Tel: 265 (0) 881900997 / 992900997</p>
+        </div>
+
+        <div class="date-section">
+            DATE: {{ current_date }}
+        </div>
+
+        <div class="to-section">
+            <p>TO: {{ client_name }}</p>
+            <p>P.O Box {{ client_po_box or '51199' }}</p>
+            <p>{{ client_city or 'Limbe' }}</p>
+        </div>
+
+        <div class="statement-title">
+            Statement of Account
+        </div>
+
+        <table class="statement-table">
+            <thead>
+                <tr>
+                    <th style="width: 120px;">Date</th>
+                    <th>Invoice No</th>
+                    <th style="width: 150px;" class="text-right">Amount (MK)</th>
+                    <th style="width: 150px;" class="text-right">Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.date }}</td>
+                    <td>{{ item.invoice_no }}</td>
+                    <td class="text-right">MK {{ "%.2f"|format(item.amount) }}</td>
+                    <td class="text-right">MK {{ "%.2f"|format(item.balance) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="signature-section">
+            <div class="sig-row">
+                <div class="sig-box">
+                    <div class="sig-line"></div>
+                    <div class="sig-label">
+                        <span>Authorized By</span>
+                        <span>Sign........................</span>
+                    </div>
+                </div>
+            </div>
+            <div class="sig-row">
+                <div class="sig-box">
+                    <div class="sig-line"></div>
+                    <div class="sig-label">
+                        <span>Prepared By</span>
+                        <span>Sign........................</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice #{{ bill.bill_id }} - Detailed View</title>
+    <style>
+        @page { size: A4; margin: 1cm; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #000; background: #fff; font-size: 13px; }
+        .container { width: 100%; max-width: 800px; margin: 0 auto; border: 1px solid #000; padding: 0; }
+        
+        .header-top { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #000; }
+        .clinic-info { border-right: 1px solid #000; padding: 10px; }
+        .patient-info { padding: 10px; }
+        
+        .clinic-info h2 { margin: 0; font-size: 14px; text-transform: uppercase; }
+        .clinic-info p { margin: 2px 0; font-size: 12px; }
+        
+        .info-row { display: flex; margin-bottom: 4px; }
+        .info-label { width: 120px; font-weight: bold; }
+        .info-value { flex: 1; }
+
+        .invoice-no-section { border-bottom: 1px solid #000; padding: 5px 10px; display: flex; }
+        .invoice-no-label { width: 120px; font-weight: bold; }
+        .invoice-no-value { flex: 1; }
+
+        .billing-table { width: 100%; border-collapse: collapse; }
+        .billing-table th, .billing-table td { border: 1px solid #000; padding: 6px; text-align: left; }
+        .billing-table th { background-color: #f2f2f2; text-transform: uppercase; font-size: 11px; }
+        
+        .text-right { text-align: right; }
+        .total-row { font-weight: bold; }
+        
+        .no-print { margin: 20px 0; text-align: center; }
+        .btn-print { background-color: #0b2e67; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        @media print { .no-print { display: none; } .container { border: 1px solid #000; } body { padding: 0; } }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="btn-print" onclick="window.print()">Print Detailed Invoice</button>
+        <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" style="margin-left: 10px; text-decoration: none; color: #0b2e67;">Back</a>
+    </div>
+
+    <div class="container">
+        <div class="header-top">
+            <div class="clinic-info">
+                <h2>Limbe Medical Clinic</h2>
+                <p>P.O. BOX 5911, LIMBE</p>
+                <p>TEL. +265(0) 212258061</p>
+            </div>
+            <div class="patient-info">
+                <div class="info-row"><div class="info-label">Patient</div><div class="info-value">{{ patient.first_name }} {{ patient.last_name }}</div></div>
+                <div class="info-row"><div class="info-label">Age:</div><div class="info-value">{{ scheme.age or 'yrs' }}</div></div>
+                <div class="info-row"><div class="info-label">Sex:</div><div class="info-value">{{ patient.gender }}</div></div>
+                <div class="info-row"><div class="info-label">Principal Member:</div><div class="info-value">{{ scheme.principal_member or patient.first_name + ' ' + patient.last_name }}</div></div>
+                <div class="info-row"><div class="info-label">Relationship:</div><div class="info-value">{{ scheme.relationship or 'Self' }}</div></div>
+            </div>
+        </div>
+
+        <div class="invoice-no-section">
+            <div class="invoice-no-label">Invoice No</div>
+            <div class="invoice-no-value">{{ bill.bill_id }}</div>
+        </div>
+
+        <table class="billing-table">
+            <thead>
+                <tr>
+                    <th style="width: 100px;">Date</th>
+                    <th>Description</th>
+                    <th style="width: 60px;" class="text-right">Qty</th>
+                    <th style="width: 100px;" class="text-right">Price</th>
+                    <th style="width: 120px;" class="text-right">Total MK</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.day }}/{{ item.mh }}/{{ item.yr }}</td>
+                    <td>{{ item.description }}</td>
+                    <td class="text-right">{{ item.qty }}</td>
+                    <td class="text-right">{{ "%.2f"|format(item.fee) }}</td>
+                    <td class="text-right">{{ "%.2f"|format(item.fee * item.qty) }}</td>
+                </tr>
+                {% endfor %}
+                <!-- Fill empty rows to match the style in image 1 if needed -->
+                {% for i in range(10 - items|length) %}
+                <tr>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td colspan="3" class="text-right">TOTAL</td>
+                    <td class="text-right">{{ "%.2f"|format(total_amount) }}</td>
+                    <td class="text-right">{{ "%.2f"|format(total_amount) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

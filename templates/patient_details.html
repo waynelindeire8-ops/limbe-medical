@@ -160,12 +160,30 @@
                         </div>
                         <div class="info-item">
                             <label>Scheme Provider</label>
-                            <span>{{ patient.scheme_provider or 'Private' }}</span>
+                            <span>{{ scheme.provider or patient.scheme_provider or 'Private' }}</span>
                         </div>
                         <div class="info-item">
                             <label>Scheme Type</label>
-                            <span>{{ patient.scheme_type or 'Cash' }}</span>
+                            <span>{{ scheme.type or patient.scheme_type or 'Cash' }}</span>
                         </div>
+                        {% if scheme.membership_number %}
+                        <div class="info-item">
+                            <label>Membership No</label>
+                            <span>{{ scheme.membership_number }}</span>
+                        </div>
+                        {% endif %}
+                        {% if scheme.form_number %}
+                        <div class="info-item">
+                            <label>Form No</label>
+                            <span>{{ scheme.form_number }}</span>
+                        </div>
+                        {% endif %}
+                        {% if scheme.coverage_percent %}
+                        <div class="info-item">
+                            <label>Coverage</label>
+                            <span>{{ scheme.coverage_percent }}%</span>
+                        </div>
+                        {% endif %}
                         <div class="info-item" style="grid-column: span 2;">
                             <label>Address</label>
                             <span>{{ patient.address }}</span>

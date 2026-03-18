@@ -55,13 +55,13 @@
                 </div>
                 <div class="summary-card" style="background: linear-gradient(135deg, #4cc9f0, #4895ef);">
                     <h3>Revenue</h3>
-                    <h2>${{ total_revenue }}</h2>
+                    <h2>MWK {{ total_revenue }}</h2>
                 </div>
             </div>
 
             <div class="analytics-grid">
                 <div class="chart-card">
-                    <h3>Appointment Status</h3>
+make                     <h3>Appointment Status</h3>
                     <canvas id="statusChart"
                             data-labels='{{ status_labels | tojson | safe }}'
                             data-data='{{ status_data | tojson | safe }}'></canvas>
@@ -112,7 +112,7 @@
             data: {
                 labels: revenueLabels,
                 datasets: [{
-                    label: 'Revenue ($)',
+                    label: 'Revenue (MWK)',
                     data: revenueData,
                     borderColor: '#4361ee',
                     tension: 0.4,

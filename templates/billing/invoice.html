@@ -48,7 +48,9 @@
             <h2>Generate Invoice</h2>
             <div class="no-print row-actions">
                 <a class="btn-outline" href="{{ url_for('billing_dashboard') }}">Back</a>
-                <button class="btn-outline" onclick="window.print()">Print Form</button>
+                <a class="btn" href="{{ url_for('print_invoice_formatted', bill_id=bill.bill_id) }}" target="_blank">Print Standard</a>
+                <a class="btn-outline" href="{{ url_for('print_invoice_detailed', bill_id=bill.bill_id) }}" target="_blank">Print Detailed</a>
+                <button class="btn-outline" onclick="window.print()">Print Editor</button>
                 <a class="btn" href="{{ url_for('export_invoice_csv', bill_id=bill.bill_id) }}">Export CSV</a>
             </div>
         </div>
@@ -64,12 +66,15 @@
                         <div class="field"><label>Date:</label><input class="value" value="{{ bill.created_date }}" readonly></div>
                     </div>
                     <div>
-                        <div class="section-title">Insurance</div>
+                        <div class="section-title">Insurance & Patient Info</div>
                         <div class="field"><label>Provider:</label><input name="provider" class="value" value="{{ scheme.provider or '' }}"></div>
                         <div class="field"><label>Type:</label><input name="type" class="value" value="{{ scheme.type or '' }}"></div>
                         <div class="field"><label>Member No:</label><input name="membership_number" class="value" value="{{ scheme.membership_number or '' }}"></div>
                         <div class="field"><label>Policy No:</label><input name="policy_number" class="value" value="{{ scheme.policy_number or '' }}"></div>
                         <div class="field"><label>Coverage %:</label><input name="coverage_percent" id="coverage_percent" class="value" value="{{ coverage_percent }}"></div>
+                        <div class="field"><label>Age:</label><input name="age" class="value" value="{{ scheme.age or '' }}" placeholder="e.g. 25 yrs"></div>
+                        <div class="field"><label>Principal:</label><input name="principal_member" class="value" value="{{ scheme.principal_member or '' }}" placeholder="e.g. Mr Kasitomu"></div>
+                        <div class="field"><label>Relationship:</label><input name="relationship" class="value" value="{{ scheme.relationship or '' }}" placeholder="e.g. Self"></div>
                     </div>
                 </div>
             </div>

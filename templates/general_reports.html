@@ -116,7 +116,7 @@
                 </div>
                 <div class="summary-card">
                     <div class="summary-label">Revenue (Est.)</div>
-                    <div class="summary-value">${{ revenue }}</div>
+                    <div class="summary-value">MWK {{ revenue }}</div>
                     <!-- <div style="font-size: 12px; color: #28a745;"><i class="fas fa-arrow-up"></i> 8% vs last month</div> -->
                 </div>
             </div>
@@ -189,7 +189,7 @@
                             <td style="padding: 10px;">{{ dept }}</td>
                             <td style="padding: 10px;">{{ count }}</td>
                             <td style="padding: 10px;">{{ count * 15 + 20 }} (Est)</td> <!-- Mock data based on doctor count -->
-                            <td style="padding: 10px;">${{ (count * 15 + 20) * 150 }}</td>
+                            <td style="padding: 10px;">MWK {{ (count * 15 + 20) * 15000 }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

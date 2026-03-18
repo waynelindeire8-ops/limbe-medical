@@ -56,7 +56,7 @@
                             {% for month, amount in revenue_data.items() %}
                             <tr>
                                 <td>{{ month }}</td>
-                                <td>${{ "%.2f"|format(amount) }}</td>
+                                <td>MWK {{ "%.2f"|format(amount) }}</td>
                             </tr>
                             {% else %}
                             <tr><td colspan="2">No data available</td></tr>
@@ -75,7 +75,7 @@
             data: {
                 labels: {{ revenue_data.keys()|list|tojson }},
                 datasets: [{
-                    label: 'Revenue ($)',
+                    label: 'Revenue (MWK)',
                     data: {{ revenue_data.values()|list|tojson }},
                     backgroundColor: '#4361ee',
                     borderColor: '#3f37c9',

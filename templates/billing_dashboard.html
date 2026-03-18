@@ -91,14 +91,14 @@
             <!-- Stats -->
             <div class="stats-grid" style="margin-bottom: 30px;">
                 <div class="card stat-card">
-                    <div class="stat-icon green-bg"><i class="fas fa-dollar-sign"></i></div>
+                    <div class="stat-icon green-bg"><i class="fas fa-money-bill-wave"></i></div>
                     <h3>Total Revenue</h3>
-                    <div class="stat-value"><h2>${{ total_revenue }}</h2></div>
+                    <div class="stat-value"><h2>MWK {{ total_revenue }}</h2></div>
                 </div>
                 <div class="card stat-card">
                     <div class="stat-icon red-bg"><i class="fas fa-clock"></i></div>
                     <h3>Pending Payments</h3>
-                    <div class="stat-value"><h2>${{ pending_amount }}</h2></div>
+                    <div class="stat-value"><h2>MWK {{ pending_amount }}</h2></div>
                 </div>
                 <div class="card stat-card">
                     <div class="stat-icon blue-bg"><i class="fas fa-file-invoice"></i></div>
@@ -112,7 +112,7 @@
                 <div class="tab active" onclick="switchTab('search')">Search Bills</div>
                 <div class="tab" onclick="switchTab('create')">Create New Bill</div>
                 <div class="tab" onclick="switchTab('process')">Process Payment</div>
-                <div class="tab" onclick="switchTab('report')">Generate Report</div>
+                <div class="tab" onclick="switchTab('report')">Reports & Summaries</div>
                 <div class="tab" onclick="switchTab('invoice')">Generate Invoice</div>
             </div>
 
@@ -141,7 +141,7 @@
                             <td>{{ bill.bill_id }}</td>
                             <td>{{ bill.date }}</td>
                             <td>{{ bill.patient_name }}</td>
-                            <td>${{ bill.amount }}</td>
+                            <td>MWK {{ bill.amount }}</td>
                             <td><span class="status-badge status-{{ bill.status|lower }}">{{ bill.status }}</span></td>
                             <td>
                                 <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
@@ -176,7 +176,7 @@
                             <textarea name="services" rows="3" placeholder="Consultation, X-Ray, etc." required></textarea>
                         </div>
                         <div class="form-group">
-                            <label>Total Amount ($)</label>
+                            <label>Total Amount (MWK)</label>
                             <input type="number" name="amount" step="0.01" min="0" required>
                         </div>
                         <button type="submit" class="btn-primary" style="width: 100%;">Generate Bill</button>
@@ -206,14 +206,64 @@
                 </div>
             </div>
 
-            <!-- Reports Tab -->
+            <!-- Reports & Summaries Tab -->
             <div id="report" class="tab-content">
                 <div class="form-card" style="max-width: 800px;">
                     <h3>Financial Summary</h3>
-                    <p>Total Revenue Collected: <strong>${{ total_revenue }}</strong></p>
-                    <p>Outstanding Pending Payments: <strong>${{ pending_amount }}</strong></p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                            <p style="margin: 0; color: #666; font-size: 14px;">Total Revenue Collected</p>
+                            <p style="margin: 5px 0; font-size: 24px; font-weight: bold; color: #28a745;">MWK {{ "%.2f"|format(total_revenue) }}</p>
+                        </div>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                            <p style="margin: 0; color: #666; font-size: 14px;">Outstanding Pending</p>
+                            <p style="margin: 5px 0; font-size: 24px; font-weight: bold; color: #dc3545;">MWK {{ "%.2f"|format(pending_amount) }}</p>
+                        </div>
+                    </div>
+
                     <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-                    <button onclick="window.print()" class="btn-outline"><i class="fas fa-print"></i> Print Report</button>
+
+                    <h3>Generate Statements & Summaries</h3>
+                    <p style="color: #666; margin-bottom: 15px;">Generate summary reports or statements for insurance providers and corporate clients.</p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <!-- Summary Bill Form -->
+                        <div style="background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 8px;">
+                            <h4 style="margin-top:0;">Medical Bill Summary (MASM/National Bank)</h4>
+                            <form action="{{ url_for('billing_summary') }}" method="get" target="_blank">
+                                <div class="form-group">
+                                    <label>Scheme Provider</label>
+                                    <select name="provider" style="width:100%; padding:8px; border-radius:4px; border:1px solid #ddd;">
+                                        <option value="">-- All Providers --</option>
+                                        <option value="National Bank">National Bank</option>
+                                        <option value="Precious">Precious</option>
+                                        <option value="Bakhresa">Bakhresa</option>
+                                        <option value="MASM">MASM</option>
+                                        <option value="Reserve Bank">Reserve Bank</option>
+                                        <option value="Azam TV">Azam TV</option>
+                                        <option value="Electrical Enterprises">Electrical Enterprises</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label>From</label><input type="date" name="date_from" style="width:100%; padding:8px; border-radius:4px; border:1px solid #ddd;"></div>
+                                <div class="form-group"><label>To</label><input type="date" name="date_to" style="width:100%; padding:8px; border-radius:4px; border:1px solid #ddd;"></div>
+                                <button type="submit" class="btn-primary" style="width: 100%; margin-top:10px;">Generate Summary</button>
+                            </form>
+                        </div>
+
+                        <!-- Statement of Account Form -->
+                        <div style="background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 8px;">
+                            <h4 style="margin-top:0;">Statement of Account (Corporate)</h4>
+                            <form action="{{ url_for('billing_statement') }}" method="get" target="_blank">
+                                <div class="form-group">
+                                    <label>Client/Company Name</label>
+                                    <input type="text" name="client" placeholder="e.g. Tea Brokers, Sable Farming" style="width:100%; padding:8px; border-radius:4px; border:1px solid #ddd;">
+                                </div>
+                                <div class="form-group"><label>From</label><input type="date" name="date_from" style="width:100%; padding:8px; border-radius:4px; border:1px solid #ddd;"></div>
+                                <div class="form-group"><label>To</label><input type="date" name="date_to" style="width:100%; padding:8px; border-radius:4px; border:1px solid #ddd;"></div>
+                                <button type="submit" class="btn-outline" style="width: 100%; margin-top:10px;">Generate Statement</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
 

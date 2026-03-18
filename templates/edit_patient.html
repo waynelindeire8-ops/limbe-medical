@@ -110,11 +110,35 @@
                     </div>
                     <div class="form-group">
                         <label for="scheme_provider">Scheme Provider</label>
-                        <input type="text" id="scheme_provider" name="scheme_provider" value="{{ patient.scheme_provider }}">
+                        <input type="text" id="scheme_provider" name="scheme_provider" value="{{ scheme.provider or patient.scheme_provider }}">
                     </div>
                     <div class="form-group">
                         <label for="scheme_type">Scheme Type</label>
-                        <input type="text" id="scheme_type" name="scheme_type" value="{{ patient.scheme_type }}">
+                        <input type="text" id="scheme_type" name="scheme_type" value="{{ scheme.type or patient.scheme_type }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="membership_number">Membership Number</label>
+                        <input type="text" id="membership_number" name="membership_number" value="{{ scheme.membership_number }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="form_number">Form Number</label>
+                        <input type="text" id="form_number" name="form_number" value="{{ scheme.form_number }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="coverage_percent">Coverage (%)</label>
+                        <input type="number" step="0.01" id="coverage_percent" name="coverage_percent" value="{{ scheme.coverage_percent }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="age">Age (for Invoices)</label>
+                        <input type="text" id="age" name="age" value="{{ scheme.age }}" placeholder="e.g. 25 yrs">
+                    </div>
+                    <div class="form-group">
+                        <label for="principal_member">Principal Member</label>
+                        <input type="text" id="principal_member" name="principal_member" value="{{ scheme.principal_member }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="relationship">Relationship to Principal</label>
+                        <input type="text" id="relationship" name="relationship" value="{{ scheme.relationship }}">
                     </div>
                     <div class="form-group">
                         <label for="emergency_contact">Emergency Contact</label>
