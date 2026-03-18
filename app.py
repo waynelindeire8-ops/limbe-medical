@@ -1582,6 +1582,7 @@ def export_invoice_csv(bill_id):
     if not bill:
         return "Bill not found", 404
     
+    patient = hms.get_patient(bill.patient_id)
     scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
     coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
     try:
@@ -1590,7 +1591,6 @@ def export_invoice_csv(bill_id):
         coverage_percent = 0.0
     
     items = []
-    # Check if bill.services is JSON
     if bill.services.startswith('[') and bill.services.endswith(']'):
         try:
             items = json.loads(bill.services)
@@ -1604,7 +1604,6 @@ def export_invoice_csv(bill_id):
         except Exception:
             yr, mh, day = "", "", ""
             
-        # Fallback to old comma-separated format
         raw_items = (bill.services or "").split(", ")
         if not raw_items or raw_items == ['']:
             raw_items = [f"Total ({bill.amount})"]
@@ -1632,28 +1631,64 @@ def export_invoice_csv(bill_id):
                 'award': award
             })
     
-    rows = []
-    for idx, item in enumerate(items, start=1):
-        rows.append([
-            idx, 
-            item.get('code', 'SRV'), 
-            item.get('description', ''), 
-            item.get('qty', 1), 
-            item.get('yr', ''), 
-            item.get('mh', ''), 
-            item.get('day', ''), 
-            f"{float(item.get('fee', 0)):.2f}", 
-            f"{float(item.get('award', 0)):.2f}"
-        ])
-    
     import io, csv
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(['LINE','CODE','DESCRIPTION','QTY','YR','MH','DAY','FEE CHG','AWARD'])
-    for r in rows:
-        writer.writerow(r)
+    
+    # Detailed Header Information
+    writer.writerow(['INVOICE DETAILS'])
+    writer.writerow(['Invoice No', bill.bill_id])
+    writer.writerow(['Date', bill.created_date])
+    writer.writerow(['Status', bill.status])
+    writer.writerow([])
+    writer.writerow(['PATIENT DETAILS'])
+    writer.writerow(['Name', f"{patient.first_name} {patient.last_name}" if patient else 'N/A'])
+    writer.writerow(['Patient ID', bill.patient_id])
+    writer.writerow(['Age', scheme.get('age', 'N/A')])
+    writer.writerow(['Gender', patient.gender if patient else 'N/A'])
+    writer.writerow([])
+    writer.writerow(['SCHEME / INSURANCE DETAILS'])
+    writer.writerow(['Provider', scheme.get('provider', 'Private')])
+    writer.writerow(['Scheme Type', scheme.get('type', 'N/A')])
+    writer.writerow(['Member No', scheme.get('membership_number', 'N/A')])
+    writer.writerow(['Policy No', scheme.get('policy_number', 'N/A')])
+    writer.writerow(['Principal Member', scheme.get('principal_member', 'N/A')])
+    writer.writerow(['Relationship', scheme.get('relationship', 'N/A')])
+    writer.writerow(['Coverage %', f"{coverage_percent}%"])
+    writer.writerow([])
+    writer.writerow(['BILLING ITEMS'])
+    writer.writerow(['LINE','CODE','DESCRIPTION','QTY','YR','MH','DAY','FEE CHG (MWK)','AWARD (MWK)','TOTAL (MWK)'])
+    
+    total_fee = 0.0
+    total_award = 0.0
+    for idx, item in enumerate(items, start=1):
+        fee = float(item.get('fee', 0))
+        qty = float(item.get('qty', 1))
+        award = float(item.get('award', 0))
+        line_total = fee * qty
+        total_fee += line_total
+        total_award += award # Assuming award is per line or already calculated
+        
+        writer.writerow([
+            idx, 
+            item.get('code', 'SRV'), 
+            item.get('description', ''), 
+            qty, 
+            item.get('yr', ''), 
+            item.get('mh', ''), 
+            item.get('day', ''), 
+            f"{fee:.2f}", 
+            f"{award:.2f}",
+            f"{line_total:.2f}"
+        ])
+    
+    writer.writerow([])
+    writer.writerow(['', '', '', '', '', '', 'SUBTOTAL', f"{total_fee:.2f}"])
+    writer.writerow(['', '', '', '', '', '', 'TOTAL AWARD', f"{total_award:.2f}"])
+    writer.writerow(['', '', '', '', '', '', 'SHORTFALL', f"{(total_fee - total_award):.2f}"])
+    
     resp = app.response_class(buf.getvalue(), mimetype='text/csv')
-    resp.headers['Content-Disposition'] = f'attachment; filename=invoice_{bill.bill_id}.csv'
+    resp.headers['Content-Disposition'] = f'attachment; filename=invoice_detailed_{bill.bill_id}.csv'
     return resp
 
 @app.route('/billing/invoice/update/<bill_id>', methods=['POST'])

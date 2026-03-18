@@ -67,14 +67,27 @@
                     </div>
                     <div>
                         <div class="section-title">Insurance & Patient Info</div>
-                        <div class="field"><label>Provider:</label><input name="provider" class="value" value="{{ scheme.provider or '' }}"></div>
-                        <div class="field"><label>Type:</label><input name="type" class="value" value="{{ scheme.type or '' }}"></div>
-                        <div class="field"><label>Member No:</label><input name="membership_number" class="value" value="{{ scheme.membership_number or '' }}"></div>
-                        <div class="field"><label>Policy No:</label><input name="policy_number" class="value" value="{{ scheme.policy_number or '' }}"></div>
+                        <div class="field">
+                            <label>Provider:</label>
+                            <select name="provider" id="providerSelect" class="value" onchange="toggleProviderLayout()">
+                                <option value="Private" {% if scheme.provider == 'Private' %}selected{% endif %}>Private / Cash</option>
+                                <option value="MASM" {% if scheme.provider == 'MASM' %}selected{% endif %}>MASM</option>
+                                <option value="National Bank" {% if scheme.provider == 'National Bank' %}selected{% endif %}>National Bank</option>
+                                <option value="Precious" {% if scheme.provider == 'Precious' %}selected{% endif %}>Precious</option>
+                                <option value="Bakhresa" {% if scheme.provider == 'Bakhresa' %}selected{% endif %}>Bakhresa</option>
+                                <option value="Reserve Bank" {% if scheme.provider == 'Reserve Bank' %}selected{% endif %}>Reserve Bank</option>
+                                <option value="Azam TV" {% if scheme.provider == 'Azam TV' %}selected{% endif %}>Azam TV</option>
+                                <option value="Electrical Enterprises" {% if scheme.provider == 'Electrical Enterprises' %}selected{% endif %}>Electrical Enterprises</option>
+                                <option value="BlueSphere" {% if scheme.provider == 'BlueSphere' %}selected{% endif %}>BlueSphere</option>
+                            </select>
+                        </div>
+                        <div class="field insurance-field"><label>Type:</label><input name="type" class="value" value="{{ scheme.type or '' }}"></div>
+                        <div class="field insurance-field"><label>Member No:</label><input name="membership_number" class="value" value="{{ scheme.membership_number or '' }}"></div>
+                        <div class="field insurance-field"><label>Policy No:</label><input name="policy_number" class="value" value="{{ scheme.policy_number or '' }}"></div>
                         <div class="field"><label>Coverage %:</label><input name="coverage_percent" id="coverage_percent" class="value" value="{{ coverage_percent }}"></div>
                         <div class="field"><label>Age:</label><input name="age" class="value" value="{{ scheme.age or '' }}" placeholder="e.g. 25 yrs"></div>
-                        <div class="field"><label>Principal:</label><input name="principal_member" class="value" value="{{ scheme.principal_member or '' }}" placeholder="e.g. Mr Kasitomu"></div>
-                        <div class="field"><label>Relationship:</label><input name="relationship" class="value" value="{{ scheme.relationship or '' }}" placeholder="e.g. Self"></div>
+                        <div class="field insurance-field principal-field"><label>Principal:</label><input name="principal_member" class="value" value="{{ scheme.principal_member or '' }}" placeholder="e.g. Mr Kasitomu"></div>
+                        <div class="field insurance-field relationship-field"><label>Relationship:</label><input name="relationship" class="value" value="{{ scheme.relationship or '' }}" placeholder="e.g. Self"></div>
                     </div>
                 </div>
             </div>
@@ -175,7 +188,29 @@
     </div>
 
     <script>
+        function toggleProviderLayout() {
+            const provider = document.getElementById('providerSelect').value;
+            const insuranceFields = document.querySelectorAll('.insurance-field');
+            const coverageInput = document.getElementById('coverage_percent');
+            
+            if (provider === 'Private') {
+                insuranceFields.forEach(f => f.style.display = 'none');
+                if (coverageInput.value == "0") coverageInput.value = "0";
+            } else {
+                insuranceFields.forEach(f => f.style.display = 'flex');
+                
+                // Set default coverage for known providers if it's currently 0
+                if (coverageInput.value == "0") {
+                    if (provider === 'MASM') coverageInput.value = "80";
+                    else if (provider === 'National Bank') coverageInput.value = "100";
+                    else if (provider === 'Precious') coverageInput.value = "90";
+                }
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            toggleProviderLayout(); // Initialize layout
+            
             const coverageInput = document.getElementById('coverage_percent');
             const detailsTable = document.getElementById('detailsTable');
             const summaryTotals = document.getElementById('summaryTotals');
