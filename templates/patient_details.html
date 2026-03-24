@@ -158,32 +158,6 @@
                             <label>Emergency Contact</label>
                             <span>{{ patient.emergency_contact }}</span>
                         </div>
-                        <div class="info-item">
-                            <label>Scheme Provider</label>
-                            <span>{{ scheme.provider or patient.scheme_provider or 'Private' }}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Scheme Type</label>
-                            <span>{{ scheme.type or patient.scheme_type or 'Cash' }}</span>
-                        </div>
-                        {% if scheme.membership_number %}
-                        <div class="info-item">
-                            <label>Membership No</label>
-                            <span>{{ scheme.membership_number }}</span>
-                        </div>
-                        {% endif %}
-                        {% if scheme.form_number %}
-                        <div class="info-item">
-                            <label>Form No</label>
-                            <span>{{ scheme.form_number }}</span>
-                        </div>
-                        {% endif %}
-                        {% if scheme.coverage_percent %}
-                        <div class="info-item">
-                            <label>Coverage</label>
-                            <span>{{ scheme.coverage_percent }}%</span>
-                        </div>
-                        {% endif %}
                         <div class="info-item" style="grid-column: span 2;">
                             <label>Address</label>
                             <span>{{ patient.address }}</span>
@@ -205,26 +179,37 @@
                             <button type="submit" class="btn-upload"><i class="fas fa-upload"></i> Upload</button>
                         </form>
 
-                        <div class="file-list">
+                        <ul class="file-list">
                             {% for file in files %}
-                            <div class="file-item">
-                                <div class="file-icon"><i class="fas fa-file-alt"></i></div>
+                            <li class="file-item">
+                                {% set is_image = file.file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')) %}
                                 <div class="file-info">
-                                    <a href="{{ file.public_url }}" target="_blank" style="text-decoration: none; color: inherit;">
-                                        <div class="file-name" style="font-weight: 500; color: #333;">{{ file.file_name or 'Unnamed File' }}</div>
-                                    </a>
-                                    <div class="file-meta" style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
+                                    {% if is_image %}
+                                        <i class="fas fa-file-image file-icon" style="color: #4cc9f0; cursor: pointer;" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')"></i>
+                                        <div>
+                                            <div style="font-weight: 500; cursor: pointer; color: #4361ee;" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')">{{ file.file_name }}</div>
+                                            <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
+                                        </div>
+                                    {% else %}
+                                        <i class="fas fa-file-alt file-icon"></i>
+                                        <div>
+                                            <div style="font-weight: 500;">{{ file.file_name }}</div>
+                                            <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
+                                        </div>
+                                    {% endif %}
                                 </div>
                                 <div class="file-actions">
-                                    <a href="javascript:void(0)" onclick="openPreview('{{ file.public_url }}', '{{ file.file_name }}', '{{ file.fallback_url_supabase }}', '{{ file.fallback_url_local }}')" title="View"><i class="fas fa-eye"></i></a>
-                                    <a href="{{ file.public_url }}" download="{{ file.file_name }}" title="Download"><i class="fas fa-download"></i></a>
-                                    <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.path) }}" class="delete" title="Delete" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
+                                    {% if is_image %}
+                                    <button type="button" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')" title="Preview" style="background:none; border:none; cursor:pointer; color: #4361ee; margin-right: 5px;"><i class="fas fa-eye"></i></button>
+                                    {% endif %}
+                                    <a href="{{ url_for('download_file', path=file.path) }}" title="Download" style="color: #4361ee; margin-right: 10px;"><i class="fas fa-download"></i></a>
+                                    <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.path) }}" title="Delete" style="color: #dc3545;" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
                                 </div>
-                            </div>
+                            </li>
                             {% else %}
-                            <p style="color: #888; text-align: center; padding: 20px;">No files uploaded yet.</p>
+                            <li style="padding: 10px; text-align: center; color: #888;">No files uploaded yet.</li>
                             {% endfor %}
-                        </div>
+                        </ul>
                     </div>
 
                     <!-- Medical Records -->
@@ -300,33 +285,18 @@
     <!-- Image Preview Modal -->
     <div id="imagePreviewModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8);">
       <span class="close" onclick="closePreview()" style="position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
-      <img class="modal-content" id="previewImage" style="margin: auto; display: block; width: 80%; max-width: 700px; margin-top: 50px;" onerror="tryFallback(this)">
+      <img class="modal-content" id="previewImage" style="margin: auto; display: block; width: 80%; max-width: 700px; margin-top: 50px;">
       <div id="caption" style="margin: auto; display: block; width: 80%; max-width: 700px; text-align: center; color: #ccc; padding: 10px 0;"></div>
     </div>
 
     <script>
-    let fallbackUrls = [];
-
-    function openPreview(public_url, filename, ...fallbacks) {
+    function openPreview(path, filename) {
         var modal = document.getElementById("imagePreviewModal");
         var modalImg = document.getElementById("previewImage");
         var captionText = document.getElementById("caption");
-        
-        fallbackUrls = fallbacks.filter(Boolean); // Store non-empty fallback URLs
         modal.style.display = "block";
-        modalImg.src = public_url;
+        modalImg.src = "{{ url_for('serve_file') }}?path=" + encodeURIComponent(path);
         captionText.innerHTML = filename;
-    }
-
-    function tryFallback(img) {
-        if (fallbackUrls.length > 0) {
-            let nextUrl = fallbackUrls.shift();
-            console.log("Image load failed, trying next fallback URL:", nextUrl);
-            img.src = nextUrl;
-        } else {
-            console.error("All fallback URLs failed to load.");
-            img.src = ""; // Optional: show a placeholder for broken image
-        }
     }
 
     function closePreview() {

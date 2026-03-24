@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <!-- Using Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -31,44 +30,8 @@
                     <a href="{{ url_for('analytics') }}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-chart-line"></i> Analytics</a>
                     {% endif %}
                     
-                    <a href="{{ url_for('messages') }}" class="icon-btn" title="Messages" style="text-decoration: none; position: relative;">
-                        <i class="fas fa-envelope"></i>
-                        {% if unread_messages_count and unread_messages_count > 0 %}
-                        <span class="badge-dot"></span>
-                        {% endif %}
-                    </a>
-
-                    <div class="dropdown">
-                        <div class="icon-btn dropdown-toggle" id="notificationBtn" title="Notifications" style="position: relative;">
-                            <i class="fas fa-bell"></i>
-                            {% set unread_notifications = system_notifications|selectattr('is_read', 'equalto', false)|list %}
-                            {% if unread_notifications|length > 0 %}
-                            <span class="badge-dot"></span>
-                            {% endif %}
-                        </div>
-                        <div class="dropdown-menu" id="notificationMenu">
-                            <div class="dropdown-header">
-                                <h3>Notifications</h3>
-                                <a href="{{ url_for('messages') }}">View All</a>
-                            </div>
-                            <div class="dropdown-content">
-                                {% if system_notifications %}
-                                    {% for note in system_notifications %}
-                                    <div class="dropdown-item {% if not note.is_read %}unread{% endif %}">
-                                        <div class="note-icon"><i class="fas fa-info-circle"></i></div>
-                                        <div class="note-info">
-                                            <p class="note-subject">{{ note.subject }}</p>
-                                            <p class="note-time">{{ note.timestamp }}</p>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="dropdown-empty">No new notifications</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    
+                    <div class="icon-btn"><i class="fas fa-envelope"></i></div>
+                    <div class="icon-btn"><i class="fas fa-bell"></i></div>
                     <div class="user-profile" title="Role: {{ current_role|title }}">
                         <span style="margin-right: 10px; font-weight: bold;">{{ current_user }}</span>
                         <img src="https://ui-avatars.com/api/?name={{ current_user }}&background=random" alt="User">
@@ -125,7 +88,7 @@
                     </div>
                     <div class="appointment-list">
                         {% for item in queue %}
-                        <div class="appointment-item {% if item.status == 'Waiting' %}border-waiting{% elif item.status == 'In Consultation' %}border-consult{% else %}border-done{% endif %}" style="display: flex; justify-content: space-between; align-items: center; padding-left: 15px;">
+                        <div class="appointment-item" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid {% if item.status == 'Waiting' %}#ffc107{% elif item.status == 'In Consultation' %}#28a745{% else %}#dc3545{% endif %}; padding-left: 15px;">
                             <div class="appt-info">
                                 <h4>{{ item.patient_name }}</h4>
                                 <p style="font-size: 13px; color: #666;">
@@ -201,107 +164,19 @@
                         <div class="card-header">
                             <h3>Patient Analytics</h3>
                             <div class="toggle-group">
-                                <button onclick="setRange(7)">7 Days</button>
-                                <button class="active" onclick="setRange(30)">30 Days</button>
-                                <button onclick="setRange(90)">90 Days</button>
+                                <button>7 Days</button>
+                                <button class="active">30 Days</button>
+                                <button>90 Days</button>
                             </div>
                         </div>
-                        <canvas id="patientChart"
-                                data-labels='{{ chart_labels | tojson | safe }}'
-                                data-regs='{{ chart_patient_reg | tojson | safe }}'
-                                data-appts='{{ chart_appointments | tojson | safe }}'
-                                style="width: 100%; height: 260px;"></canvas>
+                        <div class="chart-placeholder">
+                            <p>Chart component will be integrated here</p>
+                            <small>Patient registration and appointment trends.</small>
+                        </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
-    <style>
-        .border-waiting { border-left: 4px solid #ffc107; }
-        .border-consult { border-left: 4px solid #28a745; }
-        .border-done { border-left: 4px solid #dc3545; }
-        
-        /* Dropdown Styles */
-        .dropdown { position: relative; display: inline-block; }
-        .dropdown-menu {
-            position: absolute; right: 0; top: 50px; width: 300px;
-            background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            display: none; z-index: 1000; overflow: hidden;
-        }
-        .dropdown-menu.show { display: block; }
-        .dropdown-header {
-            padding: 15px; border-bottom: 1px solid #eee;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .dropdown-header h3 { font-size: 16px; margin: 0; }
-        .dropdown-header a { font-size: 13px; color: #4361ee; text-decoration: none; }
-        .dropdown-content { max-height: 350px; overflow-y: auto; }
-        .dropdown-item {
-            padding: 12px 15px; border-bottom: 1px solid #f8f9fa;
-            display: flex; gap: 12px; transition: background 0.2s;
-        }
-        .dropdown-item:hover { background: #f8f9fa; }
-        .dropdown-item.unread { background: #f0f7ff; }
-        .note-icon {
-            width: 35px; height: 35px; border-radius: 50%; background: #e8f0fe;
-            display: flex; align-items: center; justify-content: center; color: #4361ee;
-        }
-        .note-info p { margin: 0; }
-        .note-subject { font-size: 14px; font-weight: 500; color: #333; }
-        .note-time { font-size: 11px; color: #999; margin-top: 4px !important; }
-        .dropdown-empty { padding: 30px; text-align: center; color: #999; font-size: 14px; }
-        .badge-dot {
-            position: absolute; top: 8px; right: 8px; width: 10px; height: 10px;
-            background: #f72585; border: 2px solid white; border-radius: 50%;
-        }
-    </style>
-    <script>
-        let range = 30;
-        function setRange(r) {
-            range = r;
-            document.querySelectorAll('.toggle-group button').forEach(b => b.classList.remove('active'));
-            const idx = r === 7 ? 0 : r === 30 ? 1 : 2;
-            document.querySelectorAll('.toggle-group button')[idx].classList.add('active');
-            renderChart();
-        }
-        let chartInstance = null;
-        function renderChart() {
-            const el = document.getElementById('patientChart');
-            const labels = JSON.parse(el.dataset.labels || '[]');
-            const regs = JSON.parse(el.dataset.regs || '[]');
-            const appts = JSON.parse(el.dataset.appts || '[]');
-            const start = Math.max(labels.length - range, 0);
-            const L = labels.slice(start);
-            const R = regs.slice(start);
-            const A = appts.slice(start);
-            const ctx = el.getContext('2d');
-            if (chartInstance) chartInstance.destroy();
-            chartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: L,
-                    datasets: [
-                        { label: 'Registrations', data: R, borderColor: '#4361ee', backgroundColor: 'rgba(67,97,238,0.1)', tension: 0.3, fill: true },
-                        { label: 'Appointments', data: A, borderColor: '#f72585', backgroundColor: 'rgba(247,37,133,0.1)', tension: 0.3, fill: true }
-                    ]
-                },
-                options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: true } } }
-            });
-        }
-        document.addEventListener('DOMContentLoaded', renderChart);
-        
-        // Toggle Notifications
-        const notificationBtn = document.getElementById('notificationBtn');
-        const notificationMenu = document.getElementById('notificationMenu');
-        
-        notificationBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            notificationMenu.classList.toggle('show');
-        });
-        
-        document.addEventListener('click', () => {
-            notificationMenu.classList.remove('show');
-        });
-    </script>
 </body>
 </html>

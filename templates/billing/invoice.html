@@ -3,371 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generate Invoice</title>
+    <title>Invoice - Limbe Medical</title>
     <style>
-        body { font-family: Segoe UI, Arial, sans-serif; padding: 20px; color: #333; background: #f6f7f9; }
-        .wrap { max-width: 1100px; margin: 0 auto; }
-        .card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .header h2 { font-size: 18px; margin: 0; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .field { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .field label { width: 110px; color: #444; }
-        .value { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 8px; background: #fafafa; }
-        .table { border: 1px solid #bbb; border-radius: 4px; overflow: hidden; }
-        table { width: 100%; border-collapse: collapse; }
-        thead th { background: #0b2e67; color: #fff; padding: 8px; font-weight: 600; font-size: 12px; text-transform: uppercase; }
-        tbody td { padding: 8px; border-bottom: 1px solid #eee; font-size: 13px; }
-        .row-actions { display: flex; gap: 12px; justify-content: flex-end; }
-        .btn { padding: 10px 18px; border-radius: 4px; border: 1px solid #0b2e67; background: #0b2e67; color: #fff; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; font-weight: 600; }
-        .btn-outline { padding: 10px 18px; border-radius: 4px; border: 1px solid #0b2e67; background: #fff; color: #0b2e67; cursor: pointer; text-decoration: none; display: inline-block; font-size: 14px; font-weight: 600; }
-        .totals { font-weight: 600; padding: 8px; text-align: right; color: #222; }
-        .section-title { font-size: 14px; color: #444; margin-bottom: 6px; }
-        
-        /* Editable table inputs */
-        .table-input { width: 100%; border: none; background: transparent; padding: 4px; font-size: 13px; font-family: inherit; color: inherit; outline: none; }
-        .table-input:focus { background: #eef2f7; border-radius: 2px; }
-        .table-input.num { text-align: right; }
-        
-        .btn-add-row { background: #28a745; border-color: #28a745; margin-right: auto; }
-        .btn-remove { color: #dc3545; cursor: pointer; border: none; background: none; font-size: 16px; }
-        
-        /* Suggestions */
-        .suggestions-container { position: relative; width: 100%; }
-        .suggestions-list { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 1000; max-height: 200px; overflow-y: auto; display: none; }
-        .suggestion-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
-        .suggestion-item:hover { background: #f8f9fa; }
-        .suggestion-item:last-child { border-bottom: none; }
-        
-        @media print { .no-print { display: none; } body { padding: 0; background: #fff; } .card { border: none; } }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #333; }
+        .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); }
+        .invoice-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4361ee; padding-bottom: 20px; margin-bottom: 20px; }
+        .logo { font-size: 28px; font-weight: bold; color: #4361ee; }
+        .invoice-title { font-size: 24px; color: #555; text-align: right; }
+        .details { display: flex; justify-content: space-between; margin-bottom: 40px; }
+        .bill-to, .invoice-info { width: 48%; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #ddd; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        .total { text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; }
+        .footer { text-align: center; font-size: 12px; color: #999; margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; }
+        @media print { .no-print { display: none; } body { padding: 0; } .invoice-box { border: none; box-shadow: none; } }
     </style>
 </head>
 <body>
-    <div class="wrap">
-        <div class="header">
-            <h2>Generate Invoice</h2>
-            <div class="no-print row-actions">
-                <a class="btn-outline" href="{{ url_for('billing_dashboard') }}">Back</a>
-                <a class="btn" href="{{ url_for('print_invoice_formatted', bill_id=bill.bill_id) }}" target="_blank">Print Standard</a>
-                <a class="btn-outline" href="{{ url_for('print_invoice_detailed', bill_id=bill.bill_id) }}" target="_blank">Print Detailed</a>
-                <button class="btn-outline" onclick="window.print()">Print Editor</button>
-                <a class="btn" href="{{ url_for('export_invoice_csv', bill_id=bill.bill_id) }}">Export CSV</a>
-            </div>
-        </div>
-
-        <form action="{{ url_for('update_invoice_scheme', bill_id=bill.bill_id) }}" method="post">
-            <div class="card">
-                <div class="grid">
-                    <div>
-                        <div class="field"><label>Patient:</label><input class="value" value="{{ patient.first_name }} {{ patient.last_name }}" readonly></div>
-                        <div class="field"><label>Invoice No:</label><input class="value" value="{{ bill.bill_id }}" readonly></div>
-                        <div class="field"><label>Member No:</label><input name="membership_number" class="value" value="{{ scheme.membership_number or '' }}"></div>
-                        <div class="field"><label>Form No:</label><input name="form_number" class="value" value="{{ scheme.form_number or '' }}"></div>
-                        <div class="field"><label>Date:</label><input class="value" value="{{ bill.created_date }}" readonly></div>
-                    </div>
-                    <div>
-                        <div class="section-title">Insurance & Patient Info</div>
-                        <div class="field">
-                            <label>Provider:</label>
-                            <select name="provider" id="providerSelect" class="value" onchange="toggleProviderLayout()">
-                                <option value="Private" {% if scheme.provider == 'Private' %}selected{% endif %}>Private / Cash</option>
-                                <option value="MASM" {% if scheme.provider == 'MASM' %}selected{% endif %}>MASM</option>
-                                <option value="National Bank" {% if scheme.provider == 'National Bank' %}selected{% endif %}>National Bank</option>
-                                <option value="Precious" {% if scheme.provider == 'Precious' %}selected{% endif %}>Precious</option>
-                                <option value="Bakhresa" {% if scheme.provider == 'Bakhresa' %}selected{% endif %}>Bakhresa</option>
-                                <option value="Reserve Bank" {% if scheme.provider == 'Reserve Bank' %}selected{% endif %}>Reserve Bank</option>
-                                <option value="Azam TV" {% if scheme.provider == 'Azam TV' %}selected{% endif %}>Azam TV</option>
-                                <option value="Electrical Enterprises" {% if scheme.provider == 'Electrical Enterprises' %}selected{% endif %}>Electrical Enterprises</option>
-                                <option value="BlueSphere" {% if scheme.provider == 'BlueSphere' %}selected{% endif %}>BlueSphere</option>
-                            </select>
-                        </div>
-                        <div class="field insurance-field"><label>Type:</label><input name="type" class="value" value="{{ scheme.type or '' }}"></div>
-                        <div class="field insurance-field"><label>Member No:</label><input name="membership_number" class="value" value="{{ scheme.membership_number or '' }}"></div>
-                        <div class="field insurance-field"><label>Policy No:</label><input name="policy_number" class="value" value="{{ scheme.policy_number or '' }}"></div>
-                        <div class="field"><label>Coverage %:</label><input name="coverage_percent" id="coverage_percent" class="value" value="{{ coverage_percent }}"></div>
-                        <div class="field"><label>Age:</label><input name="age" class="value" value="{{ scheme.age or '' }}" placeholder="e.g. 25 yrs"></div>
-                        <div class="field insurance-field principal-field"><label>Principal:</label><input name="principal_member" class="value" value="{{ scheme.principal_member or '' }}" placeholder="e.g. Mr Kasitomu"></div>
-                        <div class="field insurance-field relationship-field"><label>Relationship:</label><input name="relationship" class="value" value="{{ scheme.relationship or '' }}" placeholder="e.g. Self"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="header">
-                    <div class="section-title">Details</div>
-                    <div class="no-print totals" style="margin: 0; padding: 0; font-size: 12px; color: #666;">
-                        * Awards are calculated automatically based on Fee and Coverage %
-                    </div>
-                </div>
-                <div class="table">
-                    <table id="detailsTable">
-                        <thead>
-                            <tr>
-                                <th>LINE</th>
-                                <th>CODE</th>
-                                <th>DESCRIPTION</th>
-                                <th>QTY</th>
-                                <th>YR</th>
-                                <th>MH</th>
-                                <th>DAY</th>
-                                 <th>FEE CHG</th>
-                                 <th>AWARD</th>
-                                 <th class="no-print" style="width: 40px;"></th>
-                             </tr>
-                         </thead>
-                         <tbody id="invoiceItemsBody">
-                             {% for row in items %}
-                             <tr class="item-row">
-                                 <td class="line-number">{{ loop.index }}</td>
-                                 <td>
-                                     <div class="suggestions-container">
-                                         <input type="text" name="item_code[]" class="table-input code-input" value="{{ row.code }}" autocomplete="off">
-                                         <div class="suggestions-list"></div>
-                                     </div>
-                                 </td>
-                                 <td><input type="text" name="item_desc[]" class="table-input desc-input" value="{{ row.description }}"></td>
-                                 <td><input type="number" name="item_qty[]" class="table-input num qty-input" value="{{ row.qty }}"></td>
-                                 <td><input type="text" name="item_yr[]" class="table-input num" value="{{ row.yr }}"></td>
-                                 <td><input type="text" name="item_mh[]" class="table-input num" value="{{ row.mh }}"></td>
-                                 <td><input type="text" name="item_day[]" class="table-input num" value="{{ row.day }}"></td>
-                                 <td><input type="number" step="0.01" name="item_fee[]" class="table-input num fee-input" value="{{ "%.2f"|format(row.fee) }}"></td>
-                                 <td><input type="number" step="0.01" name="item_award[]" class="table-input num award-input" value="{{ "%.2f"|format(row.award) }}" readonly></td>
-                                 <td class="no-print"><button type="button" class="btn-remove" title="Remove row"><i class="fas fa-trash"></i></button></td>
-                             </tr>
-                             {% endfor %}
-                         </tbody>
-                     </table>
-                 </div>
-                 <div style="margin-top:15px; display:flex; gap: 10px;">
-                     <button type="button" class="btn btn-add-row" id="addRowBtn"><i class="fas fa-plus"></i> Add Line</button>
-                     <button type="submit" class="btn">Save Changes</button>
-                 </div>
-             </div>
-        </form>
-
-        <div class="card">
-            <div class="section-title">Preview</div>
-            <div class="table">
-                <table id="previewTable">
-                    <thead>
-                        <tr>
-                            <th>Line</th>
-                            <th>Code</th>
-                            <th>Description</th>
-                            <th>Qty</th>
-                            <th>Yr</th>
-                            <th>Mh</th>
-                            <th>Day</th>
-                            <th>Fee Chg</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in items %}
-                        <tr class="preview-row">
-                            <td>{{ loop.index }}</td>
-                            <td class="p-code">{{ row.code }}</td>
-                            <td class="p-desc">{{ row.description }}</td>
-                            <td class="p-qty">{{ row.qty }}</td>
-                            <td class="p-yr">{{ row.yr }}</td>
-                            <td class="p-mh">{{ row.mh }}</td>
-                            <td class="p-day">{{ row.day }}</td>
-                            <td class="p-fee">MWK {{ "%.2f"|format(row.fee) }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="totals" id="summaryTotals">
-                Total: MWK {{ "%.2f"|format(total_amount) }} |
-                Covered: MWK {{ "%.2f"|format(covered_amount) }} |
-                Shortfall: MWK {{ "%.2f"|format(shortfall_amount) }} |
-                Received: MWK {{ "%.2f"|format(received_amount) }} |
-                Balance: MWK {{ "%.2f"|format(balance_amount) }}
-            </div>
-        </div>
+    <div class="no-print" style="text-align: right; max-width: 800px; margin: auto; margin-bottom: 10px;">
+        <button onclick="window.print()" style="padding: 10px 20px; background: #4361ee; color: white; border: none; border-radius: 4px; cursor: pointer;">Print Invoice</button>
     </div>
 
-    <script>
-        function toggleProviderLayout() {
-            const provider = document.getElementById('providerSelect').value;
-            const insuranceFields = document.querySelectorAll('.insurance-field');
-            const coverageInput = document.getElementById('coverage_percent');
-            
-            if (provider === 'Private') {
-                insuranceFields.forEach(f => f.style.display = 'none');
-                if (coverageInput.value == "0") coverageInput.value = "0";
-            } else {
-                insuranceFields.forEach(f => f.style.display = 'flex');
-                
-                // Set default coverage for known providers if it's currently 0
-                if (coverageInput.value == "0") {
-                    if (provider === 'MASM') coverageInput.value = "80";
-                    else if (provider === 'National Bank') coverageInput.value = "100";
-                    else if (provider === 'Precious') coverageInput.value = "90";
-                }
-            }
-        }
+    <div class="invoice-box">
+        <div class="invoice-header">
+            <div class="logo">Limbe Medical</div>
+            <div class="invoice-title">
+                INVOICE<br>
+                <span style="font-size: 16px; color: #777;">#{{ bill.bill_id }}</span>
+            </div>
+        </div>
 
-        document.addEventListener('DOMContentLoaded', function() {
-            toggleProviderLayout(); // Initialize layout
-            
-            const coverageInput = document.getElementById('coverage_percent');
-            const detailsTable = document.getElementById('detailsTable');
-            const summaryTotals = document.getElementById('summaryTotals');
-            const addRowBtn = document.getElementById('addRowBtn');
-            const invoiceItemsBody = document.getElementById('invoiceItemsBody');
-            const previewTableBody = document.querySelector('#previewTable tbody');
-            const isPaid = "{{ bill.status|lower }}" === 'paid';
+        <div class="details">
+            <div class="bill-to">
+                <strong>Bill To:</strong><br>
+                {{ patient.first_name }} {{ patient.last_name }}<br>
+                {{ patient.address }}<br>
+                {{ patient.phone }}
+            </div>
+            <div class="invoice-info" style="text-align: right;">
+                <strong>Date:</strong> {{ bill.created_date }}<br>
+                <strong>Status:</strong> {{ bill.status }}<br>
+                <strong>Patient ID:</strong> {{ patient.patient_id }}
+            </div>
+        </div>
 
-            function updateCalculations() {
-                let coverage = parseFloat(coverageInput.value) || 0;
-                let totalFee = 0;
-                let totalAward = 0;
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in bill.services.split(', ') %}
+                {% if ' ($' in item %}
+                <tr>
+                    <td>{{ item.split(' ($')[0] }}</td>
+                    <td style="text-align: right;">${{ item.split(' ($')[1].replace(')', '') }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
 
-                const rows = invoiceItemsBody.querySelectorAll('.item-row');
-                
-                // Clear and rebuild preview table
-                previewTableBody.innerHTML = '';
+        <div class="total">
+            Total: ${{ "%.2f"|format(bill.amount) }}
+        </div>
 
-                rows.forEach((row, index) => {
-                    const lineNo = index + 1;
-                    row.querySelector('.line-number').textContent = lineNo;
-
-                    const code = row.querySelector('[name="item_code[]"]').value;
-                    const desc = row.querySelector('[name="item_desc[]"]').value;
-                    const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-                    const yr = row.querySelector('[name="item_yr[]"]').value;
-                    const mh = row.querySelector('[name="item_mh[]"]').value;
-                    const day = row.querySelector('[name="item_day[]"]').value;
-                    const fee = parseFloat(row.querySelector('.fee-input').value) || 0;
-                    const awardInput = row.querySelector('.award-input');
-                    
-                    const award = fee * (coverage / 100);
-                    awardInput.value = award.toFixed(2);
-
-                    totalFee += fee;
-                    totalAward += award;
-
-                    // Add to preview
-                    const pRow = document.createElement('tr');
-                    pRow.className = 'preview-row';
-                    pRow.innerHTML = `
-                        <td>${lineNo}</td>
-                        <td class="p-code">${code}</td>
-                        <td class="p-desc">${desc}</td>
-                        <td class="p-qty">${qty}</td>
-                        <td class="p-yr">${yr}</td>
-                        <td class="p-mh">${mh}</td>
-                        <td class="p-day">${day}</td>
-                        <td class="p-fee">MWK ${fee.toFixed(2)}</td>
-                    `;
-                    previewTableBody.appendChild(pRow);
-                });
-
-                const shortfall = Math.max(totalFee - totalAward, 0);
-                const received = isPaid ? totalFee : 0;
-                const balance = Math.max(totalFee - received, 0);
-
-                summaryTotals.innerHTML = `
-                    Total: MWK ${totalFee.toFixed(2)} |
-                    Covered: MWK ${totalAward.toFixed(2)} |
-                    Shortfall: MWK ${shortfall.toFixed(2)} |
-                    Received: MWK ${received.toFixed(2)} |
-                    Balance: MWK ${balance.toFixed(2)}
-                `;
-            }
-
-            // Add Row
-            addRowBtn.addEventListener('click', function() {
-                const newRow = document.createElement('tr');
-                newRow.className = 'item-row';
-                newRow.innerHTML = `
-                    <td class="line-number"></td>
-                    <td>
-                        <div class="suggestions-container">
-                            <input type="text" name="item_code[]" class="table-input code-input" value="SRV" autocomplete="off">
-                            <div class="suggestions-list"></div>
-                        </div>
-                    </td>
-                    <td><input type="text" name="item_desc[]" class="table-input desc-input" value=""></td>
-                    <td><input type="number" name="item_qty[]" class="table-input num qty-input" value="1"></td>
-                    <td><input type="text" name="item_yr[]" class="table-input num" value=""></td>
-                    <td><input type="text" name="item_mh[]" class="table-input num" value=""></td>
-                    <td><input type="text" name="item_day[]" class="table-input num" value=""></td>
-                    <td><input type="number" step="0.01" name="item_fee[]" class="table-input num fee-input" value="0.00"></td>
-                    <td><input type="number" step="0.01" name="item_award[]" class="table-input num award-input" value="0.00" readonly></td>
-                    <td class="no-print"><button type="button" class="btn-remove" title="Remove row"><i class="fas fa-trash"></i></button></td>
-                `;
-                invoiceItemsBody.appendChild(newRow);
-                updateCalculations();
-            });
-
-            // Remove Row (Delegated)
-            invoiceItemsBody.addEventListener('click', function(e) {
-                if (e.target.closest('.btn-remove')) {
-                    const row = e.target.closest('.item-row');
-                    if (invoiceItemsBody.querySelectorAll('.item-row').length > 1) {
-                        row.remove();
-                        updateCalculations();
-                    } else {
-                        alert("Invoice must have at least one line item.");
-                    }
-                }
-            });
-
-            // Listen for changes
-            coverageInput.addEventListener('input', updateCalculations);
-            detailsTable.addEventListener('input', function(e) {
-                if (e.target.classList.contains('table-input')) {
-                    updateCalculations();
-                }
-                
-                // Inventory lookup logic
-                if (e.target.classList.contains('code-input')) {
-                    const input = e.target;
-                    const query = input.value.trim();
-                    const container = input.closest('.suggestions-container');
-                    const list = container.querySelector('.suggestions-list');
-                    const row = input.closest('.item-row');
-
-                    if (query.length < 1) {
-                        list.style.display = 'none';
-                        return;
-                    }
-
-                    fetch(`/api/inventory/search?q=${encodeURIComponent(query)}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            if (data.length > 0) {
-                                list.innerHTML = '';
-                                data.forEach(item => {
-                                    const div = document.createElement('div');
-                                    div.className = 'suggestion-item';
-                                    div.innerHTML = `<strong>${item.id}</strong> - ${item.name} (MWK ${item.price})`;
-                                    div.onclick = function() {
-                                        input.value = item.id;
-                                        row.querySelector('.desc-input').value = item.name;
-                                        row.querySelector('.fee-input').value = item.price.toFixed(2);
-                                        list.style.display = 'none';
-                                        updateCalculations();
-                                    };
-                                    list.appendChild(div);
-                                });
-                                list.style.display = 'block';
-                            } else {
-                                list.style.display = 'none';
-                            }
-                        });
-                }
-            });
-
-            // Close suggestions when clicking outside
-            document.addEventListener('click', function(e) {
-                if (!e.target.closest('.suggestions-container')) {
-                    document.querySelectorAll('.suggestions-list').forEach(l => l.style.display = 'none');
-                }
-            });
-        });
-    </script>
+        <div class="footer">
+            Thank you for choosing Limbe Medical.<br>
+            Please pay within 30 days. Checks payable to Limbe Medical Center.
+        </div>
+    </div>
 </body>
 </html>

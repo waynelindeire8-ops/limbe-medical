@@ -12,13 +12,12 @@ import os
 import json
 import re
 import uuid
-import pyotp
 try:
     from dotenv import load_dotenv
 except Exception:
     def load_dotenv():
         return False
-from supabase_data_manager import get_supabase_json, put_supabase_json, upload_file_to_supabase, delete_file_from_supabase, get_public_url
+from supabase_data_manager import get_supabase_json, put_supabase_json
 
 load_dotenv()
 import datetime
@@ -82,22 +81,8 @@ class HospitalManagementSystem:
             self.data_file = onedrive_path
 
         self.load_data()
-        self._activate_admins()
 
     # ---------- Utility ----------
-    def _activate_admins(self) -> None:
-        """Ensure all admins are active and verified by default."""
-        admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
-        changed = False
-        for user in self.users:
-            if (user.role or '').strip().lower() in admin_roles:
-                if not user.is_active or not user.is_verified:
-                    user.is_active = True
-                    user.is_verified = True
-                    changed = True
-        if changed:
-            self.save_data()
-
     @staticmethod
     def generate_id(prefix: str) -> str:
         """Generate a unique ID with a prefix."""
@@ -138,8 +123,7 @@ class HospitalManagementSystem:
 
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
-        except Exception as e:
-            print(f"[ERROR] Failed to save data: {e}")
+        except Exception:
             pass
 
     def load_data(self) -> None:
@@ -183,12 +167,6 @@ class HospitalManagementSystem:
                 tmp['appointment_time'] = tmp.pop('time')
             return _filter(Appointment, tmp)
 
-        def _normalize_doctor(obj: Dict[str, Any]) -> Dict[str, Any]:
-            tmp = dict(obj)
-            if 'specialization' in tmp and 'specialty' not in tmp:
-                tmp['specialty'] = tmp.pop('specialization')
-            return _filter(Doctor, tmp)
-
         def _normalize_bill(obj: Dict[str, Any]) -> Dict[str, Any]:
             tmp = dict(obj)
             if 'date' in tmp and 'created_date' not in tmp:
@@ -215,7 +193,7 @@ class HospitalManagementSystem:
             return _filter(MedicalRecord, new_record)
 
         self.patients = [Patient(**_filter(Patient, p)) for p in data.get('patients', [])]
-        self.doctors = [Doctor(**_normalize_doctor(d)) for d in data.get('doctors', [])]
+        self.doctors = [Doctor(**_filter(Doctor, d)) for d in data.get('doctors', [])]
         self.appointments = [Appointment(**_normalize_appointment(a)) for a in data.get('appointments', [])]
         self.medical_records = [MedicalRecord(**_normalize_record(m)) for m in data.get('medical_records', [])]
         self.prescriptions = [Prescription(**_filter(Prescription, p)) for p in data.get('prescriptions', [])]
@@ -234,76 +212,66 @@ class HospitalManagementSystem:
         added = 0
         if not patient_id or not file_paths:
             return added
-        
+        base_dir = os.path.dirname(os.path.abspath(self.data_file))
+        dest_dir = os.path.join(base_dir, 'attachments', patient_id)
+        try:
+            os.makedirs(dest_dir, exist_ok=True)
+        except Exception:
+            pass
         entries = self.patient_files.get(patient_id, [])
         ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
         for src in file_paths:
             try:
                 name = os.path.basename(src)
-                # Ensure path uses forward slashes and has no 'attachments' prefix, and no double slashes
-                supabase_path = f"{patient_id}/{name}".replace('\\', '/')
-                while '//' in supabase_path:
-                    supabase_path = supabase_path.replace('//', '/')
-                
-                if upload_file_to_supabase(src, supabase_path):
-                    public_url = get_public_url(supabase_path)
-                    entries.append({
-                        'file_name': name,
-                        'path': supabase_path,
-                        'public_url': public_url,
-                        'uploaded_at': ts,
-                        'source_appointment_id': source_appointment_id or '',
-                        'source_record_id': source_record_id or ''
-                    })
-                    added += 1
-                else:
-                    print(f"[WARN] Failed to upload file '{src}' to Supabase.")
+                dest = os.path.join(dest_dir, name)
+                if os.path.exists(dest):
+                    root, ext = os.path.splitext(name)
+                    name = f"{root}_{int(datetime.datetime.now().timestamp())}{ext}"
+                    dest = os.path.join(dest_dir, name)
+                shutil.copy2(src, dest)
+                rel_path = os.path.relpath(dest, base_dir)
+                sup_id = ''
+                # Placeholder: local copy made; integrate Supabase Storage upload when configured
+                entries.append({
+                    'file_name': name,
+                    'path': rel_path,
+                    'uploaded_at': ts,
+                    'source_appointment_id': source_appointment_id or '',
+                    'source_record_id': source_record_id or '',
+                    'supabase_file_id': sup_id
+                })
+                added += 1
             except Exception as e:
-                print(f"[WARN] Failed to process file '{src}': {e}")
-                
+                print(f"[WARN] Failed to add file '{src}': {e}")
         self.patient_files[patient_id] = entries
         self.save_data()
+        try:
+            self.add_activity(None, 'attach_files', 'patient', patient_id, f"{added} file(s)")
+        except Exception:
+            pass
         return added
 
     def delete_patient_file(self, patient_id: str, rel_path: str) -> bool:
         if not patient_id or not rel_path:
             return False
-            
+        base_dir = os.path.dirname(os.path.abspath(self.data_file))
+        abs_path = os.path.join(base_dir, rel_path)
         entries = self.patient_files.get(patient_id, []) or []
-        # Flexible match: normalize backslashes and double slashes and compare
-        norm_rel = rel_path.replace('\\', '/')
-        while '//' in norm_rel:
-            norm_rel = norm_rel.replace('//', '/')
-        
-        def normalize(p):
-            p = (p or '').replace('\\', '/')
-            while '//' in p:
-                p = p.replace('//', '/')
-            return p
-
-        file_to_delete = next((e for e in entries if normalize(e.get('path')) == norm_rel), None)
-        
-        if not file_to_delete:
+        new_entries = [e for e in entries if e.get('path') != rel_path]
+        if len(new_entries) == len(entries):
             return False
-            
-        # Sanitize path for Supabase (replace backslashes with forward slashes)
-        supabase_path = norm_rel
-        # Remove bucket name prefix if it exists
-        if supabase_path.startswith('attachments/'):
-            supabase_path = supabase_path.replace('attachments/', '', 1)
-        elif supabase_path.startswith('attachment/'):
-            supabase_path = supabase_path.replace('attachment/', '', 1)
-            
-        if delete_file_from_supabase(supabase_path):
-            # Update local list (also with flexible matching)
-            new_entries = [e for e in entries if normalize(e.get('path')) != norm_rel]
-            self.patient_files[patient_id] = new_entries
-            self.save_data()
-            return True
-        else:
-            print(f"[WARN] Failed to delete file '{supabase_path}' from Supabase.")
-            return False
+        try:
+            if os.path.exists(abs_path):
+                os.remove(abs_path)
+        except Exception as e:
+            print(f"[WARN] Failed to delete file '{abs_path}': {e}")
+        self.patient_files[patient_id] = new_entries
+        self.save_data()
+        try:
+            self.add_activity(None, 'delete_file', 'patient', patient_id, rel_path)
+        except Exception:
+            pass
+        return True
 
     def rename_patient_file(self, patient_id: str, rel_path: str, new_name: str) -> bool:
         if not patient_id or not rel_path or not (new_name or '').strip():
@@ -329,7 +297,7 @@ class HospitalManagementSystem:
         except Exception as e:
             print(f"[WARN] Failed to rename file '{abs_path}' -> '{new_abs}': {e}")
             return False
-        new_rel = os.path.relpath(new_abs, base_dir).replace('\\', '/')
+        new_rel = os.path.relpath(new_abs, base_dir)
         entry['file_name'] = new_name
         entry['path'] = new_rel
         self.save_data()
@@ -379,59 +347,13 @@ class HospitalManagementSystem:
             or search_term in p.patient_id.lower()
         ]
 
-    def update_patient(self, old_id: str, **kwargs) -> bool:
-        # Find the patient
-        patient = self.get_patient(old_id)
+    def update_patient(self, patient_id: str, **kwargs) -> bool:
+        patient = self.get_patient(patient_id)
         if not patient:
-            print(f"[ERROR] update_patient: Patient {old_id} not found.")
             return False
-            
-        new_id = kwargs.get('patient_id')
-        if new_id and new_id != old_id:
-            # Check if the new ID already exists in ANOTHER patient
-            existing = self.get_patient(new_id)
-            if existing and existing != patient:
-                print(f"[ERROR] update_patient: New ID {new_id} already exists.")
-                return False
-                
-            # Update patient ID in other records to maintain reference
-            print(f"[DEBUG] update_patient: Changing ID from {old_id} to {new_id}")
-            for a in self.appointments:
-                if a.patient_id == old_id:
-                    a.patient_id = new_id
-            
-            for m in self.medical_records:
-                if m.patient_id == old_id:
-                    m.patient_id = new_id
-                    
-            for b in self.bills:
-                if b.patient_id == old_id:
-                    b.patient_id = new_id
-                    
-            for p in self.prescriptions:
-                if p.patient_id == old_id:
-                    p.patient_id = new_id
-            
-            for q in self.queue:
-                if q.patient_id == old_id:
-                    q.patient_id = new_id
-            
-            # Update keys in dictionaries
-            if old_id in self.patient_files:
-                self.patient_files[new_id] = self.patient_files.pop(old_id)
-            
-            if old_id in self.patient_scheme:
-                self.patient_scheme[new_id] = self.patient_scheme.pop(old_id)
-                
-        # Update patient attributes
         for key, value in kwargs.items():
             if hasattr(patient, key):
                 setattr(patient, key, value)
-        
-        # Explicitly update ID if it changed and wasn't in kwargs (though it should be)
-        if new_id:
-            patient.patient_id = new_id
-            
         self.save_data()
         return True
 
@@ -749,28 +671,21 @@ class HospitalManagementSystem:
 
     # ---------- Queue Management ----------
     def add_to_queue(self, queue_item: QueueItem) -> None:
+        """Add a patient to the queue."""
         self.queue.append(queue_item)
         self.save_data()
 
     def update_queue_status(self, queue_id: str, status: str) -> bool:
+        """Update the status of a queue item."""
         for item in self.queue:
             if item.queue_id == queue_id:
                 item.status = status
                 self.save_data()
-                try:
-                    ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    if status.lower() == 'in consultation':
-                        item.consultation_start_time = ts
-                    elif status.lower() == 'completed':
-                        item.consultation_end_time = ts
-                    elif status.lower() == 'no-show':
-                        item.no_show_time = ts
-                except Exception:
-                    pass
                 return True
         return False
 
     def remove_from_queue(self, queue_id: str) -> bool:
+        """Remove a patient from the queue."""
         initial_len = len(self.queue)
         self.queue = [item for item in self.queue if item.queue_id != queue_id]
         if len(self.queue) < initial_len:
@@ -779,40 +694,8 @@ class HospitalManagementSystem:
         return False
 
     def get_queue(self) -> List[QueueItem]:
+        """Get the current queue."""
         return self.queue
-
-    def call_patient(self, queue_id: str) -> bool:
-        for item in self.queue:
-            if item.queue_id == queue_id:
-                item.called_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                item.status = 'In Consultation'
-                self.save_data()
-                return True
-        return False
-
-    def transfer_patient(self, queue_id: str, department: str, doctor_id: str) -> bool:
-        for item in self.queue:
-            if item.queue_id == queue_id:
-                item.department = department or item.department
-                item.doctor_id = doctor_id or item.doctor_id
-                item.status = 'Waiting'
-                self.save_data()
-                return True
-        return False
-
-    def requeue_patient(self, queue_id: str) -> bool:
-        for item in self.queue:
-            if item.queue_id == queue_id:
-                item.status = 'Waiting'
-                self.save_data()
-                return True
-        return False
-
-    def estimate_wait_time(self, department: str) -> str:
-        per_patient_minutes = 15
-        waiting = [q for q in self.queue if (q.department or '') == (department or '') and (q.status or '').lower() == 'waiting']
-        minutes = len(waiting) * per_patient_minutes
-        return f"{minutes} mins"
 
     def update_settings(self, **kwargs) -> None:
         self.settings.update(kwargs)
@@ -858,8 +741,9 @@ class HospitalManagementSystem:
             password_salt=creds['salt'],
             password_hash=creds['hash'],
             role=r,
-            is_verified=(r in admin_roles),
-            is_active=(r in admin_roles)
+            is_active=True,
+            is_verified=False,
+            otp_enabled=False
         )
         self.users.append(user)
         self.save_data()
@@ -869,47 +753,10 @@ class HospitalManagementSystem:
         user = next((u for u in self.users if u.username.lower() == username.lower()), None)
         if not user:
             return None
-        
-        if not user.is_active or not user.is_verified:
-            return None
-            
         creds = self._hash_password(password, user.password_salt)
         if creds['hash'] == user.password_hash:
             return user
         return None
-
-    def generate_otp_secret(self, username: str) -> Optional[str]:
-        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
-        if not user:
-            return None
-        if not user.otp_secret:
-            user.otp_secret = pyotp.random_base32()
-            self.save_data()
-        return user.otp_secret
-
-    def verify_otp(self, username: str, code: str) -> bool:
-        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
-        if not user or not user.otp_secret:
-            return False
-        totp = pyotp.TOTP(user.otp_secret)
-        return totp.verify(code)
-
-    def enable_otp(self, username: str) -> bool:
-        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
-        if not user or not user.otp_secret:
-            return False
-        user.otp_enabled = True
-        self.save_data()
-        return True
-
-    def disable_otp(self, username: str) -> bool:
-        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
-        if not user:
-            return False
-        user.otp_enabled = False
-        user.otp_secret = ""
-        self.save_data()
-        return True
 
     def add_activity(self, actor: Optional[str], action: str, entity: str, entity_id: str, summary: str) -> None:
         entry = {
@@ -944,49 +791,45 @@ class HospitalManagementSystem:
             pass
         return True
 
-    def require_admin(self, actor_username: str) -> bool:
+    def toggle_user_status(self, target_username: str, active: bool, actor_username: str) -> bool:
         admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
         actor = next((u for u in self.users if u.username.lower() == actor_username.lower()), None)
-        return actor and (actor.role or '').strip().lower() in admin_roles
-
-    def activate_user(self, target_username: str, actor_username: str) -> bool:
-        if not self.require_admin(actor_username):
+        if not actor or (actor.role or '').strip().lower() not in admin_roles:
             return False
         user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
         if not user:
             return False
-        user.is_active = True
+        user.is_active = active
         self.save_data()
+        self.add_activity(actor_username, 'toggle_status', 'user', user.user_id, f"{user.username}: {'Active' if active else 'Inactive'}")
         return True
 
-    def deactivate_user(self, target_username: str, actor_username: str) -> bool:
-        if not self.require_admin(actor_username):
+    def toggle_user_verification(self, target_username: str, verified: bool, actor_username: str) -> bool:
+        admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
+        actor = next((u for u in self.users if u.username.lower() == actor_username.lower()), None)
+        if not actor or (actor.role or '').strip().lower() not in admin_roles:
             return False
         user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
         if not user:
             return False
-        user.is_active = False
+        user.is_verified = verified
         self.save_data()
+        self.add_activity(actor_username, 'toggle_verification', 'user', user.user_id, f"{user.username}: {'Verified' if verified else 'Unverified'}")
         return True
 
-    def verify_user(self, target_username: str, actor_username: str) -> bool:
-        if not self.require_admin(actor_username):
+    def toggle_user_2fa(self, target_username: str, enabled: bool, actor_username: str) -> bool:
+        admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
+        actor = next((u for u in self.users if u.username.lower() == actor_username.lower()), None)
+        if not actor or (actor.role or '').strip().lower() not in admin_roles:
             return False
         user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
         if not user:
             return False
-        user.is_verified = True
+        user.otp_enabled = enabled
+        if not enabled:
+            user.otp_secret = None
         self.save_data()
-        return True
-
-    def unverify_user(self, target_username: str, actor_username: str) -> bool:
-        if not self.require_admin(actor_username):
-            return False
-        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
-        if not user:
-            return False
-        user.is_verified = False
-        self.save_data()
+        self.add_activity(actor_username, 'toggle_2fa', 'user', user.user_id, f"{user.username}: {'2FA Enabled' if enabled else '2FA Disabled'}")
         return True
 
     def _resolve_onedrive_base(self) -> Optional[str]:

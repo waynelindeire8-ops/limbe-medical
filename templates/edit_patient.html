@@ -58,24 +58,10 @@
         <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
             <a href="{{ url_for('patients') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Patients</a>
             
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}" style="padding: 15px; margin-bottom: 20px; border-radius: 8px; {% if category == 'success' %}background-color: #d4edda; color: #155724;{% else %}background-color: #f8d7da; color: #721c24;{% endif %}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
             <div class="form-container">
                 <h2>Edit Patient</h2>
                 <br>
                 <form method="POST">
-                    <div class="form-group">
-                        <label for="patient_id">Patient ID</label>
-                        <input type="text" id="patient_id" name="patient_id" value="{{ patient.patient_id }}">
-                    </div>
                     <div class="form-group">
                         <label for="first_name">First Name</label>
                         <input type="text" id="first_name" name="first_name" value="{{ patient.first_name }}" required>
@@ -86,19 +72,19 @@
                     </div>
                     <div class="form-group">
                         <label for="dob">Date of Birth</label>
-                        <input type="date" id="dob" name="dob" value="{{ patient.date_of_birth }}">
+                        <input type="date" id="dob" name="dob" value="{{ patient.date_of_birth }}" required>
                     </div>
                     <div class="form-group">
                         <label for="gender">Gender</label>
-                        <select id="gender" name="gender">
-                            <option value="">Select Gender</option>
+                        <select id="gender" name="gender" required>
                             <option value="Male" {% if patient.gender == 'Male' %}selected{% endif %}>Male</option>
                             <option value="Female" {% if patient.gender == 'Female' %}selected{% endif %}>Female</option>
+                            <option value="Other" {% if patient.gender == 'Other' %}selected{% endif %}>Other</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="phone">Phone Number</label>
-                        <input type="tel" id="phone" name="phone" value="{{ patient.phone }}">
+                        <input type="tel" id="phone" name="phone" value="{{ patient.phone }}" required>
                     </div>
                     <div class="form-group">
                         <label for="email">Email</label>
@@ -107,38 +93,6 @@
                     <div class="form-group">
                         <label for="address">Address</label>
                         <textarea id="address" name="address" rows="3">{{ patient.address }}</textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="scheme_provider">Scheme Provider</label>
-                        <input type="text" id="scheme_provider" name="scheme_provider" value="{{ scheme.provider or patient.scheme_provider }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="scheme_type">Scheme Type</label>
-                        <input type="text" id="scheme_type" name="scheme_type" value="{{ scheme.type or patient.scheme_type }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="membership_number">Membership Number</label>
-                        <input type="text" id="membership_number" name="membership_number" value="{{ scheme.membership_number }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="form_number">Form Number</label>
-                        <input type="text" id="form_number" name="form_number" value="{{ scheme.form_number }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="coverage_percent">Coverage (%)</label>
-                        <input type="number" step="0.01" id="coverage_percent" name="coverage_percent" value="{{ scheme.coverage_percent }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="age">Age (for Invoices)</label>
-                        <input type="text" id="age" name="age" value="{{ scheme.age }}" placeholder="e.g. 25 yrs">
-                    </div>
-                    <div class="form-group">
-                        <label for="principal_member">Principal Member</label>
-                        <input type="text" id="principal_member" name="principal_member" value="{{ scheme.principal_member }}">
-                    </div>
-                    <div class="form-group">
-                        <label for="relationship">Relationship to Principal</label>
-                        <input type="text" id="relationship" name="relationship" value="{{ scheme.relationship }}">
                     </div>
                     <div class="form-group">
                         <label for="emergency_contact">Emergency Contact</label>

@@ -16,10 +16,6 @@
         <a href="{{ url_for('doctors') }}" class="menu-item {% if active_page == 'doctors' %}active{% endif %}" title="Doctors"><i class="fas fa-user-md"></i></a>
         {% endif %}
         
-        {% if current_role in ['admin'] %}
-        <a href="{{ url_for('admin_users') }}" class="menu-item {% if active_page == 'admin_users' %}active{% endif %}" title="Admin Users"><i class="fas fa-users-cog"></i></a>
-        {% endif %}
-
         {% if current_role in ['admin', 'doctor', 'receptionist'] %}
         <a href="{{ url_for('departments') }}" class="menu-item {% if active_page == 'departments' %}active{% endif %}" title="Departments"><i class="fas fa-building"></i></a>
         {% endif %}
@@ -28,20 +24,11 @@
         <a href="{{ url_for('view_schedule') }}" class="menu-item {% if active_page == 'schedule' %}active{% endif %}" title="Schedule"><i class="fas fa-calendar-alt"></i></a>
         {% endif %}
 
-        {% if current_role in ['admin', 'receptionist', 'nurse', 'doctor'] %}
-        <a href="{{ url_for('queue_dashboard') }}" class="menu-item {% if active_page == 'queue' %}active{% endif %}" title="Queue"><i class="fas fa-list-ol"></i></a>
-        {% endif %}
-        
         {% if current_role in ['admin', 'doctor', 'nurse'] %}
         <a href="{{ url_for('medical_records') }}" class="menu-item {% if active_page == 'medical_records' %}active{% endif %}" title="Medical Records"><i class="fas fa-file-medical"></i></a>
         {% endif %}
         
-        <a href="{{ url_for('messages') }}" class="menu-item {% if active_page == 'messages' %}active{% endif %}" title="Messages" style="position: relative;">
-            <i class="fas fa-comments"></i>
-            {% if unread_messages_count and unread_messages_count > 0 %}
-            <span style="position:absolute; top:-6px; right:-6px; background:#e63946; color:#fff; border-radius:10px; padding:2px 6px; font-size:11px;">{{ unread_messages_count }}</span>
-            {% endif %}
-        </a>
+        <a href="{{ url_for('messages') }}" class="menu-item {% if active_page == 'messages' %}active{% endif %}" title="Messages"><i class="fas fa-comments"></i></a>
         
         {% if current_role in ['admin', 'doctor', 'lab_assistant', 'nurse'] %}
         <a href="{{ url_for('view_lab_results') }}" class="menu-item {% if active_page == 'lab_results' %}active{% endif %}" title="Lab Results"><i class="fas fa-flask"></i></a>
@@ -54,53 +41,17 @@
         {% if current_role in ['admin', 'cashier'] %}
         <a href="{{ url_for('billing_dashboard') }}" class="menu-item {% if active_page == 'billing' %}active{% endif %}" title="Billing"><i class="fas fa-file-invoice-dollar"></i></a>
         {% endif %}
-
-        {% if current_role in ['admin', 'doctor', 'nurse', 'pharmacist'] %}
-        <a href="{{ url_for('inventory') }}" class="menu-item {% if active_page == 'inventory' %}active{% endif %}" title="Inventory"><i class="fas fa-boxes"></i></a>
-        {% endif %}
         
         {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
         <a href="{{ url_for('prescriptions') }}" class="menu-item {% if active_page == 'prescriptions' %}active{% endif %}" title="Prescriptions"><i class="fas fa-capsules"></i></a>
         {% endif %}
+
+        {% if current_role in ['admin', 'admin doctor', 'admin_doctor'] %}
+        <a href="{{ url_for('admin_users') }}" class="menu-item {% if active_page == 'admin_users' %}active{% endif %}" title="User Management"><i class="fas fa-users-cog"></i></a>
+        {% endif %}
     </nav>
     <div class="settings">
-        <a href="{{ url_for('setup_2fa') }}" class="menu-item {% if active_page == 'setup_2fa' %}active{% endif %}" title="2FA Security"><i class="fas fa-shield-alt"></i></a>
         <a href="{{ url_for('settings') }}" class="menu-item {% if active_page == 'settings' %}active{% endif %}" title="Settings"><i class="fas fa-cog"></i></a>
         <a href="{{ url_for('logout') }}" class="menu-item" title="Logout"><i class="fas fa-sign-out-alt"></i></a>
     </div>
 </aside>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('select').forEach(function(sel) {
-    if (sel.dataset.searchableInit === '1') return;
-    sel.dataset.searchableInit = '1';
-    var datalistId = 'dl-' + Math.random().toString(36).slice(2);
-    var input = document.createElement('input');
-    input.setAttribute('list', datalistId);
-    input.setAttribute('placeholder', 'Type to search...');
-    if (sel.hasAttribute('required')) input.setAttribute('required','required');
-    input.style.width = '100%';
-    input.style.padding = '10px';
-    input.style.border = '1px solid #ddd';
-    input.style.borderRadius = '6px';
-    var dl = document.createElement('datalist');
-    dl.id = datalistId;
-    Array.from(sel.options).forEach(function(opt) {
-      var o = document.createElement('option');
-      o.value = opt.text;
-      o.dataset.val = opt.value;
-      dl.appendChild(o);
-    });
-    sel.parentNode.insertBefore(input, sel);
-    sel.parentNode.insertBefore(dl, sel);
-    sel.style.display = 'none';
-    if (sel.selectedIndex >= 0) input.value = sel.options[sel.selectedIndex].text;
-    function sync() {
-      var match = Array.from(dl.options).find(function(o){ return o.value === input.value; });
-      if (match) sel.value = match.dataset.val;
-    }
-    input.addEventListener('change', sync);
-    input.addEventListener('input', sync);
-  });
-});
-</script>

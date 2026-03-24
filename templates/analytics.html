@@ -55,31 +55,25 @@
                 </div>
                 <div class="summary-card" style="background: linear-gradient(135deg, #4cc9f0, #4895ef);">
                     <h3>Revenue</h3>
-                    <h2>MWK {{ total_revenue }}</h2>
+                    <h2>${{ total_revenue }}</h2>
                 </div>
             </div>
 
             <div class="analytics-grid">
                 <div class="chart-card">
-make                     <h3>Appointment Status</h3>
-                    <canvas id="statusChart"
-                            data-labels='{{ status_labels | tojson | safe }}'
-                            data-data='{{ status_data | tojson | safe }}'></canvas>
+                    <h3>Appointment Status</h3>
+                    <canvas id="statusChart"></canvas>
                 </div>
                 <div class="chart-card">
                     <h3>Revenue Trend (Last 6 Months)</h3>
-                    <canvas id="revenueChart"
-                            data-labels='{{ revenue_labels | tojson | safe }}'
-                            data-data='{{ revenue_data | tojson | safe }}'></canvas>
+                    <canvas id="revenueChart"></canvas>
                 </div>
             </div>
 
             <div class="analytics-grid">
                 <div class="chart-card" style="grid-column: 1 / -1;">
                     <h3>Top Doctors by Appointments</h3>
-                    <canvas id="doctorChart"
-                            data-labels='{{ top_doctors_labels | tojson | safe }}'
-                            data-data='{{ top_doctors_data | tojson | safe }}'></canvas>
+                    <canvas id="doctorChart"></canvas>
                 </div>
             </div>
         </main>
@@ -87,33 +81,27 @@ make                     <h3>Appointment Status</h3>
 
     <script>
         // Appointment Status Chart
-        const statusEl = document.getElementById('statusChart');
-        const statusCtx = statusEl.getContext('2d');
-        const statusLabels = JSON.parse(statusEl.dataset.labels || '[]');
-        const statusData = JSON.parse(statusEl.dataset.data || '[]');
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
         new Chart(statusCtx, {
             type: 'doughnut',
             data: {
-                labels: statusLabels,
+                labels: {{ status_labels | tojson }},
                 datasets: [{
-                    data: statusData,
+                    data: {{ status_data | tojson }},
                     backgroundColor: ['#4cc9f0', '#28a745', '#dc3545']
                 }]
             }
         });
 
         // Revenue Chart
-        const revenueEl = document.getElementById('revenueChart');
-        const revenueCtx = revenueEl.getContext('2d');
-        const revenueLabels = JSON.parse(revenueEl.dataset.labels || '[]');
-        const revenueData = JSON.parse(revenueEl.dataset.data || '[]');
+        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
         new Chart(revenueCtx, {
             type: 'line',
             data: {
-                labels: revenueLabels,
+                labels: {{ revenue_labels | tojson }},
                 datasets: [{
-                    label: 'Revenue (MWK)',
-                    data: revenueData,
+                    label: 'Revenue ($)',
+                    data: {{ revenue_data | tojson }},
                     borderColor: '#4361ee',
                     tension: 0.4,
                     fill: true,
@@ -128,17 +116,14 @@ make                     <h3>Appointment Status</h3>
         });
 
         // Doctor Chart
-        const doctorEl = document.getElementById('doctorChart');
-        const doctorCtx = doctorEl.getContext('2d');
-        const doctorLabels = JSON.parse(doctorEl.dataset.labels || '[]');
-        const doctorData = JSON.parse(doctorEl.dataset.data || '[]');
+        const doctorCtx = document.getElementById('doctorChart').getContext('2d');
         new Chart(doctorCtx, {
             type: 'bar',
             data: {
-                labels: doctorLabels,
+                labels: {{ top_doctors_labels | tojson }},
                 datasets: [{
                     label: 'Appointments',
-                    data: doctorData,
+                    data: {{ top_doctors_data | tojson }},
                     backgroundColor: '#f72585'
                 }]
             },

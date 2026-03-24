@@ -133,7 +133,7 @@
                             <select name="doctor_id" required>
                                 <option value="">Select Doctor</option>
                                 {% for d in doctors %}
-                                <option value="{{ d.doctor_id }}">Dr. {{ d.last_name }} ({{ d.specialty }})</option>
+                                <option value="{{ d.doctor_id }}">Dr. {{ d.last_name }} ({{ d.specialization }})</option>
                                 {% endfor %}
                             </select>
                         </div>

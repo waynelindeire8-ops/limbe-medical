@@ -1,19 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, send_file, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
 import datetime
 import os
-import io
-import json
-import urllib.parse
-import qrcode
-import pyotp
-import base64
-import openpyxl
 from werkzeug.utils import secure_filename
 from functools import wraps
-from dotenv import load_dotenv
-
-load_dotenv() # Load variables from .env
-
 from main import HospitalManagementSystem
 from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord, QueueItem
 
@@ -38,6 +27,15 @@ def notify(subject: str, content: str, recipient_id: str = 'all'):
     )
     hms.messages.append(msg)
     hms.save_data()
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('role', '').strip().lower() not in ['admin', 'admin doctor', 'admin_doctor']:
+            flash('Admin access required', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Seed Users
 def seed_users():
@@ -64,61 +62,9 @@ def seed_users():
 
 seed_users()
 
-def process_patient_files(patient_id):
-    """Retrieve files for a patient and ensure each has a valid public_url."""
-    raw_files = hms.patient_files.get(patient_id, [])
-    processed_files = []
-    
-    # Base URL for public attachments
-    storage_base = "https://qiudxdvssvkbpoovwpbr.supabase.co/storage/v1/object/public/attachments/"
-    
-    for f in raw_files:
-        if isinstance(f, dict):
-            fname = f.get('file_name') or f.get('filename') or 'Unnamed File'
-            path = f.get('path') or f.get('file_path')
-            uploaded_at = f.get('uploaded_at') or f.get('upload_date') or 'Unknown'
-            
-            if not path:
-                continue
-                
-            # Sanitize path: force forward slashes and remove double slashes
-            clean_p = path.replace('\\', '/')
-            while '//' in clean_p:
-                clean_p = clean_p.replace('//', '/')
-            
-            # Pattern 1: No prefix (just patient_id/file.jpg)
-            # This is our new standard
-            p1 = clean_p
-            if p1.startswith('attachments/'):
-                p1 = p1.replace('attachments/', '', 1)
-            elif p1.startswith('attachment/'):
-                p1 = p1.replace('attachment/', '', 1)
-                
-            # Pattern 2: With 'attachments/' prefix
-            # Some older files might actually be stored with the prefix in the key
-            p2 = f"attachments/{p1}"
-            
-            # URL encode both potential paths
-            def encode_path(p):
-                return '/'.join([urllib.parse.quote(part) for part in p.split('/')])
-            
-            url1 = storage_base + encode_path(p1)
-            url2 = storage_base + encode_path(p2)
-            url3 = url_for('serve_file', path=path)
-            
-            processed_files.append({
-                'file_name': fname,
-                'path': path,
-                'public_url': url1, # Primary attempt
-                'fallback_url_supabase': url2, # Fallback for Supabase
-                'fallback_url_local': url3, # Fallback for local/OneDrive
-                'uploaded_at': uploaded_at
-            })
-    return processed_files
-
 @app.before_request
 def require_login():
-    allowed_routes = ['login', 'static', 'register']
+    allowed_routes = ['login', 'static']
     if request.endpoint not in allowed_routes and 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -197,19 +143,13 @@ def login():
         password = request.form['password']
         user = hms.authenticate(username, password)
         if user:
-            if user.otp_enabled:
-                # Store user_id temporarily for 2FA verification
-                session['temp_user_id'] = user.user_id
-                session['temp_username'] = user.username
-                return redirect(url_for('verify_2fa'))
-            
             session['user_id'] = user.user_id
             session['username'] = user.username
             session['role'] = user.role
             flash(f'Welcome back, {user.username}!', 'success')
             return redirect(url_for('dashboard'))
         else:
-            flash('Invalid username or password, or account not activated.', 'error')
+            flash('Invalid username or password', 'error')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -217,170 +157,6 @@ def logout():
     session.clear()
     flash('Logged out successfully', 'success')
     return redirect(url_for('login'))
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        # Default role is 'user', can be changed by admin later
-        if hms.register_user(username, password, role='user'):
-            flash('Registration successful! Please wait for an admin to activate your account.', 'success')
-            return redirect(url_for('login'))
-        else:
-            flash('Username already exists.', 'error')
-    return render_template('register.html')
-
-@app.route('/verify_2fa', methods=['GET', 'POST'])
-def verify_2fa():
-    if 'temp_user_id' not in session:
-        return redirect(url_for('login'))
-    
-    if request.method == 'POST':
-        code = request.form.get('code')
-        username = session.get('temp_username')
-        if hms.verify_otp(username, code):
-            user_id = session.pop('temp_user_id')
-            username = session.pop('temp_username')
-            user = next((u for u in hms.users if u.user_id == user_id), None)
-            if user:
-                session['user_id'] = user.user_id
-                session['username'] = user.username
-                session['role'] = user.role
-                flash(f'Welcome back, {user.username}!', 'success')
-                return redirect(url_for('dashboard'))
-            else:
-                flash('An error occurred. Please log in again.', 'error')
-                return redirect(url_for('login'))
-        else:
-            flash('Invalid 2FA code', 'error')
-            
-    return render_template('verify_2fa.html')
-
-@app.route('/setup_2fa', methods=['GET', 'POST'])
-def setup_2fa():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    
-    username = session.get('username')
-    user = next((u for u in hms.users if u.username == username), None)
-    
-    if request.method == 'POST':
-        code = request.form.get('code')
-        if hms.verify_otp(username, code):
-            hms.enable_otp(username)
-            flash('2FA enabled successfully!', 'success')
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Invalid code. Please try again.', 'error')
-            
-    # Generate secret if not already present
-    secret = hms.generate_otp_secret(username)
-    # Generate provisioning URI for QR code
-    otp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name="Limbe Medical Clinic")
-    
-    # Generate QR code image as base64
-    img = qrcode.make(otp_uri)
-    buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    qr_base64 = base64.b64encode(buffered.getvalue()).decode()
-    
-    return render_template('setup_2fa.html', qr_code=qr_base64, secret=secret, otp_enabled=user.otp_enabled, active_page='setup_2fa')
-
-@app.route('/disable_2fa', methods=['POST'])
-def disable_2fa():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    
-    username = session.get('username')
-    hms.disable_otp(username)
-    flash('2FA disabled successfully.', 'success')
-    return redirect(url_for('dashboard'))
-
-@app.route('/admin/users')
-def admin_users():
-    if 'user_id' not in session or not hms.require_admin(session.get('username')):
-        flash('You do not have permission to access this page.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    users = hms.users
-    return render_template('admin_users.html', users=users, active_page='admin_users')
-
-@app.route('/admin/users/activate/<username>')
-def activate_user(username):
-    if 'user_id' not in session or not hms.require_admin(session.get('username')):
-        flash('You do not have permission to perform this action.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    if hms.activate_user(username, session.get('username')):
-        flash(f'User {username} has been activated.', 'success')
-    else:
-        flash(f'Could not activate user {username}.', 'error')
-    
-    return redirect(url_for('admin_users'))
-
-@app.route('/admin/users/deactivate/<username>')
-def deactivate_user(username):
-    if 'user_id' not in session or not hms.require_admin(session.get('username')):
-        flash('You do not have permission to perform this action.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    if hms.deactivate_user(username, session.get('username')):
-        flash(f'User {username} has been deactivated.', 'success')
-    else:
-        flash(f'Could not deactivate user {username}.', 'error')
-    
-    return redirect(url_for('admin_users'))
-
-@app.route('/admin/users/verify/<username>')
-def verify_user(username):
-    if 'user_id' not in session or not hms.require_admin(session.get('username')):
-        flash('You do not have permission to perform this action.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    if hms.verify_user(username, session.get('username')):
-        flash(f'User {username} has been verified.', 'success')
-    else:
-        flash(f'Could not verify user {username}.', 'error')
-    
-    return redirect(url_for('admin_users'))
-
-@app.route('/admin/users/unverify/<username>')
-def unverify_user(username):
-    if 'user_id' not in session or not hms.require_admin(session.get('username')):
-        flash('You do not have permission to perform this action.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    if hms.unverify_user(username, session.get('username')):
-        flash(f'User {username} has been unverified.', 'success')
-    else:
-        flash(f'Could not unverify user {username}.', 'error')
-    
-    return redirect(url_for('admin_users'))
-
-@app.route('/admin/users/enable_2fa/<username>')
-def enable_user_2fa(username):
-    if 'user_id' not in session or not hms.require_admin(session.get('username')):
-        flash('You do not have permission to perform this action.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    # This will generate the secret and the user will be prompted to set up 2FA on next login
-    hms.generate_otp_secret(username)
-    hms.enable_otp(username)
-    flash(f'2FA has been enabled for user {username}. They will be required to set it up on their next login.', 'success')
-    
-    return redirect(url_for('admin_users'))
-
-@app.route('/admin/users/disable_2fa/<username>')
-def disable_user_2fa(username):
-    if 'user_id' not in session or not hms.require_admin(session.get('username')):
-        flash('You do not have permission to perform this action.', 'error')
-        return redirect(url_for('dashboard'))
-    
-    hms.disable_otp(username)
-    flash(f'2FA has been disabled for user {username}.', 'success')
-    
-    return redirect(url_for('admin_users'))
 
 @app.route('/')
 def dashboard():
@@ -394,11 +170,11 @@ def dashboard():
     active_doctors = len(hms.get_available_doctors())
     
     # Get recent appointments
-    recent_appointments = sorted(hms.appointments, key=lambda x: (x.appointment_date or "") + ' ' + (x.appointment_time or ""), reverse=True)[:5]
+    recent_appointments = sorted(hms.appointments, key=lambda x: x.appointment_date + ' ' + x.appointment_time, reverse=True)[:5]
     
     # Get active queue
-    active_queue = [q for q in hms.queue if (q.status or "").lower() != 'completed']
-    sorted_queue = sorted(active_queue, key=lambda x: (x.arrival_time or ""))
+    active_queue = [q for q in hms.queue if q.status != 'Completed']
+    sorted_queue = sorted(active_queue, key=lambda x: x.arrival_time)
     # Charts
     days = 90
     base = datetime.date.today()
@@ -567,39 +343,6 @@ def queue_noshow(queue_id):
         notify('No-show', queue_id, 'receptionist')
     return redirect(url_for('queue_dashboard'))
 
-from supabase_data_manager import get_public_url, download_file_from_supabase
-
-@app.route('/download_file')
-def download_file():
-    path = request.args.get('path')
-    if not path:
-        return "File not found", 404
-        
-    # Sanitize path for Supabase
-    clean_path = path.replace('\\', '/')
-    if clean_path.startswith('attachments/'):
-        clean_path = clean_path.replace('attachments/', '', 1)
-    elif clean_path.startswith('attachment/'):
-        clean_path = clean_path.replace('attachment/', '', 1)
-        
-    # Fetch file data from Supabase
-    file_data = download_file_from_supabase(clean_path)
-    if not file_data:
-        return "Error downloading file from storage", 500
-        
-    # Create a BytesIO object from the binary data
-    file_stream = io.BytesIO(file_data)
-    
-    # Get filename for the download
-    filename = os.path.basename(clean_path)
-    
-    # Send the file to the user as an attachment
-    return send_file(
-        file_stream,
-        as_attachment=True,
-        download_name=filename
-    )
-
 @app.route('/patient/<patient_id>')
 def patient_details(patient_id):
     patient = hms.get_patient(patient_id)
@@ -607,19 +350,15 @@ def patient_details(patient_id):
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
     
-    # Retrieve files and ensure public_url exists for each using helper
-    files = process_patient_files(patient_id)
-    
+    files = hms.patient_files.get(patient_id, [])
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
-    scheme = hms.get_patient_scheme(patient_id)
     
     return render_template('patient_details.html', 
                            patient=patient, 
                            files=files, 
                            appointments=appointments, 
                            medical_records=medical_records,
-                           scheme=scheme,
                            active_page='patients')
 
 @app.route('/patient/<patient_id>/upload_file', methods=['POST'])
@@ -635,19 +374,20 @@ def upload_patient_file(patient_id):
     
     if file:
         filename = secure_filename(file.filename)
-        temp_dir = os.path.join(os.getcwd(), 'temp_uploads')
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_path = os.path.join(temp_dir, filename)
+        # Create a temporary path to save the uploaded file before passing to HMS
+        # HMS expects file paths to copy from
+        upload_folder = os.path.join(os.getcwd(), 'uploads')
+        os.makedirs(upload_folder, exist_ok=True)
+        temp_path = os.path.join(upload_folder, filename)
+        file.save(temp_path)
         
         try:
-            file.save(temp_path)
-            if hms.add_patient_files(patient_id, [temp_path]):
-                flash('File uploaded successfully to Supabase!', 'success')
-            else:
-                flash('Failed to upload file to Supabase.', 'error')
+            hms.add_patient_files(patient_id, [temp_path])
+            flash('File uploaded successfully!', 'success')
         except Exception as e:
             flash(f'Error uploading file: {e}', 'error')
         finally:
+            # Clean up temp file
             if os.path.exists(temp_path):
                 os.remove(temp_path)
                 
@@ -657,10 +397,27 @@ def upload_patient_file(patient_id):
 def delete_patient_file(patient_id):
     rel_path = request.args.get('path')
     if hms.delete_patient_file(patient_id, rel_path):
-        flash('File deleted successfully from Supabase!', 'success')
+        flash('File deleted successfully!', 'success')
     else:
-        flash('Error deleting file from Supabase!', 'error')
+        flash('Error deleting file!', 'error')
     return redirect(url_for('patient_details', patient_id=patient_id))
+
+@app.route('/download_file')
+def download_file():
+    path = request.args.get('path')
+    if not path:
+        return "File not found", 404
+        
+    # Security check: ensure path is within attachments
+    base_dir = os.path.dirname(os.path.abspath(hms.data_file))
+    abs_path = os.path.join(base_dir, path)
+    
+    if not os.path.exists(abs_path):
+        return "File not found", 404
+        
+    directory = os.path.dirname(abs_path)
+    filename = os.path.basename(abs_path)
+    return send_from_directory(directory, filename, as_attachment=True)
 
 @app.route('/serve_file')
 def serve_file():
@@ -668,24 +425,16 @@ def serve_file():
     if not path:
         return "File not found", 404
         
-    # Security check: ensure path is within allowed directories
-    # We check both the main data directory and potential OneDrive paths
+    # Security check: ensure path is within attachments
     base_dir = os.path.dirname(os.path.abspath(hms.data_file))
+    abs_path = os.path.join(base_dir, path)
     
-    # Try to find the file in multiple locations
-    possible_paths = [
-        os.path.join(base_dir, path),
-        os.path.join(base_dir, 'attachments', path),
-        os.path.abspath(path) # Absolute path check (use with caution, but needed for OneDrive sometimes)
-    ]
-    
-    for abs_path in possible_paths:
-        if os.path.exists(abs_path) and os.path.isfile(abs_path):
-            directory = os.path.dirname(abs_path)
-            filename = os.path.basename(abs_path)
-            return send_from_directory(directory, filename)
-            
-    return "File not found", 404
+    if not os.path.exists(abs_path):
+        return "File not found", 404
+        
+    directory = os.path.dirname(abs_path)
+    filename = os.path.basename(abs_path)
+    return send_from_directory(directory, filename)
 
 @app.route('/patients')
 def patients():
@@ -716,27 +465,6 @@ def add_patient():
                 scheme_type=request.form.get('scheme_type','')
             )
             hms.add_patient(new_patient)
-            
-            # Save scheme info
-            scheme_info = {
-                'provider': request.form.get('scheme_provider', ''),
-                'type': request.form.get('scheme_type', ''),
-                'membership_number': request.form.get('membership_number', ''),
-                'form_number': request.form.get('form_number', ''),
-                'coverage_percent': 0.0,
-                'age': request.form.get('age', ''),
-                'principal_member': request.form.get('principal_member', ''),
-                'relationship': request.form.get('relationship', '')
-            }
-            
-            cp = request.form.get('coverage_percent', '0')
-            try:
-                scheme_info['coverage_percent'] = float(cp)
-            except:
-                pass
-                
-            hms.update_patient_scheme(new_patient.patient_id, scheme_info)
-            
             flash('Patient added successfully!', 'success')
             notify('Patient added', f"{new_patient.first_name} {new_patient.last_name} ({new_patient.patient_id})", 'admin')
             notify('Patient added', f"{new_patient.first_name} {new_patient.last_name}", 'receptionist')
@@ -753,13 +481,19 @@ def edit_patient(patient_id):
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
 
-    scheme = hms.get_patient_scheme(patient_id)
-
     if request.method == 'POST':
         try:
+            # Get original patient object for validation
+            patient = hms.get_patient(patient_id)
+            if not patient:
+                flash('Patient not found!', 'error')
+                return redirect(url_for('patients'))
+
+            new_id = request.form.get('patient_id', '').strip()
+            
             # Prepare update data
             update_data = {
-                'patient_id': request.form.get('patient_id', '').strip(),
+                'patient_id': new_id,
                 'first_name': request.form.get('first_name'),
                 'last_name': request.form.get('last_name'),
                 'date_of_birth': request.form.get('dob',''),
@@ -776,35 +510,19 @@ def edit_patient(patient_id):
             update_data = {k: v for k, v in update_data.items() if v is not None}
             
             success = hms.update_patient(patient_id, **update_data)
-            
+            print(f"[DEBUG] edit_patient: update_patient success={success}")
             if success:
-                # Update scheme info as well
-                new_scheme = dict(scheme or {})
-                new_scheme['provider'] = request.form.get('scheme_provider', '')
-                new_scheme['type'] = request.form.get('scheme_type', '')
-                new_scheme['membership_number'] = request.form.get('membership_number', '')
-                new_scheme['form_number'] = request.form.get('form_number', '')
-                new_scheme['age'] = request.form.get('age', '')
-                new_scheme['principal_member'] = request.form.get('principal_member', '')
-                new_scheme['relationship'] = request.form.get('relationship', '')
-                
-                cp = request.form.get('coverage_percent', '0')
-                try:
-                    new_scheme['coverage_percent'] = float(cp)
-                except:
-                    new_scheme['coverage_percent'] = 0.0
-                
-                hms.update_patient_scheme(update_data.get('patient_id') or patient_id, new_scheme)
-                
                 flash('Patient updated successfully!', 'success')
-                notify('Patient updated', update_data.get('patient_id') or patient_id, 'admin')
-                return redirect(url_for('patient_details', patient_id=update_data.get('patient_id') or patient_id))
+                notify('Patient updated', new_id or patient_id, 'admin')
+                return redirect(url_for('patients'))
             else:
+                print(f"[ERROR] edit_patient: update_patient failed for {patient_id}")
                 flash('Error updating patient: ID might already be in use.', 'error')
         except Exception as e:
+            print(f"[ERROR] edit_patient exception: {e}")
             flash(f'Error updating patient: {e}', 'error')
 
-    return render_template('edit_patient.html', patient=patient, scheme=scheme, active_page='patients')
+    return render_template('edit_patient.html', patient=patient, active_page='patients')
 
 
 @app.route('/delete_patient/<patient_id>')
@@ -916,7 +634,7 @@ def edit_appointment(appointment_id):
     
     # Get current patient details and files
     current_patient = hms.get_patient(appointment.patient_id)
-    patient_files = process_patient_files(appointment.patient_id) if current_patient else []
+    patient_files = hms.patient_files.get(appointment.patient_id, []) if current_patient else []
 
     if request.method == 'POST':
         try:
@@ -1104,7 +822,7 @@ def general_reports():
          revenue = sum(bill.amount for bill in hms.bills)
     else:
          # Mock revenue based on completed appointments
-         revenue = sum(15000 for a in hms.appointments if a.status == 'Completed')
+         revenue = sum(150 for a in hms.appointments if a.status == 'Completed')
 
     # Department counts for the table
     department_counts = {}
@@ -1268,233 +986,6 @@ def pay_bill(bill_id):
         flash('Error processing payment', 'error')
     return redirect(url_for('view_bill', bill_id=bill_id))
 
-@app.route('/billing/invoice/print/<bill_id>')
-def print_invoice_formatted(bill_id):
-    bill = hms.get_bill(bill_id)
-    if not bill:
-        return "Bill not found", 404
-    patient = hms.get_patient(bill.patient_id)
-    scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
-    
-    items = []
-    # Check if bill.services is JSON
-    if bill.services.startswith('[') and bill.services.endswith(']'):
-        try:
-            items = json.loads(bill.services)
-        except Exception:
-            items = []
-    
-    if not items:
-        # Fallback logic for items (same as print_invoice)
-        try:
-            dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
-            yr, mh, day = dt.year, dt.month, dt.day
-        except Exception:
-            yr, mh, day = "", "", ""
-        
-        for raw in (bill.services or "").split(", "):
-            desc = raw
-            amt = 0.0
-            if "($" in raw:
-                try:
-                    desc = raw.split(" ($")[0]
-                    amt = float(raw.split(" ($")[1].rstrip(")").strip())
-                except Exception:
-                    pass
-            items.append({
-                'code': 'SRV',
-                'description': desc,
-                'qty': 1,
-                'yr': yr,
-                'mh': mh,
-                'day': day,
-                'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
-                'award': 0.0
-            })
-    
-    coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
-    try:
-        coverage_percent = float(coverage_percent)
-    except Exception:
-        coverage_percent = 0.0
-    
-    total_amount = float(bill.amount)
-    covered_amount = total_amount * (coverage_percent / 100.0)
-    shortfall_amount = max(total_amount - covered_amount, 0.0)
-    
-    return render_template('billing/print_invoice.html',
-                           bill=bill,
-                           patient=patient,
-                           scheme=scheme,
-                           coverage_percent=int(coverage_percent),
-                           items=items,
-                           total_amount=total_amount,
-                           covered_amount=covered_amount,
-                           shortfall_amount=shortfall_amount)
-
-@app.route('/billing/summary', methods=['GET'])
-def billing_summary():
-    # Filters for summary bill
-    provider = request.args.get('provider', '')
-    date_from = request.args.get('date_from', '')
-    date_to = request.args.get('date_to', '')
-    
-    bills_to_show = []
-    total_sum = 0.0
-    
-    for bill in hms.bills:
-        # Basic filtering logic
-        match = True
-        if provider:
-            scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
-            if scheme.get('provider', '').lower() != provider.lower():
-                match = False
-        
-        if date_from and bill.created_date < date_from:
-            match = False
-        if date_to and bill.created_date > date_to:
-            match = False
-            
-        if match:
-            # Enrich bill with patient name and scheme info for the summary table
-            patient = hms.get_patient(bill.patient_id)
-            scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
-            
-            # Simple column parsing (like CON, DRUG, LAB) if needed
-            con_amt = 0.0
-            drug_amt = 0.0
-            lab_amt = 0.0
-            
-            if bill.services.startswith('[') and bill.services.endswith(']'):
-                try:
-                    items = json.loads(bill.services)
-                    for itm in items:
-                        desc = itm.get('description', '').lower()
-                        fee = float(itm.get('fee', 0))
-                        if 'consult' in desc: con_amt += fee
-                        elif 'lab' in desc or 'test' in desc: lab_amt += fee
-                        else: drug_amt += fee # Default to drug for simplicity
-                except: pass
-
-            bill_data = {
-                'bill_id': bill.bill_id,
-                'created_date': bill.created_date,
-                'patient_name': f"{patient.first_name} {patient.last_name}" if patient else 'Unknown',
-                'membership_number': scheme.get('membership_number', ''),
-                'form_number': scheme.get('form_number', ''),
-                'branch': scheme.get('branch', ''), # If we had branch info
-                'patient_id': bill.patient_id,
-                'amount': float(bill.amount),
-                'con_amt': con_amt,
-                'drug_amt': drug_amt,
-                'lab_amt': lab_amt
-            }
-            bills_to_show.append(bill_data)
-            total_sum += float(bill.amount)
-            
-    title = f"{provider.upper() if provider else 'ALL'} MEDICAL BILL SUMMARY"
-    if date_from and date_to:
-        title += f" FROM {date_from} TO {date_to}"
-    elif date_from:
-        title += f" SINCE {date_from}"
-    elif date_to:
-        title += f" UNTIL {date_to}"
-        
-    p_lower = provider.lower()
-    return render_template('billing/summary_bill.html', 
-                           bills=bills_to_show, 
-                           total_sum=total_sum, 
-                           title=title,
-                           show_date=(p_lower != 'reserve bank'),
-                           show_member_info=(p_lower in ['national bank', 'reserve bank', 'masm', 'precious']),
-                           show_id_no=(p_lower == 'azam tv'),
-                           show_detailed_cols=(p_lower in ['bakhresa', 'electrical enterprises', 'azam tv']))
-
-@app.route('/billing/invoice/detailed/<bill_id>')
-def print_invoice_detailed(bill_id):
-    bill = hms.get_bill(bill_id)
-    if not bill:
-        return "Bill not found", 404
-    patient = hms.get_patient(bill.patient_id)
-    scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
-    
-    items = []
-    if bill.services.startswith('[') and bill.services.endswith(']'):
-        try:
-            items = json.loads(bill.services)
-        except Exception:
-            items = []
-    
-    if not items:
-        # Fallback for legacy format
-        try:
-            dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
-            yr, mh, day = dt.year, dt.month, dt.day
-        except:
-            yr, mh, day = "", "", ""
-        
-        for raw in (bill.services or "").split(", "):
-            desc = raw
-            amt = 0.0
-            if "($" in raw:
-                try:
-                    desc = raw.split(" ($")[0]
-                    amt = float(raw.split(" ($")[1].rstrip(")").strip())
-                except:
-                    pass
-            items.append({
-                'code': 'SRV',
-                'description': desc,
-                'qty': 1,
-                'yr': yr, 'mh': mh, 'day': day,
-                'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
-                'award': 0.0
-            })
-            
-    total_amount = float(bill.amount)
-    
-    return render_template('billing/invoice_detailed.html',
-                           bill=bill,
-                           patient=patient,
-                           scheme=scheme,
-                           items=items,
-                           total_amount=total_amount)
-
-@app.route('/billing/statement', methods=['GET'])
-def billing_statement():
-    client_name = request.args.get('client', '')
-    date_from = request.args.get('date_from', '')
-    date_to = request.args.get('date_to', '')
-    
-    # Filter bills for this client/company
-    statement_items = []
-    running_balance = 0.0
-    
-    for bill in hms.bills:
-        scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
-        # If client matches scheme provider or if it's explicitly mentioned in the bill
-        if client_name and scheme.get('provider', '').lower() != client_name.lower():
-            continue
-            
-        if date_from and bill.created_date < date_from:
-            continue
-        if date_to and bill.created_date > date_to:
-            continue
-            
-        amt = float(bill.amount)
-        running_balance += amt
-        statement_items.append({
-            'date': bill.created_date,
-            'invoice_no': bill.bill_id,
-            'amount': amt,
-            'balance': running_balance
-        })
-        
-    return render_template('billing/statement_of_account.html',
-                           client_name=client_name or 'Valued Client',
-                           current_date=datetime.datetime.now().strftime("%Y-%m-%d"),
-                           items=statement_items)
-
 @app.route('/billing/invoice/<bill_id>')
 def print_invoice(bill_id):
     bill = hms.get_bill(bill_id)
@@ -1507,55 +998,40 @@ def print_invoice(bill_id):
         yr, mh, day = dt.year, dt.month, dt.day
     except Exception:
         yr, mh, day = "", "", ""
-    
     items = []
-    # Check if bill.services is JSON
-    if bill.services.startswith('[') and bill.services.endswith(']'):
-        try:
-            items = json.loads(bill.services)
-        except Exception:
-            items = []
-    
-    if not items:
-        # Fallback to old comma-separated format
-        for raw in (bill.services or "").split(", "):
-            desc = raw
-            amt = 0.0
-            if "($" in raw:
-                try:
-                    desc = raw.split(" ($")[0]
-                    amt = float(raw.split(" ($")[1].rstrip(")").strip())
-                except Exception:
-                    pass
-            items.append({
-                'code': 'SRV',
-                'description': desc,
-                'qty': 1,
-                'yr': yr,
-                'mh': mh,
-                'day': day,
-                'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
-                'award': 0.0
-            })
-    
+    for raw in (bill.services or "").split(", "):
+        desc = raw
+        amt = 0.0
+        if "($" in raw:
+            try:
+                desc = raw.split(" ($")[0]
+                amt = float(raw.split(" ($")[1].rstrip(")").strip())
+            except Exception:
+                pass
+        items.append({
+            'code': 'SRV',
+            'description': desc,
+            'qty': 1,
+            'yr': yr,
+            'mh': mh,
+            'day': day,
+            'fee': amt if amt > 0 else float(bill.amount) if len(items) == 0 else 0.0,
+            'award': 0.0
+        })
     coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
     try:
         coverage_percent = float(coverage_percent)
     except Exception:
         coverage_percent = 0.0
-    
     total_amount = float(bill.amount)
     covered_amount = total_amount * (coverage_percent / 100.0)
     shortfall_amount = max(total_amount - covered_amount, 0.0)
     received_amount = total_amount if (bill.status or '').lower() == 'paid' else 0.0
     balance_amount = max(total_amount - received_amount, 0.0)
-    
-    # Recalculate awards proportionally if not already provided
+    # populate award per row proportionally
     for r in items:
-        if r.get('award') is None or r.get('award') == 0:
-            if r.get('fee', 0) > 0:
-                r['award'] = float(r['fee']) * (coverage_percent / 100.0)
-                
+        if r['fee'] > 0:
+            r['award'] = r['fee'] * (coverage_percent / 100.0)
     return render_template('billing/invoice.html',
                            bill=bill,
                            patient=patient,
@@ -1581,114 +1057,42 @@ def export_invoice_csv(bill_id):
     bill = hms.get_bill(bill_id)
     if not bill:
         return "Bill not found", 404
-    
-    patient = hms.get_patient(bill.patient_id)
+    try:
+        dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
+        yr, mh, day = dt.year, dt.month, dt.day
+    except Exception:
+        yr, mh, day = "", "", ""
     scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
     coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
     try:
         coverage_percent = float(coverage_percent)
     except Exception:
         coverage_percent = 0.0
-    
-    items = []
-    if bill.services.startswith('[') and bill.services.endswith(']'):
-        try:
-            items = json.loads(bill.services)
-        except Exception:
-            items = []
-    
-    if not items:
-        try:
-            dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
-            yr, mh, day = dt.year, dt.month, dt.day
-        except Exception:
-            yr, mh, day = "", "", ""
-            
-        raw_items = (bill.services or "").split(", ")
-        if not raw_items or raw_items == ['']:
-            raw_items = [f"Total ({bill.amount})"]
-            
-        for idx, raw in enumerate(raw_items, start=1):
-            desc = raw
-            fee = 0.0
-            if "($" in raw:
-                try:
-                    desc = raw.split(" ($")[0]
-                    fee = float(raw.split(" ($")[1].rstrip(")").strip())
-                except Exception:
-                    pass
-            if fee == 0.0 and idx == 1:
-                fee = float(bill.amount)
-            award = fee * (coverage_percent / 100.0)
-            items.append({
-                'code': 'SRV',
-                'description': desc,
-                'qty': 1,
-                'yr': yr,
-                'mh': mh,
-                'day': day,
-                'fee': fee,
-                'award': award
-            })
-    
+    rows = []
+    items = (bill.services or "").split(", ")
+    if not items or items == ['']:
+        items = [f"Total ({bill.amount})"]
+    for idx, raw in enumerate(items, start=1):
+        desc = raw
+        fee = 0.0
+        if "($" in raw:
+            try:
+                desc = raw.split(" ($")[0]
+                fee = float(raw.split(" ($")[1].rstrip(")").strip())
+            except Exception:
+                pass
+        if fee == 0.0 and idx == 1:
+            fee = float(bill.amount)
+        award = fee * (coverage_percent / 100.0)
+        rows.append([idx, 'SRV', desc, 1, yr, mh, day, f"{fee:.2f}", f"{award:.2f}"])
     import io, csv
     buf = io.StringIO()
     writer = csv.writer(buf)
-    
-    # Detailed Header Information
-    writer.writerow(['INVOICE DETAILS'])
-    writer.writerow(['Invoice No', bill.bill_id])
-    writer.writerow(['Date', bill.created_date])
-    writer.writerow(['Status', bill.status])
-    writer.writerow([])
-    writer.writerow(['PATIENT DETAILS'])
-    writer.writerow(['Name', f"{patient.first_name} {patient.last_name}" if patient else 'N/A'])
-    writer.writerow(['Patient ID', bill.patient_id])
-    writer.writerow(['Age', scheme.get('age', 'N/A')])
-    writer.writerow(['Gender', patient.gender if patient else 'N/A'])
-    writer.writerow([])
-    writer.writerow(['SCHEME / INSURANCE DETAILS'])
-    writer.writerow(['Provider', scheme.get('provider', 'Private')])
-    writer.writerow(['Scheme Type', scheme.get('type', 'N/A')])
-    writer.writerow(['Member No', scheme.get('membership_number', 'N/A')])
-    writer.writerow(['Policy No', scheme.get('policy_number', 'N/A')])
-    writer.writerow(['Principal Member', scheme.get('principal_member', 'N/A')])
-    writer.writerow(['Relationship', scheme.get('relationship', 'N/A')])
-    writer.writerow(['Coverage %', f"{coverage_percent}%"])
-    writer.writerow([])
-    writer.writerow(['BILLING ITEMS'])
-    writer.writerow(['LINE','CODE','DESCRIPTION','QTY','YR','MH','DAY','FEE CHG (MWK)','AWARD (MWK)','TOTAL (MWK)'])
-    
-    total_fee = 0.0
-    total_award = 0.0
-    for idx, item in enumerate(items, start=1):
-        fee = float(item.get('fee', 0))
-        qty = float(item.get('qty', 1))
-        award = float(item.get('award', 0))
-        line_total = fee * qty
-        total_fee += line_total
-        total_award += award # Assuming award is per line or already calculated
-        
-        writer.writerow([
-            idx, 
-            item.get('code', 'SRV'), 
-            item.get('description', ''), 
-            qty, 
-            item.get('yr', ''), 
-            item.get('mh', ''), 
-            item.get('day', ''), 
-            f"{fee:.2f}", 
-            f"{award:.2f}",
-            f"{line_total:.2f}"
-        ])
-    
-    writer.writerow([])
-    writer.writerow(['', '', '', '', '', '', 'SUBTOTAL', f"{total_fee:.2f}"])
-    writer.writerow(['', '', '', '', '', '', 'TOTAL AWARD', f"{total_award:.2f}"])
-    writer.writerow(['', '', '', '', '', '', 'SHORTFALL', f"{(total_fee - total_award):.2f}"])
-    
+    writer.writerow(['LINE','CODE','DESCRIPTION','QTY','YR','MH','DAY','FEE CHG','AWARD'])
+    for r in rows:
+        writer.writerow(r)
     resp = app.response_class(buf.getvalue(), mimetype='text/csv')
-    resp.headers['Content-Disposition'] = f'attachment; filename=invoice_detailed_{bill.bill_id}.csv'
+    resp.headers['Content-Disposition'] = f'attachment; filename=invoice_{bill.bill_id}.csv'
     return resp
 
 @app.route('/billing/invoice/update/<bill_id>', methods=['POST'])
@@ -1696,8 +1100,6 @@ def update_invoice_scheme(bill_id):
     bill = hms.get_bill(bill_id)
     if not bill:
         return "Bill not found", 404
-    
-    # Update Scheme info
     scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
     scheme = dict(scheme or {})
     scheme['provider'] = request.form.get('provider', '')
@@ -1705,59 +1107,12 @@ def update_invoice_scheme(bill_id):
     scheme['membership_number'] = request.form.get('membership_number', '')
     scheme['policy_number'] = request.form.get('policy_number', '')
     scheme['form_number'] = request.form.get('form_number', '')
-    scheme['age'] = request.form.get('age', '')
-    scheme['principal_member'] = request.form.get('principal_member', '')
-    scheme['relationship'] = request.form.get('relationship', '')
     cp = request.form.get('coverage_percent', '0')
     try:
-        coverage_percent = float(cp)
-        scheme['coverage_percent'] = coverage_percent
+        scheme['coverage_percent'] = float(cp)
     except Exception:
-        coverage_percent = 0.0
-        scheme['coverage_percent'] = 0.0
+        scheme['coverage_percent'] = cp
     hms.update_patient_scheme(bill.patient_id, scheme)
-    
-    # Update Bill Items
-    item_codes = request.form.getlist('item_code[]')
-    item_descs = request.form.getlist('item_desc[]')
-    item_qtys = request.form.getlist('item_qty[]')
-    item_yrs = request.form.getlist('item_yr[]')
-    item_mhs = request.form.getlist('item_mh[]')
-    item_days = request.form.getlist('item_day[]')
-    item_fees = request.form.getlist('item_fee[]')
-    
-    if item_descs and item_fees:
-        new_items = []
-        new_total = 0.0
-        for i in range(len(item_descs)):
-            desc = item_descs[i].strip()
-            if not desc: continue
-            
-            try: f = float(item_fees[i])
-            except Exception: f = 0.0
-            
-            try: q = int(item_qtys[i])
-            except Exception: q = 1
-            
-            # Recalculate award based on updated coverage percent
-            award = f * (coverage_percent / 100.0)
-            
-            new_items.append({
-                'code': item_codes[i] if i < len(item_codes) else 'SRV',
-                'description': desc,
-                'qty': q,
-                'yr': item_yrs[i] if i < len(item_yrs) else '',
-                'mh': item_mhs[i] if i < len(item_mhs) else '',
-                'day': item_days[i] if i < len(item_days) else '',
-                'fee': f,
-                'award': award
-            })
-            new_total += f
-        
-        bill.services = json.dumps(new_items)
-        bill.amount = new_total
-        hms.save_data()
-        
     flash('Invoice details updated.', 'success')
     return redirect(url_for('print_invoice', bill_id=bill_id))
 
@@ -1775,113 +1130,6 @@ def billing_reports():
     sorted_revenue = dict(sorted(revenue_by_month.items()))
     
     return render_template('billing/reports.html', revenue_data=sorted_revenue, active_page='billing')
-
-@app.route('/inventory')
-def inventory():
-    search_term = request.args.get('search', '').lower()
-    category = request.args.get('category', '')
-    
-    items = hms.inventory
-    
-    if search_term:
-        items = [i for i in items if search_term in i.name.lower() or search_term in i.item_id.lower()]
-    
-    if category:
-        items = [i for i in items if i.category == category]
-        
-    categories = sorted(list(set([i.category for i in hms.inventory if i.category])))
-    
-    return render_template('inventory/inventory.html', 
-                           items=items, 
-                           categories=categories,
-                           active_page='inventory', 
-                           search_term=search_term,
-                           selected_category=category)
-
-@app.route('/inventory/add', methods=['GET', 'POST'])
-def add_inventory_item():
-    if request.method == 'POST':
-        try:
-            # Use item_id from form if provided, else generate
-            item_id = request.form.get('item_id', '').strip() or hms.generate_id('INV')
-            
-            new_item = InventoryItem(
-                item_id=item_id,
-                name=request.form['name'],
-                category=request.form['category'],
-                quantity=int(request.form['quantity']),
-                unit_price=float(request.form['unit_price']),
-                supplier=request.form.get('supplier', ''),
-                expiry_date=request.form.get('expiry_date', ''),
-                min_quantity=int(request.form.get('min_quantity', 0)),
-                dosage_form=request.form.get('dosage_form', ''),
-                strength=request.form.get('strength', ''),
-                batch_number=request.form.get('batch_number', ''),
-                notes=request.form.get('notes', '')
-            )
-            hms.inventory.append(new_item)
-            hms.save_data()
-            flash('Inventory item added successfully!', 'success')
-            notify('Inventory update', f"Added: {new_item.name} ({new_item.item_id})", 'admin')
-            return redirect(url_for('inventory'))
-        except Exception as e:
-            flash(f'Error adding inventory item: {e}', 'error')
-            
-    return render_template('inventory/add_inventory.html', active_page='inventory')
-
-@app.route('/inventory/edit/<item_id>', methods=['GET', 'POST'])
-def edit_inventory_item(item_id):
-    item = next((i for i in hms.inventory if i.item_id == item_id), None)
-    if not item:
-        flash('Item not found!', 'error')
-        return redirect(url_for('inventory'))
-        
-    if request.method == 'POST':
-        try:
-            item.name = request.form['name']
-            item.category = request.form['category']
-            item.quantity = int(request.form['quantity'])
-            item.unit_price = float(request.form['unit_price'])
-            item.supplier = request.form.get('supplier', '')
-            item.expiry_date = request.form.get('expiry_date', '')
-            item.min_quantity = int(request.form.get('min_quantity', 0))
-            item.dosage_form = request.form.get('dosage_form', '')
-            item.strength = request.form.get('strength', '')
-            item.batch_number = request.form.get('batch_number', '')
-            item.notes = request.form.get('notes', '')
-            
-            hms.save_data()
-            flash('Inventory item updated successfully!', 'success')
-            return redirect(url_for('inventory'))
-        except Exception as e:
-            flash(f'Error updating inventory item: {e}', 'error')
-            
-    return render_template('inventory/edit_inventory.html', item=item, active_page='inventory')
-
-@app.route('/inventory/delete/<item_id>')
-def delete_inventory_item(item_id):
-    for i, item in enumerate(hms.inventory):
-        if item.item_id == item_id:
-            del hms.inventory[i]
-            hms.save_data()
-            flash('Item deleted successfully!', 'success')
-            return redirect(url_for('inventory'))
-    flash('Item not found!', 'error')
-    return redirect(url_for('inventory'))
-
-@app.route('/api/inventory/search')
-def api_search_inventory():
-    query = request.args.get('q', '').lower()
-    results = []
-    for item in hms.inventory:
-        if query in item.name.lower() or query in item.item_id.lower():
-            results.append({
-                'id': item.item_id,
-                'name': item.name,
-                'price': item.unit_price,
-                'category': item.category
-            })
-    return jsonify(results[:10])
 
 @app.route('/prescriptions')
 def prescriptions():
@@ -2242,6 +1490,84 @@ def settings():
             flash(f'Error updating settings: {e}', 'error')
             
     return render_template('settings.html', settings=hms.settings, active_page='settings')
+
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    return render_template('admin_users.html', users=hms.users, active_page='admin_users')
+
+@app.route('/admin/update_role', methods=['POST'])
+@admin_required
+def update_user_role():
+    target_username = request.form.get('username')
+    new_role = request.form.get('role')
+    actor_username = session.get('username')
+    
+    if hms.update_user_role(target_username, new_role, actor_username):
+        flash(f'Role for {target_username} updated to {new_role}!', 'success')
+    else:
+        flash(f'Error updating role for {target_username}!', 'error')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/activate/<username>')
+@admin_required
+def activate_user(username):
+    actor_username = session.get('username')
+    if hms.toggle_user_status(username, True, actor_username):
+        flash(f'User {username} activated!', 'success')
+    else:
+        flash(f'Error activating user {username}!', 'error')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/deactivate/<username>')
+@admin_required
+def deactivate_user(username):
+    actor_username = session.get('username')
+    if hms.toggle_user_status(username, False, actor_username):
+        flash(f'User {username} deactivated!', 'success')
+    else:
+        flash(f'Error deactivating user {username}!', 'error')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/verify/<username>')
+@admin_required
+def verify_user(username):
+    actor_username = session.get('username')
+    if hms.toggle_user_verification(username, True, actor_username):
+        flash(f'User {username} verified!', 'success')
+    else:
+        flash(f'Error verifying user {username}!', 'error')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/unverify/<username>')
+@admin_required
+def unverify_user(username):
+    actor_username = session.get('username')
+    if hms.toggle_user_verification(username, False, actor_username):
+        flash(f'User {username} unverified!', 'success')
+    else:
+        flash(f'Error unverifying user {username}!', 'error')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/enable_2fa/<username>')
+@admin_required
+def enable_user_2fa(username):
+    actor_username = session.get('username')
+    if hms.toggle_user_2fa(username, True, actor_username):
+        flash(f'2FA enabled for {username}!', 'success')
+    else:
+        flash(f'Error enabling 2FA for {username}!', 'error')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/disable_2fa/<username>')
+@admin_required
+def disable_user_2fa(username):
+    actor_username = session.get('username')
+    if hms.toggle_user_2fa(username, False, actor_username):
+        flash(f'2FA disabled for {username}!', 'success')
+    else:
+        flash(f'Error disabling 2FA for {username}!', 'error')
+    return redirect(url_for('admin_users'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

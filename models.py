@@ -3,6 +3,7 @@ Models - Re-exports data models from the main Hospital Management System
 """
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 @dataclass
 class Patient:
@@ -17,8 +18,6 @@ class Patient:
     emergency_contact: str
     medical_history: str
     created_date: str
-    scheme_provider: str = ""
-    scheme_type: str = ""
 
 
 @dataclass
@@ -26,11 +25,11 @@ class Doctor:
     doctor_id: str
     first_name: str
     last_name: str
-    specialty: str
+    specialization: str
     phone: str
     email: str
+    schedule: str
     status: str
-    schedule: str = ""
 
 
 @dataclass
@@ -103,50 +102,46 @@ class InventoryItem:
 
 @dataclass
 class User:
-    user_id: str = ""
-    username: str = ""
-    password_salt: str = ""
-    password_hash: str = ""
-    role: str = ""
-    otp_secret: str = ""
-    otp_enabled: bool = False
+    user_id: str
+    username: str
+    password_salt: str
+    password_hash: str
+    role: str
+    is_active: bool = True
     is_verified: bool = False
-    is_active: bool = False
+    otp_enabled: bool = False
+    otp_secret: Optional[str] = None
 
 
 @dataclass
 class Message:
-    message_id: str = ""
-    sender_id: str = ""
-    sender_name: str = ""
-    recipient_id: str = ""
-    subject: str = ""
-    content: str = ""
-    timestamp: str = ""
-    is_read: bool = False
-    is_archived: bool = False
+    message_id: str
+    sender_id: str
+    sender_name: str
+    recipient_id: str
+    subject: str
+    content: str
+    timestamp: str
+    is_read: bool
+    is_archived: bool
 
 
 @dataclass
 class QueueItem:
-    queue_id: str = ""
-    patient_id: str = ""
-    patient_name: str = ""
-    doctor_id: str = ""
-    status: str = "Waiting"
-    priority: str = "Normal"
-    arrival_time: str = ""
-    estimated_wait: str = ""
+    queue_id: str
+    patient_id: str
+    patient_name: str
+    doctor_id: str
+    status: str  # Waiting, In Consultation, Completed, Cancelled
+    priority: str # Normal, Urgent, Emergency
+    arrival_time: str
+    estimated_wait: str
     department: str = ""
     visit_reason: str = ""
     special_category: str = ""
     check_in_time: str = ""
     assigned_doctor_id: str = ""
-    called_time: str = ""
-    consultation_start_time: str = ""
-    consultation_end_time: str = ""
-    no_show_time: str = ""
-
+    doctor_name: str = ""
 
 
 # Re-export all models for GUI compatibility

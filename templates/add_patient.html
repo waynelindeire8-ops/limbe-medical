@@ -59,24 +59,10 @@
         <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
             <a href="{{ url_for('patients') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Patients</a>
             
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}" style="padding: 15px; margin-bottom: 20px; border-radius: 8px; {% if category == 'success' %}background-color: #d4edda; color: #155724;{% else %}background-color: #f8d7da; color: #721c24;{% endif %}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
             <div class="form-container">
                 <h2>Add New Patient</h2>
                 <br>
                 <form method="POST">
-                    <div class="form-group">
-                        <label for="patient_id">Patient ID</label>
-                        <input type="text" id="patient_id" name="patient_id" placeholder="Leave blank to auto-generate">
-                    </div>
                     <div class="form-group">
                         <label for="first_name">First Name</label>
                         <input type="text" id="first_name" name="first_name" required>
@@ -87,19 +73,20 @@
                     </div>
                     <div class="form-group">
                         <label for="dob">Date of Birth</label>
-                        <input type="date" id="dob" name="dob">
+                        <input type="date" id="dob" name="dob" required>
                     </div>
                     <div class="form-group">
                         <label for="gender">Gender</label>
-                        <select id="gender" name="gender">
+                        <select id="gender" name="gender" required>
                             <option value="">Select Gender</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
+                            <option value="Other">Other</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="phone">Phone Number</label>
-                        <input type="tel" id="phone" name="phone">
+                        <input type="tel" id="phone" name="phone" required>
                     </div>
                     <div class="form-group">
                         <label for="email">Email</label>
@@ -108,38 +95,6 @@
                     <div class="form-group">
                         <label for="address">Address</label>
                         <textarea id="address" name="address" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="scheme_provider">Scheme Provider</label>
-                        <input type="text" id="scheme_provider" name="scheme_provider" placeholder="e.g., MASM, Liberty">
-                    </div>
-                    <div class="form-group">
-                        <label for="scheme_type">Scheme Type</label>
-                        <input type="text" id="scheme_type" name="scheme_type" placeholder="e.g., Insurance, Corporate">
-                    </div>
-                    <div class="form-group">
-                        <label for="membership_number">Membership Number</label>
-                        <input type="text" id="membership_number" name="membership_number">
-                    </div>
-                    <div class="form-group">
-                        <label for="form_number">Form Number</label>
-                        <input type="text" id="form_number" name="form_number">
-                    </div>
-                    <div class="form-group">
-                        <label for="coverage_percent">Coverage (%)</label>
-                        <input type="number" step="0.01" id="coverage_percent" name="coverage_percent" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label for="age">Age (for Invoices)</label>
-                        <input type="text" id="age" name="age" placeholder="e.g. 25 yrs">
-                    </div>
-                    <div class="form-group">
-                        <label for="principal_member">Principal Member</label>
-                        <input type="text" id="principal_member" name="principal_member">
-                    </div>
-                    <div class="form-group">
-                        <label for="relationship">Relationship to Principal</label>
-                        <input type="text" id="relationship" name="relationship">
                     </div>
                     <div class="form-group">
                         <label for="emergency_contact">Emergency Contact</label>

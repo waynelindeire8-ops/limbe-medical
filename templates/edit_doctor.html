@@ -58,16 +58,6 @@
         <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
             <a href="{{ url_for('doctors') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Doctors</a>
             
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}" style="padding: 15px; margin-bottom: 20px; border-radius: 8px; {% if category == 'success' %}background-color: #d4edda; color: #155724;{% else %}background-color: #f8d7da; color: #721c24;{% endif %}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
             <div class="form-container">
                 <h2>Edit Doctor</h2>
                 <br>
