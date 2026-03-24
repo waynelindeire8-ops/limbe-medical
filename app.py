@@ -64,7 +64,7 @@ seed_users()
 
 @app.before_request
 def require_login():
-    allowed_routes = ['login', 'static']
+    allowed_routes = ['login', 'register', 'static']
     if request.endpoint not in allowed_routes and 'user_id' not in session:
         return redirect(url_for('login'))
 
@@ -151,6 +151,18 @@ def login():
         else:
             flash('Invalid username or password', 'error')
     return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        if hms.register_user(username, password, role='user'):
+            flash('Account created successfully! Please login.', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash('Username already exists.', 'error')
+    return render_template('register.html')
 
 @app.route('/logout')
 def logout():
