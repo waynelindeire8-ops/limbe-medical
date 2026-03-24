@@ -7,41 +7,43 @@ from typing import Optional
 
 @dataclass
 class Patient:
-    patient_id: str
-    first_name: str
-    last_name: str
-    date_of_birth: str
-    gender: str
-    phone: str
-    email: str
-    address: str
-    emergency_contact: str
-    medical_history: str
-    created_date: str
+    patient_id: str = ""
+    first_name: str = ""
+    last_name: str = ""
+    date_of_birth: str = ""
+    gender: str = ""
+    phone: str = ""
+    email: str = ""
+    address: str = ""
+    emergency_contact: str = ""
+    medical_history: str = ""
+    created_date: str = ""
+    scheme_provider: str = ""
+    scheme_type: str = ""
 
 
 @dataclass
 class Doctor:
-    doctor_id: str
-    first_name: str
-    last_name: str
-    specialization: str
-    phone: str
-    email: str
-    schedule: str
-    status: str
+    doctor_id: str = ""
+    first_name: str = ""
+    last_name: str = ""
+    specialty: str = ""
+    phone: str = ""
+    email: str = ""
+    schedule: str = ""
+    status: str = ""
 
 
 @dataclass
 class Appointment:
-    appointment_id: str
-    patient_id: str
-    doctor_id: str
-    appointment_date: str
-    appointment_time: str
-    reason: str
-    status: str
-    notes: str
+    appointment_id: str = ""
+    patient_id: str = ""
+    doctor_id: str = ""
+    appointment_date: str = ""
+    appointment_time: str = ""
+    reason: str = ""
+    status: str = ""
+    notes: str = ""
 
 
 @dataclass
@@ -61,52 +63,52 @@ class MedicalRecord:
 
 @dataclass
 class Prescription:
-    prescription_id: str
-    patient_id: str
-    doctor_id: str
-    date: str
-    medication: str
-    dosage: str
-    frequency: str
-    duration: str
-    notes: str
-    status: str
+    prescription_id: str = ""
+    patient_id: str = ""
+    doctor_id: str = ""
+    date: str = ""
+    medication: str = ""
+    dosage: str = ""
+    frequency: str = ""
+    duration: str = ""
+    notes: str = ""
+    status: str = ""
 
 
 @dataclass
 class Bill:
-    bill_id: str
-    patient_id: str
-    appointment_id: str
-    amount: float
-    services: str
-    status: str
-    created_date: str
+    bill_id: str = ""
+    patient_id: str = ""
+    appointment_id: str = ""
+    amount: float = 0.0
+    services: str = ""
+    status: str = ""
+    created_date: str = ""
 
 
 @dataclass
 class InventoryItem:
-    item_id: str
-    name: str
-    category: str
-    quantity: int
-    unit_price: float
-    supplier: str
-    expiry_date: str
-    min_quantity: int
-    dosage_form: str
-    strength: str
-    batch_number: str
-    notes: str
+    item_id: str = ""
+    name: str = ""
+    category: str = ""
+    quantity: int = 0
+    unit_price: float = 0.0
+    supplier: str = ""
+    expiry_date: str = ""
+    min_quantity: int = 0
+    dosage_form: str = ""
+    strength: str = ""
+    batch_number: str = ""
+    notes: str = ""
 
 
 @dataclass
 class User:
-    user_id: str
-    username: str
-    password_salt: str
-    password_hash: str
-    role: str
+    user_id: str = ""
+    username: str = ""
+    password_salt: str = ""
+    password_hash: str = ""
+    role: str = ""
     is_active: bool = True
     is_verified: bool = False
     otp_enabled: bool = False
@@ -115,27 +117,27 @@ class User:
 
 @dataclass
 class Message:
-    message_id: str
-    sender_id: str
-    sender_name: str
-    recipient_id: str
-    subject: str
-    content: str
-    timestamp: str
-    is_read: bool
-    is_archived: bool
+    message_id: str = ""
+    sender_id: str = ""
+    sender_name: str = ""
+    recipient_id: str = ""
+    subject: str = ""
+    content: str = ""
+    timestamp: str = ""
+    is_read: bool = False
+    is_archived: bool = False
 
 
 @dataclass
 class QueueItem:
-    queue_id: str
-    patient_id: str
-    patient_name: str
-    doctor_id: str
-    status: str  # Waiting, In Consultation, Completed, Cancelled
-    priority: str # Normal, Urgent, Emergency
-    arrival_time: str
-    estimated_wait: str
+    queue_id: str = ""
+    patient_id: str = ""
+    patient_name: str = ""
+    doctor_id: str = ""
+    status: str = "Waiting"  # Waiting, In Consultation, Completed, Cancelled
+    priority: str = "Routine" # Normal, Urgent, Emergency
+    arrival_time: str = ""
+    estimated_wait: str = ""
     department: str = ""
     visit_reason: str = ""
     special_category: str = ""
