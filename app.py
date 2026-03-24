@@ -7,6 +7,7 @@ import urllib.parse
 import qrcode
 import pyotp
 import base64
+import openpyxl
 from werkzeug.utils import secure_filename
 from functools import wraps
 from dotenv import load_dotenv
@@ -659,7 +660,6 @@ def delete_patient_file(patient_id):
         flash('File deleted successfully from Supabase!', 'success')
     else:
         flash('Error deleting file from Supabase!', 'error')
-    return redirect(url_for('patient_details', patient_id=patient_id))
     return redirect(url_for('patient_details', patient_id=patient_id))
 
 @app.route('/serve_file')
