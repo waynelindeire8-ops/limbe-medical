@@ -59,8 +59,8 @@
                 {% for item in bill.services.split(', ') %}
                 {% if ' ($' in item %}
                 <tr>
-                    <td>{{ item.split(' ($')[0] }}</td>
-                    <td style="text-align: right;">${{ item.split(' ($')[1].replace(')', '') }}</td>
+                    <td>{{ item.split(' (MWK')[0] }}</td>
+                    <td style="text-align: right;">MWK{{ item.split(' (MWK')[1].replace(')', '') }}</td>
                 </tr>
                 {% endif %}
                 {% endfor %}
@@ -68,7 +68,7 @@
         </table>
 
         <div class="total">
-            Total: ${{ "%.2f"|format(bill.amount) }}
+            Total: MWK{{ "%.2f"|format(bill.amount) }}
         </div>
 
         <div class="footer">

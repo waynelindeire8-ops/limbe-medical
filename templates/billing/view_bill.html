@@ -102,8 +102,8 @@
                         <!-- Services are stored as a comma-separated string like "Consultation ($50.00), X-Ray ($30.00)" -->
                         {% for item in bill.services.split(', ') %}
                         <tr>
-                            <td>{{ item.split(' ($')[0] }}</td>
-                            <td style="text-align: right;">${{ item.split(' ($')[1].replace(')', '') if ' ($' in item else '0.00' }}</td>
+                            <td>{{ item.split(' (MWK')[0] }}</td>
+                            <td style="text-align: right;">MWK{{ item.split(' (MWK')[1].replace(')', '') if ' (MWK' in item else '0.00' }}</td>
                         </tr>
                         {% endfor %}
                         <tr class="total-row">
