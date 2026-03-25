@@ -1000,6 +1000,32 @@ def pay_bill(bill_id):
         flash('Error processing payment', 'error')
     return redirect(url_for('view_bill', bill_id=bill_id))
 
+@app.route('/billing/edit/<bill_id>', methods=['GET', 'POST'])
+def edit_bill(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        flash('Bill not found', 'error')
+        return redirect(url_for('billing_dashboard'))
+    
+    if request.method == 'POST':
+        try:
+            services = request.form.get('services')
+            amount = float(request.form.get('amount'))
+            status = request.form.get('status')
+            
+            bill.services = services
+            bill.amount = amount
+            bill.status = status
+            hms.save_data()
+            
+            flash('Bill updated successfully!', 'success')
+            return redirect(url_for('view_bill', bill_id=bill_id))
+        except Exception as e:
+            flash(f'Error updating bill: {e}', 'error')
+            
+    patient = hms.get_patient(bill.patient_id)
+    return render_template('billing/edit_bill.html', bill=bill, patient=patient, active_page='billing')
+
 @app.route('/billing/invoice/<bill_id>')
 def print_invoice(bill_id):
     bill = hms.get_bill(bill_id)

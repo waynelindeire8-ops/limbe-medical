@@ -143,7 +143,7 @@
                             <td>${{ bill.amount }}</td>
                             <td><span class="status-badge status-{{ bill.status|lower }}">{{ bill.status }}</span></td>
                             <td>
-                                <a href="{{ url_for('view_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
+                                <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
                                 {% if bill.status == 'Pending' %}
                                 <a href="#" onclick="openPaymentModal('{{ bill.bill_id }}', '{{ bill.amount }}')" style="color: #28a745;" title="Process Payment"><i class="fas fa-credit-card"></i></a>
                                 {% endif %}

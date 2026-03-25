@@ -114,6 +114,7 @@
                 </table>
 
                 <div class="action-buttons">
+                    <a href="{{ url_for('edit_bill', bill_id=bill.bill_id) }}" class="btn btn-warning"><i class="fas fa-edit"></i> Edit Bill</a>
                     <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" target="_blank" class="btn btn-primary"><i class="fas fa-file-invoice"></i> Print Invoice</a>
                     {% if bill.status|lower == 'paid' %}
                     <a href="{{ url_for('print_receipt', bill_id=bill.bill_id) }}" target="_blank" class="btn btn-secondary"><i class="fas fa-receipt"></i> Print Receipt</a>

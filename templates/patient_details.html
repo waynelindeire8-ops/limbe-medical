@@ -158,6 +158,14 @@
                             <label>Emergency Contact</label>
                             <span>{{ patient.emergency_contact }}</span>
                         </div>
+                        <div class="info-item">
+                            <label>Scheme Provider</label>
+                            <span>{{ patient.scheme_provider or 'None' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Scheme Type</label>
+                            <span>{{ patient.scheme_type or 'None' }}</span>
+                        </div>
                         <div class="info-item" style="grid-column: span 2;">
                             <label>Address</label>
                             <span>{{ patient.address }}</span>
@@ -302,7 +310,7 @@
                                         <td>${{ bill.amount }}</td>
                                         <td><span class="status-badge status-{{ bill.status|lower }}">{{ bill.status }}</span></td>
                                         <td>
-                                            <a href="{{ url_for('view_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
+                                            <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
                                         </td>
                                     </tr>
                                     {% else %}

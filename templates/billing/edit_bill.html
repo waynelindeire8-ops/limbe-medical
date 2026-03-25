@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Bill - Limbe Medical</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .form-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .btn-submit {
+            background-color: #4361ee;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        .btn-submit:hover {
+            background-color: #3f37c9;
+        }
+        .back-link {
+            display: block;
+            margin-bottom: 20px;
+            color: #4361ee;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+            <a href="{{ url_for('view_bill', bill_id=bill.bill_id) }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Bill Details</a>
+            
+            <div class="form-container">
+                <h2>Edit Bill: {{ bill.bill_id }}</h2>
+                <p style="color: #666; margin-bottom: 20px;">Patient: {{ patient.first_name }} {{ patient.last_name }}</p>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="services">Services / Items (comma-separated with prices)</label>
+                        <textarea id="services" name="services" rows="5" required>{{ bill.services }}</textarea>
+                        <small style="color: #888;">Example: Consultation ($50.00), X-Ray ($30.00)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Total Amount ($)</label>
+                        <input type="number" id="amount" name="amount" step="0.01" value="{{ bill.amount }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select id="status" name="status" required>
+                            <option value="Pending" {% if bill.status == 'Pending' %}selected{% endif %}>Pending</option>
+                            <option value="Paid" {% if bill.status == 'Paid' %}selected{% endif %}>Paid</option>
+                            <option value="Cancelled" {% if bill.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-submit">Save Changes</button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
