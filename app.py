@@ -934,6 +934,7 @@ def billing_dashboard():
                            total_revenue=total_revenue,
                            pending_amount=pending_amount,
                            total_bills=total_bills,
+                           today_date=datetime.datetime.now().strftime("%Y-%m-%d"),
                            active_page='billing')
 
 @app.route('/billing/create', methods=['POST'])
@@ -958,6 +959,222 @@ def create_bill():
         notify('Bill created', new_bill.bill_id, 'cashier')
     except Exception as e:
         flash(f'Error creating bill: {e}', 'error')
+    return redirect(url_for('billing_dashboard'))
+
+@app.route('/invoice', methods=['POST'])
+def handle_invoice():
+    try:
+        provider = request.form.get('provider')
+        invoice_date = request.form.get('invoice_date')
+        
+        dates = request.form.getlist('item_date[]')
+        patient_ids = request.form.getlist('item_patient_id[]')
+        id_nos = request.form.getlist('item_id_no[]')
+        cons = request.form.getlist('item_con[]')
+        drugs = request.form.getlist('item_drug[]')
+        labs = request.form.getlist('item_lab[]')
+        amounts = request.form.getlist('item_amount[]')
+
+        invoice_items = []
+        total_invoice_amount = 0
+        
+        for i in range(len(patient_ids)):
+            if not patient_ids[i]: continue
+            
+            item_amount = float(amounts[i])
+            total_invoice_amount += item_amount
+            
+            invoice_items.append({
+                'date': dates[i],
+                'patient_id': patient_ids[i],
+                'id_no': id_nos[i],
+                'con': float(cons[i]),
+                'drug': float(drugs[i]),
+                'lab': float(labs[i]),
+                'amount': item_amount
+            })
+
+        if not invoice_items:
+            flash('No items added to invoice', 'error')
+            return redirect(url_for('billing_dashboard'))
+
+        primary_patient_id = patient_ids[0]
+        
+        new_bill = Bill(
+            bill_id=hms.generate_id("INV"),
+            patient_id=primary_patient_id,
+            appointment_id="",
+            amount=total_invoice_amount,
+            services=f"Bulk Invoice for {provider}",
+            status="Pending",
+            created_date=invoice_date,
+            provider=provider,
+            items=invoice_items
+        )
+        
+        hms.create_bill(new_bill)
+        flash('Invoice saved successfully!', 'success')
+        notify('Invoice created', new_bill.bill_id, 'cashier')
+        
+    except Exception as e:
+        flash(f'Error saving invoice: {e}', 'error')
+    return redirect(url_for('billing_dashboard'))
+
+@app.route('/invoice/individual', methods=['POST'])
+def handle_individual_invoice():
+    try:
+        patient_id = request.form.get('patient_id')
+        invoice_date = request.form.get('invoice_date')
+        
+        descriptions = request.form.getlist('ind_description[]')
+        amounts = request.form.getlist('ind_amount[]')
+
+        invoice_items = []
+        total_amount = 0
+        services_summary = []
+        
+        for i in range(len(descriptions)):
+            if not descriptions[i]: continue
+            
+            amt = float(amounts[i])
+            total_amount += amt
+            
+            invoice_items.append({
+                'description': descriptions[i],
+                'amount': amt
+            })
+            services_summary.append(f"{descriptions[i]} (${amt})")
+
+        if not invoice_items:
+            flash('No items added to invoice', 'error')
+            return redirect(url_for('billing_dashboard'))
+
+        new_bill = Bill(
+            bill_id=hms.generate_id("INV"),
+            patient_id=patient_id,
+            appointment_id="",
+            amount=total_amount,
+            services=", ".join(services_summary),
+            status="Pending",
+            created_date=invoice_date,
+            items=invoice_items
+        )
+        
+        hms.create_bill(new_bill)
+        flash('Individual Invoice saved successfully!', 'success')
+        notify('Individual Invoice created', new_bill.bill_id, 'cashier')
+        
+    except Exception as e:
+        flash(f'Error saving individual invoice: {e}', 'error')
+    return redirect(url_for('billing_dashboard'))
+
+@app.route('/invoice/individual/update/<bill_id>', methods=['POST'])
+def update_individual_invoice(bill_id):
+    try:
+        bill = hms.get_bill(bill_id)
+        if not bill:
+            flash('Bill not found', 'error')
+            return redirect(url_for('billing_dashboard'))
+
+        patient_id = request.form.get('patient_id')
+        invoice_date = request.form.get('invoice_date')
+        
+        descriptions = request.form.getlist('ind_description[]')
+        amounts = request.form.getlist('ind_amount[]')
+
+        invoice_items = []
+        total_amount = 0
+        services_summary = []
+        
+        for i in range(len(descriptions)):
+            if not descriptions[i]: continue
+            
+            amt = float(amounts[i])
+            total_amount += amt
+            
+            invoice_items.append({
+                'description': descriptions[i],
+                'amount': amt
+            })
+            services_summary.append(f"{descriptions[i]} (${amt})")
+
+        if not invoice_items:
+            flash('No items added to invoice', 'error')
+            return redirect(url_for('billing_dashboard'))
+
+        bill.patient_id = patient_id
+        bill.created_date = invoice_date
+        bill.amount = total_amount
+        bill.items = invoice_items
+        bill.services = ", ".join(services_summary)
+        
+        hms.save_data()
+        flash('Individual Invoice updated successfully!', 'success')
+        
+    except Exception as e:
+        flash(f'Error updating individual invoice: {e}', 'error')
+    return redirect(url_for('billing_dashboard'))
+
+@app.route('/api/bill/<bill_id>')
+def get_bill_json(bill_id):
+    bill = hms.get_bill(bill_id)
+    if not bill:
+        return {'error': 'Bill not found'}, 404
+    return asdict(bill)
+
+@app.route('/invoice/update/<bill_id>', methods=['POST'])
+def update_invoice(bill_id):
+    try:
+        bill = hms.get_bill(bill_id)
+        if not bill:
+            flash('Bill not found', 'error')
+            return redirect(url_for('billing_dashboard'))
+
+        provider = request.form.get('provider')
+        invoice_date = request.form.get('invoice_date')
+        
+        dates = request.form.getlist('item_date[]')
+        patient_ids = request.form.getlist('item_patient_id[]')
+        id_nos = request.form.getlist('item_id_no[]')
+        cons = request.form.getlist('item_con[]')
+        drugs = request.form.getlist('item_drug[]')
+        labs = request.form.getlist('item_lab[]')
+        amounts = request.form.getlist('item_amount[]')
+
+        invoice_items = []
+        total_invoice_amount = 0
+        
+        for i in range(len(patient_ids)):
+            if not patient_ids[i]: continue
+            
+            item_amount = float(amounts[i])
+            total_invoice_amount += item_amount
+            
+            invoice_items.append({
+                'date': dates[i],
+                'patient_id': patient_ids[i],
+                'id_no': id_nos[i],
+                'con': float(cons[i]),
+                'drug': float(drugs[i]),
+                'lab': float(labs[i]),
+                'amount': item_amount
+            })
+
+        if not invoice_items:
+            flash('No items added to invoice', 'error')
+            return redirect(url_for('billing_dashboard'))
+
+        bill.provider = provider
+        bill.created_date = invoice_date
+        bill.amount = total_invoice_amount
+        bill.items = invoice_items
+        bill.services = f"Bulk Invoice for {provider} (Updated)"
+        
+        hms.save_data()
+        flash('Invoice updated successfully!', 'success')
+        
+    except Exception as e:
+        flash(f'Error updating invoice: {e}', 'error')
     return redirect(url_for('billing_dashboard'))
 
 @app.route('/billing/payment', methods=['POST'])
@@ -1026,11 +1243,39 @@ def edit_bill(bill_id):
     patient = hms.get_patient(bill.patient_id)
     return render_template('billing/edit_bill.html', bill=bill, patient=patient, active_page='billing')
 
-@app.route('/billing/invoice/<bill_id>')
+@app.route('/billing/print/<bill_id>')
 def print_invoice(bill_id):
     bill = hms.get_bill(bill_id)
     if not bill:
         return "Bill not found", 404
+    
+    # If this is a structured invoice (bulk or individual)
+    if hasattr(bill, 'items') and bill.items:
+        if getattr(bill, 'provider', None):
+            # Bulk Invoice
+            resolved_items = []
+            for item in bill.items:
+                p = hms.get_patient(item['patient_id'])
+                item_copy = dict(item)
+                item_copy['patient_name'] = f"{p.first_name} {p.last_name}" if p else "Unknown"
+                item_copy['scheme_type'] = getattr(p, 'scheme_type', '-') if p else "-"
+                resolved_items.append(item_copy)
+            
+            return render_template('billing/invoice.html',
+                                   bill=bill,
+                                   items=resolved_items,
+                                   is_bulk=True)
+        else:
+            # Individual Invoice with items
+            patient = hms.get_patient(bill.patient_id)
+            return render_template('billing/invoice.html',
+                                   bill=bill,
+                                   patient=patient,
+                                   items=bill.items,
+                                   is_bulk=False,
+                                   is_structured_individual=True)
+    
+    # Fallback for old simple bills or non-structured individual bills
     patient = hms.get_patient(bill.patient_id)
     scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
     try:
@@ -1082,7 +1327,8 @@ def print_invoice(bill_id):
                            covered_amount=covered_amount,
                            shortfall_amount=shortfall_amount,
                            received_amount=received_amount,
-                           balance_amount=balance_amount)
+                           balance_amount=balance_amount,
+                           is_bulk=False)
 
 @app.route('/billing/receipt/<bill_id>')
 def print_receipt(bill_id):
@@ -1097,40 +1343,72 @@ def export_invoice_csv(bill_id):
     bill = hms.get_bill(bill_id)
     if not bill:
         return "Bill not found", 404
-    try:
-        dt = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d")
-        yr, mh, day = dt.year, dt.month, dt.day
-    except Exception:
-        yr, mh, day = "", "", ""
-    scheme = hms.get_patient_scheme(bill.patient_id) if hasattr(hms, 'get_patient_scheme') else {}
-    coverage_percent = scheme.get('coverage_percent') or scheme.get('coverage') or 0
-    try:
-        coverage_percent = float(coverage_percent)
-    except Exception:
-        coverage_percent = 0.0
-    rows = []
-    items = (bill.services or "").split(", ")
-    if not items or items == ['']:
-        items = [f"Total ({bill.amount})"]
-    for idx, raw in enumerate(items, start=1):
-        desc = raw
-        fee = 0.0
-        if "($" in raw:
-            try:
-                desc = raw.split(" ($")[0]
-                fee = float(raw.split(" ($")[1].rstrip(")").strip())
-            except Exception:
-                pass
-        if fee == 0.0 and idx == 1:
-            fee = float(bill.amount)
-        award = fee * (coverage_percent / 100.0)
-        rows.append([idx, 'SRV', desc, 1, yr, mh, day, f"{fee:.2f}", f"{award:.2f}"])
+    
     import io, csv
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(['LINE','CODE','DESCRIPTION','QTY','YR','MH','DAY','FEE CHG','AWARD'])
-    for r in rows:
-        writer.writerow(r)
+    
+    # Check if bulk or individual
+    if hasattr(bill, 'items') and bill.items and getattr(bill, 'provider', None):
+        # Bulk Invoice Export
+        writer.writerow(['LIMBE MEDICAL CLINIC'])
+        writer.writerow(['BULK MEDICAL BILL EXPORT'])
+        writer.writerow(['PROVIDER', bill.provider])
+        writer.writerow(['DATE', bill.created_date])
+        writer.writerow([])
+        writer.writerow(['INV NO', 'DATE', 'NAME OF PATIENT', 'SCHEME NO', 'SCHEME TYPE', 'CON', 'DRUG', 'LAB', 'TOTAL AMOUNT'])
+        
+        for item in bill.items:
+            p = hms.get_patient(item['patient_id'])
+            p_name = f"{p.first_name} {p.last_name}" if p else "Unknown"
+            s_type = getattr(p, 'scheme_type', '-') if p else "-"
+            writer.writerow([
+                bill.bill_id,
+                item.get('date', bill.created_date),
+                p_name,
+                item.get('id_no', '-'),
+                s_type,
+                item.get('con', 0),
+                item.get('drug', 0),
+                item.get('lab', 0),
+                item.get('amount', 0)
+            ])
+        writer.writerow([])
+        writer.writerow(['', '', '', '', '', '', '', 'GRAND TOTAL', bill.amount])
+        
+    else:
+        # Individual Invoice Export
+        patient = hms.get_patient(bill.patient_id)
+        p_name = f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
+        
+        writer.writerow(['LIMBE MEDICAL CLINIC'])
+        writer.writerow(['STATEMENT OF ACCOUNT'])
+        writer.writerow(['PATIENT', p_name])
+        writer.writerow(['DATE', bill.created_date])
+        writer.writerow([])
+        writer.writerow(['DATE', 'INVOICE NO', 'DESCRIPTION', 'AMOUNT', 'BALANCE'])
+        
+        if hasattr(bill, 'items') and bill.items:
+            for item in bill.items:
+                writer.writerow([
+                    bill.created_date,
+                    bill.bill_id,
+                    item.get('description', '-'),
+                    item.get('amount', 0),
+                    ''
+                ])
+        else:
+            writer.writerow([
+                bill.created_date,
+                bill.bill_id,
+                bill.services,
+                bill.amount,
+                bill.amount if bill.status != 'Paid' else 0
+            ])
+            
+        writer.writerow([])
+        writer.writerow(['', '', 'TOTAL', bill.amount, ''])
+
     resp = app.response_class(buf.getvalue(), mimetype='text/csv')
     resp.headers['Content-Disposition'] = f'attachment; filename=invoice_{bill.bill_id}.csv'
     return resp

@@ -84,6 +84,8 @@ class Bill:
     services: str = ""
     status: str = ""
     created_date: str = ""
+    provider: str = ""
+    items: list = field(default_factory=list)
 
 
 @dataclass
