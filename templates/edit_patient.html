@@ -72,11 +72,11 @@
                     </div>
                     <div class="form-group">
                         <label for="dob">Date of Birth</label>
-                        <input type="date" id="dob" name="dob" value="{{ patient.date_of_birth }}" required>
+                        <input type="date" id="dob" name="dob" value="{{ patient.date_of_birth }}">
                     </div>
                     <div class="form-group">
                         <label for="gender">Gender</label>
-                        <select id="gender" name="gender" required>
+                        <select id="gender" name="gender">
                             <option value="Male" {% if patient.gender == 'Male' %}selected{% endif %}>Male</option>
                             <option value="Female" {% if patient.gender == 'Female' %}selected{% endif %}>Female</option>
                             <option value="Other" {% if patient.gender == 'Other' %}selected{% endif %}>Other</option>
@@ -84,7 +84,7 @@
                     </div>
                     <div class="form-group">
                         <label for="phone">Phone Number</label>
-                        <input type="tel" id="phone" name="phone" value="{{ patient.phone }}" required>
+                        <input type="tel" id="phone" name="phone" value="{{ patient.phone }}">
                     </div>
                     <div class="form-group">
                         <label for="email">Email</label>
@@ -97,6 +97,14 @@
                     <div class="form-group">
                         <label for="emergency_contact">Emergency Contact</label>
                         <input type="text" id="emergency_contact" name="emergency_contact" value="{{ patient.emergency_contact }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="scheme_provider">Scheme Provider</label>
+                        <input type="text" id="scheme_provider" name="scheme_provider" value="{{ patient.scheme_provider }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="scheme_type">Scheme Type</label>
+                        <input type="text" id="scheme_type" name="scheme_type" value="{{ patient.scheme_type }}">
                     </div>
                     <button type="submit" class="btn-submit">Update Patient</button>
                 </form>

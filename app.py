@@ -365,12 +365,14 @@ def patient_details(patient_id):
     files = hms.patient_files.get(patient_id, [])
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
+    bills = hms.get_patient_bills(patient_id)
     
     return render_template('patient_details.html', 
                            patient=patient, 
                            files=files, 
                            appointments=appointments, 
                            medical_records=medical_records,
+                           bills=bills,
                            active_page='patients')
 
 @app.route('/patient/<patient_id>/upload_file', methods=['POST'])

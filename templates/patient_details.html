@@ -277,6 +277,43 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- Billing History -->
+                    <div class="section-card">
+                        <div class="section-header">
+                            <h3>Billing History</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Bill ID</th>
+                                        <th>Date</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for bill in bills %}
+                                    <tr>
+                                        <td>{{ bill.bill_id }}</td>
+                                        <td>{{ bill.created_date }}</td>
+                                        <td>${{ bill.amount }}</td>
+                                        <td><span class="status-badge status-{{ bill.status|lower }}">{{ bill.status }}</span></td>
+                                        <td>
+                                            <a href="{{ url_for('view_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: #888;">No bills found.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
