@@ -24,6 +24,10 @@
         <a href="{{ url_for('view_schedule') }}" class="menu-item {% if active_page == 'schedule' %}active{% endif %}" title="Schedule"><i class="fas fa-calendar-alt"></i></a>
         {% endif %}
 
+        {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
+        <a href="{{ url_for('queue_dashboard') }}" class="menu-item {% if active_page == 'queue' %}active{% endif %}" title="Queue Dashboard"><i class="fas fa-user-clock"></i></a>
+        {% endif %}
+
         {% if current_role in ['admin', 'doctor', 'nurse'] %}
         <a href="{{ url_for('medical_records') }}" class="menu-item {% if active_page == 'medical_records' %}active{% endif %}" title="Medical Records"><i class="fas fa-file-medical"></i></a>
         {% endif %}

@@ -82,26 +82,43 @@
             <div class="content-grid" style="grid-template-columns: 2fr 1fr;">
                 <!-- Queue System -->
                 <div class="card recent-appointments">
-                    <div class="card-header">
+                    <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
                         <h3>Patient Queue</h3>
-                        <span class="badge" style="background: #e8f0fe; color: #4361ee;">{{ queue|length }} Waiting</span>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" id="queueSearch" placeholder="Filter queue..." style="padding: 5px 10px; border: 1px solid #ddd; border-radius: 15px; font-size: 12px; outline: none;">
+                            <span class="badge" style="background: #e8f0fe; color: #4361ee;">{{ queue|length }} Waiting</span>
+                            <a href="{{ url_for('queue_dashboard') }}" style="font-size: 13px; color: var(--primary-color); text-decoration: none; font-weight: 600;">View All <i class="fas fa-external-link-alt"></i></a>
+                        </div>
                     </div>
-                    <div class="appointment-list">
+                    <div class="appointment-list" id="queueList">
                         {% for item in queue %}
-                        <div class="appointment-item" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid {% if item.status == 'Waiting' %}#ffc107{% elif item.status == 'In Consultation' %}#28a745{% else %}#dc3545{% endif %}; padding-left: 15px;">
+                        <div class="appointment-item" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid {% if item.triage_level == '1' %}#dc3545{% elif item.triage_level == '2' %}#fd7e14{% elif item.triage_level == '3' %}#ffc107{% else %}#28a745{% endif %}; padding-left: 15px; margin-bottom: 10px; background: #fcfcfc;">
                             <div class="appt-info">
-                                <h4>{{ item.patient_name }}</h4>
-                                <p style="font-size: 13px; color: #666;">
-                                    <i class="far fa-clock"></i> Arrived: {{ item.arrival_time }} &bull; 
-                                    <span style="font-weight: 500;">{{ item.status }}</span>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <h4 style="margin: 0;">{{ item.patient_name }}</h4>
+                                    <span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #eee; color: #666;">{{ item.department }}</span>
+                                </div>
+                                <p style="font-size: 12px; color: #666; margin-top: 4px;">
+                                    <i class="far fa-clock"></i> {{ item.arrival_time }} &bull; 
+                                    <span style="font-weight: 600; color: {% if item.status == 'Calling' %}#4361ee{% elif item.status == 'In Consultation' %}#28a745{% else %}#666{% endif %};">{{ item.status }}</span>
+                                    {% if item.priority != 'Routine' %}
+                                    &bull; <span style="color: #dc3545; font-weight: bold;">{{ item.priority }}</span>
+                                    {% endif %}
                                 </p>
                             </div>
                             <div class="appt-actions" style="display: flex; gap: 5px;">
                                 {% if item.status == 'Waiting' %}
-                                <a href="{{ url_for('update_queue_status', queue_id=item.queue_id, status='In Consultation') }}" class="btn-sm" style="background: #4361ee; color: white; text-decoration: none;" title="Call Patient"><i class="fas fa-bullhorn"></i> Call</a>
-                                {% elif item.status == 'In Consultation' %}
-                                <a href="{{ url_for('update_queue_status', queue_id=item.queue_id, status='Completed') }}" class="btn-sm" style="background: #28a745; color: white; text-decoration: none;" title="Complete"><i class="fas fa-check"></i> Done</a>
+                                <a href="{{ url_for('queue_call', queue_id=item.queue_id) }}" class="btn-sm" style="background: #4361ee; color: white; text-decoration: none;" title="Call Patient"><i class="fas fa-bullhorn"></i></a>
                                 {% endif %}
+                                
+                                {% if item.status == 'Calling' or item.status == 'Waiting' %}
+                                <a href="{{ url_for('update_queue_status', queue_id=item.queue_id, status='In Consultation') }}" class="btn-sm" style="background: #28a745; color: white; text-decoration: none;" title="Start Consultation"><i class="fas fa-play"></i></a>
+                                {% endif %}
+                                
+                                {% if item.status == 'In Consultation' %}
+                                <a href="{{ url_for('queue_complete', queue_id=item.queue_id) }}" class="btn-sm" style="background: #28a745; color: white; text-decoration: none;" title="Complete"><i class="fas fa-check"></i></a>
+                                {% endif %}
+                                
                                 <a href="{{ url_for('remove_from_queue', queue_id=item.queue_id) }}" class="btn-sm" style="background: #dc3545; color: white; text-decoration: none;" title="Remove" onclick="return confirm('Remove from queue?')"><i class="fas fa-times"></i></a>
                             </div>
                         </div>
@@ -116,15 +133,22 @@
                 <div class="right-column">
                     <!-- Recent Appointments -->
                     <div class="card quick-actions" style="margin-bottom: 20px;">
-                        <h3>Recent Appointments</h3>
-                        <div class="appointment-list" style="max-height: 300px; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0;">Recent Appointments</h3>
+                            <input type="text" id="apptSearch" placeholder="Filter..." style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 10px; font-size: 11px; outline: none; width: 80px;">
+                        </div>
+                        <div class="appointment-list" id="apptList" style="max-height: 300px; overflow-y: auto;">
                             {% for appt in recent_appointments %}
                             <div class="appointment-item" style="padding: 10px 0; border-bottom: 1px solid #eee;">
                                 <div class="appt-info">
                                     <div style="font-weight: 600; font-size: 14px;">
-                                        {% set patient = hms.get_patient(appt.patient_id) %}
+                                    {% set patient = hms.get_patient(appt.patient_id) %}
+                                    {% if patient %}
                                         {{ patient.first_name }} {{ patient.last_name }}
-                                    </div>
+                                    {% else %}
+                                        Unknown Patient ({{ appt.patient_id }})
+                                    {% endif %}
+                                </div>
                                     <div style="font-size: 12px; color: #888;">
                                         {{ appt.appointment_time }} &bull; {{ appt.status }}
                                     </div>
@@ -178,5 +202,23 @@
             </div>
         </main>
     </div>
+    <script>
+        document.getElementById('queueSearch').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            let items = document.querySelectorAll('#queueList .appointment-item');
+            items.forEach(item => {
+                let text = item.textContent.toLowerCase();
+                item.style.display = text.includes(filter) ? '' : 'none';
+            });
+        });
+        document.getElementById('apptSearch').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            let items = document.querySelectorAll('#apptList .appointment-item');
+            items.forEach(item => {
+                let text = item.textContent.toLowerCase();
+                item.style.display = text.includes(filter) ? '' : 'none';
+            });
+        });
+    </script>
 </body>
 </html>

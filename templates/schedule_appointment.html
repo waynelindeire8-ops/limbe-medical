@@ -6,6 +6,7 @@
     <title>Schedule Appointment</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
     <style>
         .form-container {
             background-color: white;
@@ -98,5 +99,18 @@
             </div>
         </main>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectElements = document.querySelectorAll('select');
+            selectElements.forEach(select => {
+                new Choices(select, {
+                    searchEnabled: true,
+                    itemSelectText: '',
+                    placeholder: true,
+                });
+            });
+        });
+    </script>
 </body>
 </html>

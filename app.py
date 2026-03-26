@@ -76,7 +76,7 @@ def inject_user():
     for m in hms.messages:
         if not m.is_read and (m.recipient_id == username or m.recipient_id == role or m.recipient_id == 'all'):
             unread += 1
-    return dict(current_user=username, current_role=role, unread_messages_count=unread)
+    return dict(current_user=username, current_role=role, unread_messages_count=unread, hms=hms)
 
 @app.route('/analytics')
 def analytics():
@@ -172,59 +172,88 @@ def logout():
 
 @app.route('/')
 def dashboard():
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    
-    # Calculate stats
-    total_patients = len(hms.patients)
-    todays_appointments = len([a for a in hms.appointments if a.appointment_date == today])
-    pending_appointments = len([a for a in hms.appointments if a.status == 'Scheduled'])
-    completed_appointments = len([a for a in hms.appointments if a.status == 'Completed'])
-    active_doctors = len(hms.get_available_doctors())
-    
-    # Get recent appointments
-    recent_appointments = sorted(hms.appointments, key=lambda x: x.appointment_date + ' ' + x.appointment_time, reverse=True)[:5]
-    
-    # Get active queue
-    active_queue = [q for q in hms.queue if q.status != 'Completed']
-    sorted_queue = sorted(active_queue, key=lambda x: x.arrival_time)
-    # Charts
-    days = 90
-    base = datetime.date.today()
-    chart_labels = [(base - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days-1, -1, -1)]
-    reg_map = {}
-    for p in hms.patients:
-        d = (getattr(p,'created_date','') or '')
-        if d:
-            reg_map[d] = reg_map.get(d,0) + 1
-    appt_map = {}
-    for a in hms.appointments:
-        d = getattr(a,'appointment_date','') or ''
-        if d:
-            appt_map[d] = appt_map.get(d,0) + 1
-    chart_patient_reg = [reg_map.get(d,0) for d in chart_labels]
-    chart_appointments = [appt_map.get(d,0) for d in chart_labels]
-    
-    # Get last 5 system notifications for the current user
-    username = session.get('username')
-    role = session.get('role')
-    system_notifications = [m for m in hms.messages 
-                           if m.sender_id == 'system' and 
-                           (m.recipient_id == username or m.recipient_id == role or m.recipient_id == 'all')]
-    system_notifications = sorted(system_notifications, key=lambda x: x.timestamp, reverse=True)[:5]
-    
-    return render_template('dashboard.html', 
-                           total_patients=total_patients,
-                           active_doctors=active_doctors,
-                           todays_appointments=todays_appointments,
-                           pending_appointments=pending_appointments,
-                           completed_appointments=completed_appointments,
-                           recent_appointments=recent_appointments,
-                           queue=sorted_queue,
-                           chart_labels=chart_labels,
-                           chart_patient_reg=chart_patient_reg,
-                           chart_appointments=chart_appointments,
-                           system_notifications=system_notifications,
-                           active_page='dashboard')
+    try:
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        
+        # Calculate stats
+        total_patients = len(hms.patients)
+        todays_appointments = len([a for a in hms.appointments if getattr(a, 'appointment_date', '') == today])
+        pending_appointments = len([a for a in hms.appointments if getattr(a, 'status', '') == 'Scheduled'])
+        completed_appointments = len([a for a in hms.appointments if getattr(a, 'status', '') == 'Completed'])
+        
+        active_doctors = 0
+        try:
+            active_doctors = len(hms.get_available_doctors())
+        except Exception as e:
+            print(f"[ERROR] get_available_doctors failed: {e}")
+            active_doctors = len([d for d in hms.doctors if getattr(d, 'status', '').lower() == "available"])
+        
+        # Get recent appointments with safety
+        recent_appointments = []
+        try:
+            recent_appointments = sorted(hms.appointments, 
+                                        key=lambda x: (getattr(x, 'appointment_date', '') or '') + ' ' + (getattr(x, 'appointment_time', '') or ''), 
+                                        reverse=True)[:5]
+        except Exception as e:
+            print(f"[ERROR] Sorting recent_appointments failed: {e}")
+            recent_appointments = hms.appointments[-5:] if hms.appointments else []
+        
+        # Get active queue
+        active_queue = [q for q in hms.queue if getattr(q, 'status', '') != 'Completed']
+        sorted_queue = []
+        try:
+            sorted_queue = sorted(active_queue, key=lambda x: (getattr(x, 'arrival_time', '') or ''))
+        except Exception as e:
+            print(f"[ERROR] Sorting queue failed: {e}")
+            sorted_queue = active_queue
+            
+        # Charts
+        days = 90
+        base = datetime.date.today()
+        chart_labels = [(base - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days-1, -1, -1)]
+        reg_map = {}
+        for p in hms.patients:
+            d = (getattr(p,'created_date','') or '')
+            if d:
+                reg_map[d] = reg_map.get(d,0) + 1
+        appt_map = {}
+        for a in hms.appointments:
+            d = getattr(a,'appointment_date','') or ''
+            if d:
+                appt_map[d] = appt_map.get(d,0) + 1
+        chart_patient_reg = [reg_map.get(d,0) for d in chart_labels]
+        chart_appointments = [appt_map.get(d,0) for d in chart_labels]
+        
+        # Get last 5 system notifications for the current user
+        username = session.get('username')
+        role = session.get('role')
+        system_notifications = []
+        try:
+            system_notifications = [m for m in hms.messages 
+                                if getattr(m, 'sender_id', '') == 'system' and 
+                                (getattr(m, 'recipient_id', '') == username or getattr(m, 'recipient_id', '') == role or getattr(m, 'recipient_id', '') == 'all')]
+            system_notifications = sorted(system_notifications, key=lambda x: (getattr(x, 'timestamp', '') or ''), reverse=True)[:5]
+        except Exception as e:
+            print(f"[ERROR] Getting system_notifications failed: {e}")
+
+        return render_template('dashboard.html', 
+                            total_patients=total_patients,
+                            active_doctors=active_doctors,
+                            todays_appointments=todays_appointments,
+                            pending_appointments=pending_appointments,
+                            completed_appointments=completed_appointments,
+                            recent_appointments=recent_appointments,
+                            queue=sorted_queue,
+                            chart_labels=chart_labels,
+                            chart_patient_reg=chart_patient_reg,
+                            chart_appointments=chart_appointments,
+                            system_notifications=system_notifications,
+                            active_page='dashboard')
+    except Exception as e:
+        print(f"[CRITICAL ERROR] Dashboard route failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Internal Server Error: {e}", 500
 
 @app.route('/queue/add/<patient_id>')
 def add_to_queue(patient_id):
@@ -245,7 +274,9 @@ def add_to_queue(patient_id):
                 visit_reason='',
                 special_category='',
                 check_in_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                assigned_doctor_id=''
+                assigned_doctor_id='',
+                triage_level='3',
+                vitals={}
             )
             hms.add_to_queue(new_item)
             flash(f'{patient.first_name} added to queue.', 'success')
@@ -282,6 +313,10 @@ def queue_checkin():
         urgency = request.form.get('urgency') or 'Routine'
         special = request.form.get('special') or 'None'
         doc_id = request.form.get('doctor_id') or 'Unassigned'
+        triage = request.form.get('triage_level') or '3'
+        bp = request.form.get('bp') or ''
+        temp = request.form.get('temp') or ''
+        weight = request.form.get('weight') or ''
         p = hms.get_patient(pid)
         if p:
             new_item = QueueItem(
@@ -297,7 +332,9 @@ def queue_checkin():
                 visit_reason=reason,
                 special_category=special,
                 check_in_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                assigned_doctor_id=doc_id
+                assigned_doctor_id=doc_id,
+                triage_level=triage,
+                vitals={'bp': bp, 'temp': temp, 'weight': weight}
             )
             hms.add_to_queue(new_item)
             flash('Patient checked in.', 'success')
@@ -315,7 +352,7 @@ def queue_dashboard():
         d = q.department or 'General'
         queues_by_dept.setdefault(d, []).append(q)
     for d in queues_by_dept:
-        queues_by_dept[d] = sorted(queues_by_dept[d], key=lambda x: (x.priority, x.arrival_time))
+        queues_by_dept[d] = sorted(queues_by_dept[d], key=lambda x: (x.priority or 'Routine', x.arrival_time or ''))
     return render_template('queue/dashboard.html', queues_by_dept=queues_by_dept, doctors=hms.doctors, departments=hms.departments or ['General'], active_page='queue')
 
 @app.route('/queue/call/<queue_id>')
@@ -550,7 +587,12 @@ def delete_patient(patient_id):
 
 @app.route('/doctors')
 def doctors():
-    return render_template('doctors.html', doctors=hms.doctors, active_page='doctors')
+    search_term = request.args.get('search', '').lower()
+    if search_term:
+        doctors_list = hms.search_doctors(search_term)
+    else:
+        doctors_list = hms.doctors
+    return render_template('doctors.html', doctors=doctors_list, active_page='doctors', search_term=search_term)
 
 @app.route('/add_doctor', methods=['GET', 'POST'])
 def add_doctor():
@@ -738,7 +780,7 @@ def messages():
             user_messages.append(msg)
             
     # Sort by timestamp (newest first)
-    sorted_messages = sorted(user_messages, key=lambda x: x.timestamp, reverse=True)
+    sorted_messages = sorted(user_messages, key=lambda x: (x.timestamp or ''), reverse=True)
     
     # Format for display
     display_messages = []
@@ -900,7 +942,7 @@ def billing_dashboard():
     search_term = request.args.get('search', '').lower()
     
     # Sort bills by date descending (newest first)
-    all_bills = sorted(hms.bills, key=lambda x: x.created_date, reverse=True)
+    all_bills = sorted(hms.bills, key=lambda x: (x.created_date or ''), reverse=True)
     
     # Resolve patient names for display
     display_bills = []
@@ -1452,7 +1494,7 @@ def billing_reports():
 @app.route('/prescriptions')
 def prescriptions():
     search_term = request.args.get('search', '').lower()
-    all_rx = sorted(hms.prescriptions, key=lambda x: x.date, reverse=True)
+    all_rx = sorted(hms.prescriptions, key=lambda x: (x.date or ''), reverse=True)
     def map_display(rx):
         patient = hms.get_patient(rx.patient_id)
         doctor = hms.get_doctor(rx.doctor_id)
@@ -1561,7 +1603,7 @@ def print_prescription(prescription_id):
 @app.route('/medical_records')
 def medical_records():
     search_term = request.args.get('search', '').lower()
-    all_records = sorted(hms.medical_records, key=lambda x: x.date, reverse=True)
+    all_records = sorted(hms.medical_records, key=lambda x: (x.date or ''), reverse=True)
     
     display_list = []
     for record in all_records:
@@ -1696,7 +1738,8 @@ def add_medical_record():
                 'release_pulmonary': 'release_pulmonary' in request.form,
                 'release_nuclear_reports': 'release_nuclear_reports' in request.form,
                 'release_heart': 'release_heart' in request.form,
-                'release_radiology_cd': 'release_radiology_cd' in request.form
+                'release_radiology_cd': 'release_radiology_cd' in request.form,
+                'notes': request.form.get('notes')
             }
             
             new_record = MedicalRecord(
@@ -1753,7 +1796,8 @@ def edit_medical_record(record_id):
                 'personal_info': request.form.get('personal_info'),
                 'emergency_contact': request.form.get('emergency_contact'),
                 'office_use': request.form.get('office_use'),
-                'authorization_release': request.form.get('authorization_release')
+                'authorization_release': request.form.get('authorization_release'),
+                'notes': request.form.get('notes')
             })
             
             hms.update_medical_record(record)
@@ -1777,6 +1821,53 @@ def view_medical_record(record_id):
     patient = hms.get_patient(record.patient_id)
     doctor = hms.get_doctor(record.doctor_id)
     return render_template('view_medical_record.html', record=record, patient=patient, doctor=doctor, active_page='medical_records')
+
+@app.route('/medical_records/print/<record_id>')
+def print_medical_record(record_id):
+    record = next((r for r in hms.medical_records if r.record_id == record_id), None)
+    if not record:
+        return "Medical record not found", 404
+        
+    patient = hms.get_patient(record.patient_id)
+    doctor = hms.get_doctor(record.doctor_id)
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return render_template('print_medical_record.html', record=record, patient=patient, doctor=doctor, now=now)
+
+@app.route('/medical_records/export/<record_id>')
+def export_medical_record_csv(record_id):
+    record = next((r for r in hms.medical_records if r.record_id == record_id), None)
+    if not record:
+        return "Medical record not found", 404
+    
+    patient = hms.get_patient(record.patient_id)
+    doctor = hms.get_doctor(record.doctor_id)
+    
+    import io, csv
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    
+    writer.writerow(['LIMBE MEDICAL CLINIC'])
+    writer.writerow(['MEDICAL RECORD EXPORT'])
+    writer.writerow([])
+    writer.writerow(['RECORD ID', record.record_id])
+    writer.writerow(['DATE', record.date])
+    writer.writerow(['PATIENT', f"{patient.first_name} {patient.last_name}" if patient else 'Unknown'])
+    writer.writerow(['DOCTOR', f"Dr. {doctor.last_name}" if doctor else 'Unknown'])
+    writer.writerow([])
+    writer.writerow(['SECTION', 'DETAILS'])
+    writer.writerow(['Consultation Reason', record.consult_reason])
+    writer.writerow(['Diagnosis', record.diagnosis])
+    writer.writerow(['Treatment', record.treatment])
+    writer.writerow(['Prescriptions', record.prescriptions])
+    writer.writerow(['Notes', record.notes])
+    writer.writerow([])
+    writer.writerow(['DETAILED INFORMATION'])
+    for key, val in record.details.items():
+        writer.writerow([key.replace('_', ' ').title(), val])
+        
+    resp = app.response_class(buf.getvalue(), mimetype='text/csv')
+    resp.headers['Content-Disposition'] = f'attachment; filename=medical_record_{record.record_id}.csv'
+    return resp
 
 @app.route('/medical_records/delete/<record_id>')
 def delete_medical_record(record_id):

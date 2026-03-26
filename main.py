@@ -675,6 +675,47 @@ class HospitalManagementSystem:
         self.queue.append(queue_item)
         self.save_data()
 
+    def estimate_wait_time(self, department: str) -> str:
+        """Estimate the wait time for a patient based on the number of waiting patients in a department."""
+        # Simple estimation: 15 mins per waiting patient
+        waiting_count = len([q for q in self.queue if q.department == department and q.status == 'Waiting'])
+        wait_mins = waiting_count * 15
+        if wait_mins == 0:
+            return "5 mins"
+        return f"{wait_mins} mins"
+
+    def call_patient(self, queue_id: str) -> bool:
+        """Mark a patient as being called."""
+        for item in self.queue:
+            if item.queue_id == queue_id:
+                item.status = "Calling"
+                item.last_called_time = datetime.datetime.now().strftime("%H:%M:%S")
+                self.save_data()
+                return True
+        return False
+
+    def transfer_patient(self, queue_id: str, new_dept: str, new_doctor_id: str) -> bool:
+        """Transfer a patient to a different department or doctor."""
+        for item in self.queue:
+            if item.queue_id == queue_id:
+                item.department = new_dept
+                item.assigned_doctor_id = new_doctor_id
+                # Reset estimated wait for the new department
+                item.estimated_wait = self.estimate_wait_time(new_dept)
+                self.save_data()
+                return True
+        return False
+
+    def requeue_patient(self, queue_id: str) -> bool:
+        """Re-queue a patient who might have been missed or needs a follow-up."""
+        for item in self.queue:
+            if item.queue_id == queue_id:
+                item.status = "Waiting"
+                item.requeued_count = getattr(item, 'requeued_count', 0) + 1
+                self.save_data()
+                return True
+        return False
+
     def update_queue_status(self, queue_id: str, status: str) -> bool:
         """Update the status of a queue item."""
         for item in self.queue:

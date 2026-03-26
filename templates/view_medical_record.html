@@ -97,7 +97,8 @@
                     </div>
                     <div style="display: flex; gap: 10px;">
                         <a href="{{ url_for('edit_medical_record', record_id=record.record_id) }}" class="btn btn-outline" style="text-decoration: none;"><i class="fas fa-edit"></i> Edit</a>
-                        <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Print</button>
+                        <a href="{{ url_for('export_medical_record_csv', record_id=record.record_id) }}" class="btn btn-outline" style="text-decoration: none; color: #27ae60;"><i class="fas fa-file-excel"></i> Export</a>
+                        <a href="{{ url_for('print_medical_record', record_id=record.record_id) }}" target="_blank" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-print"></i> Detailed Print</a>
                     </div>
                 </div>
 
@@ -175,8 +176,13 @@
                 </div>
 
                 {% if record.notes %}
-                <div class="section-title">Additional Notes</div>
+                <div class="section-title">Clinical Notes</div>
                 <div class="detail-block">{{ record.notes }}</div>
+                {% endif %}
+                
+                {% if record.details.get('notes') %}
+                <div class="section-title">Office Notes</div>
+                <div class="detail-block">{{ record.details.get('notes') }}</div>
                 {% endif %}
             </div>
         </main>

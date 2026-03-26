@@ -136,8 +136,8 @@ class QueueItem:
     patient_id: str = ""
     patient_name: str = ""
     doctor_id: str = ""
-    status: str = "Waiting"  # Waiting, In Consultation, Completed, Cancelled
-    priority: str = "Routine" # Normal, Urgent, Emergency
+    status: str = "Waiting"  # Waiting, Calling, In Consultation, Completed, No-show, Re-queued
+    priority: str = "Routine" # Emergency, Urgent, Routine
     arrival_time: str = ""
     estimated_wait: str = ""
     department: str = ""
@@ -146,6 +146,13 @@ class QueueItem:
     check_in_time: str = ""
     assigned_doctor_id: str = ""
     doctor_name: str = ""
+    # Added details
+    triage_level: str = "3" # 1 (Critical) to 5 (Non-urgent)
+    vitals: dict = field(default_factory=dict) # {bp: "120/80", temp: "36.5", weight: "70"}
+    assigned_nurse_id: str = ""
+    last_called_time: str = ""
+    requeued_count: int = 0
+    notes: str = ""
 
 
 # Re-export all models for GUI compatibility
