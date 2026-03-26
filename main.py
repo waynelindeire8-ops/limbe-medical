@@ -30,7 +30,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Any
-from models import Patient, Doctor, Appointment, MedicalRecord, Prescription, Bill, InventoryItem, User, Message, QueueItem
+from models import Patient, Doctor, Appointment, MedicalRecord, Prescription, Bill, InventoryItem, User, Message, QueueItem, LabResult
 
 
 # ==============================
@@ -53,6 +53,7 @@ class HospitalManagementSystem:
         self.users: List[User] = []
         self.messages: List[Message] = []
         self.queue: List[QueueItem] = []
+        self.lab_results: List[LabResult] = []
         self.activity: List[Dict[str, Any]] = []
         self.patient_files: Dict[str, List[Dict[str, Any]]] = {}
         self.patient_scheme: Dict[str, Dict[str, Any]] = {}
@@ -103,6 +104,7 @@ class HospitalManagementSystem:
                 'users': [asdict(u) for u in self.users],
                 'messages': [asdict(m) for m in self.messages],
                 'queue': [asdict(q) for q in self.queue],
+                'lab_results': [asdict(lr) for lr in self.lab_results],
                 'settings': self.settings,
                 'activity': self.activity,
                 'patient_files': self.patient_files,
@@ -202,6 +204,7 @@ class HospitalManagementSystem:
         self.users = [User(**_filter(User, u)) for u in data.get('users', [])]
         self.messages = [Message(**_filter(Message, m)) for m in data.get('messages', [])]
         self.queue = [QueueItem(**_filter(QueueItem, q)) for q in data.get('queue', [])]
+        self.lab_results = [LabResult(**_filter(LabResult, lr)) for lr in data.get('lab_results', [])]
         self.departments = data.get('departments', [])
         self.settings = data.get('settings', self.settings)
         self.activity = data.get('activity', [])
@@ -560,6 +563,43 @@ class HospitalManagementSystem:
                 self.save_data()
                 try:
                     self.add_activity(None, 'delete', 'medical_record', record_id, '')
+                except Exception:
+                    pass
+                return True
+        return False
+
+    # ---------- Lab Results ----------
+    def add_lab_result(self, result: LabResult) -> bool:
+        self.lab_results.append(result)
+        self.save_data()
+        try:
+            self.add_activity(None, 'add', 'lab_result', result.result_id, result.patient_id)
+        except Exception:
+            pass
+        return True
+
+    def get_lab_result(self, result_id: str) -> Optional[LabResult]:
+        return next((r for r in self.lab_results if r.result_id == result_id), None)
+
+    def update_lab_result(self, result: LabResult) -> bool:
+        for i, r in enumerate(self.lab_results):
+            if r.result_id == result.result_id:
+                self.lab_results[i] = result
+                self.save_data()
+                try:
+                    self.add_activity(None, 'update', 'lab_result', result.result_id, result.patient_id)
+                except Exception:
+                    pass
+                return True
+        return False
+
+    def delete_lab_result(self, result_id: str) -> bool:
+        for i, r in enumerate(self.lab_results):
+            if r.result_id == result_id:
+                del self.lab_results[i]
+                self.save_data()
+                try:
+                    self.add_activity(None, 'delete', 'lab_result', result_id, '')
                 except Exception:
                     pass
                 return True

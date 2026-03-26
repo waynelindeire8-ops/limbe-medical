@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Results</title>
+    {% include 'includes/styles.html' %}
+</head>
+<body>
+    <div class="container">
+        {% include 'includes/sidebar.html' %}
+        <main class="main-content">
+            <div class="header-bar">
+                <h1>Lab Results</h1>
+                <a href="{{ url_for('add_lab_result') }}" class="btn btn-primary">Add Lab Result</a>
+            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            <div class="content-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test Name</th>
+                            <th>Patient</th>
+                            <th>Doctor</th>
+                            <th>Test Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in lab_results %}
+                            <tr>
+                                <td>{{ result.test_name }}</td>
+                                <td>{{ hms.get_patient(result.patient_id).first_name }} {{ hms.get_patient(result.patient_id).last_name }}</td>
+                                <td>Dr. {{ hms.get_doctor(result.doctor_id).last_name }}</td>
+                                <td>{{ result.test_date }}</td>
+                                <td>{{ result.status }}</td>
+                                <td>
+                                    <a href="{{ url_for('view_lab_result', result_id=result.result_id) }}">View</a>
+                                    <a href="{{ url_for('edit_lab_result', result_id=result.result_id) }}">Edit</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

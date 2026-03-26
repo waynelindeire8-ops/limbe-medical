@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Lab Result</title>
+    {% include 'includes/styles.html' %}
+</head>
+<body>
+    <div class="container">
+        {% include 'includes/sidebar.html' %}
+        <main class="main-content">
+            <div class="header-bar">
+                <h1>Add Lab Result</h1>
+            </div>
+            <form method="POST">
+                <div class="form-group">
+                    <label>Test Name</label>
+                    <input type="text" name="test_name" required>
+                </div>
+                <div class="form-group">
+                    <label>Patient</label>
+                    <select name="patient_id" required>
+                        {% for patient in patients %}
+                            <option value="{{ patient.patient_id }}">{{ patient.first_name }} {{ patient.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Doctor</label>
+                    <select name="doctor_id" required>
+                        {% for doctor in doctors %}
+                            <option value="{{ doctor.doctor_id }}">Dr. {{ doctor.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Test Date</label>
+                    <input type="date" name="test_date" required>
+                </div>
+                <div class="form-group">
+                    <label>Result Value</label>
+                    <input type="text" name="result_value">
+                </div>
+                <div class="form-group">
+                    <label>Units</label>
+                    <input type="text" name="units">
+                </div>
+                <div class="form-group">
+                    <label>Reference Range</label>
+                    <input type="text" name="reference_range">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select name="status">
+                        <option value="Pending">Pending</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Result</button>
+            </form>
+        </main>
+    </div>
+</body>
+</html>

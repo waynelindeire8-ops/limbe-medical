@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Lab Result</title>
+    {% include 'includes/styles.html' %}
+</head>
+<body>
+    <div class="container">
+        {% include 'includes/sidebar.html' %}
+        <main class="main-content">
+            <div class="header-bar">
+                <h1>Edit Lab Result</h1>
+            </div>
+            <form method="POST">
+                <div class="form-group">
+                    <label>Test Name</label>
+                    <input type="text" name="test_name" value="{{ result.test_name }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Patient</label>
+                    <select name="patient_id" required>
+                        {% for patient in patients %}
+                            <option value="{{ patient.patient_id }}" {% if patient.patient_id == result.patient_id %}selected{% endif %}>{{ patient.first_name }} {{ patient.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Doctor</label>
+                    <select name="doctor_id" required>
+                        {% for doctor in doctors %}
+                            <option value="{{ doctor.doctor_id }}" {% if doctor.doctor_id == result.doctor_id %}selected{% endif %}>Dr. {{ doctor.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Test Date</label>
+                    <input type="date" name="test_date" value="{{ result.test_date }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Result Value</label>
+                    <input type="text" name="result_value" value="{{ result.result_value }}">
+                </div>
+                <div class="form-group">
+                    <label>Units</label>
+                    <input type="text" name="units" value="{{ result.units }}">
+                </div>
+                <div class="form-group">
+                    <label>Reference Range</label>
+                    <input type="text" name="reference_range" value="{{ result.reference_range }}">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select name="status">
+                        <option value="Pending" {% if result.status == 'Pending' %}selected{% endif %}>Pending</option>
+                        <option value="Completed" {% if result.status == 'Completed' %}selected{% endif %}>Completed</option>
+                        <option value="Cancelled" {% if result.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea name="notes">{{ result.notes }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Result</button>
+            </form>
+        </main>
+    </div>
+</body>
+</html>

@@ -1878,6 +1878,83 @@ def delete_medical_record(record_id):
         flash('Error deleting medical record!', 'error')
     return redirect(url_for('medical_records'))
 
+# ==================================
+# 🧪 LAB RESULTS
+# ==================================
+
+@app.route('/lab_results')
+def lab_results():
+    results = hms.lab_results
+    return render_template('lab_results.html', lab_results=results, active_page='lab_results', hms=hms)
+
+@app.route('/lab_results/add', methods=['GET', 'POST'])
+def add_lab_result():
+    if request.method == 'POST':
+        try:
+            new_result = LabResult(
+                result_id=hms.generate_id("LR"),
+                patient_id=request.form['patient_id'],
+                doctor_id=request.form['doctor_id'],
+                test_name=request.form['test_name'],
+                test_date=request.form['test_date'],
+                result_value=request.form.get('result_value'),
+                units=request.form.get('units'),
+                reference_range=request.form.get('reference_range'),
+                status=request.form.get('status', 'Pending'),
+                notes=request.form.get('notes')
+            )
+            hms.add_lab_result(new_result)
+            flash('Lab result added successfully!', 'success')
+            return redirect(url_for('lab_results'))
+        except Exception as e:
+            flash(f'Error adding lab result: {e}', 'error')
+    patients = hms.patients
+    doctors = hms.doctors
+    return render_template('add_lab_result.html', patients=patients, doctors=doctors, active_page='lab_results')
+
+@app.route('/lab_results/edit/<result_id>', methods=['GET', 'POST'])
+def edit_lab_result(result_id):
+    result = hms.get_lab_result(result_id)
+    if not result:
+        flash('Lab result not found!', 'error')
+        return redirect(url_for('lab_results'))
+    if request.method == 'POST':
+        try:
+            result.patient_id = request.form['patient_id']
+            result.doctor_id = request.form['doctor_id']
+            result.test_name = request.form['test_name']
+            result.test_date = request.form['test_date']
+            result.result_value = request.form.get('result_value')
+            result.units = request.form.get('units')
+            result.reference_range = request.form.get('reference_range')
+            result.status = request.form.get('status')
+            result.notes = request.form.get('notes')
+            hms.update_lab_result(result)
+            flash('Lab result updated successfully!', 'success')
+            return redirect(url_for('lab_results'))
+        except Exception as e:
+            flash(f'Error updating lab result: {e}', 'error')
+    patients = hms.patients
+    doctors = hms.doctors
+    return render_template('edit_lab_result.html', result=result, patients=patients, doctors=doctors, active_page='lab_results')
+
+@app.route('/lab_results/view/<result_id>')
+def view_lab_result(result_id):
+    result = hms.get_lab_result(result_id)
+    if not result:
+        flash('Lab result not found!', 'error')
+        return redirect(url_for('lab_results'))
+    return render_template('view_lab_result.html', result=result, active_page='lab_results', hms=hms)
+
+@app.route('/lab_results/print/<result_id>')
+def print_lab_result(result_id):
+    result = hms.get_lab_result(result_id)
+    if not result:
+        return "Lab result not found", 404
+    return render_template('print_lab_result.html', result=result, hms=hms)
+
+
+
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     if request.method == 'POST':

@@ -155,5 +155,19 @@ class QueueItem:
     notes: str = ""
 
 
+@dataclass
+class LabResult:
+    result_id: str = ""
+    patient_id: str = ""
+    doctor_id: str = ""
+    test_name: str = ""
+    test_date: str = ""
+    result_value: str = ""
+    units: str = ""
+    reference_range: str = ""
+    status: str = "Pending" # Pending, Completed, Cancelled
+    notes: str = ""
+
+
 # Re-export all models for GUI compatibility
-__all__ = ['Patient', 'Doctor', 'Appointment', 'MedicalRecord', 'Prescription', 'Bill', 'InventoryItem', 'User', 'Message', 'QueueItem']
+__all__ = ['Patient', 'Doctor', 'Appointment', 'MedicalRecord', 'Prescription', 'Bill', 'InventoryItem', 'User', 'Message', 'QueueItem', 'LabResult']
