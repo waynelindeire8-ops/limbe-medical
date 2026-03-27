@@ -82,7 +82,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th>Patient ID</th>
                             <th>Name</th>
                             <th>DOB</th>
                             <th>Gender</th>
@@ -95,6 +95,8 @@
                         <tr>
                             <td>{{ patient.patient_id }}</td>
                             <td>{{ patient.first_name }} {{ patient.last_name }}</td>
+                            <td>{{ patient.date_of_birth }}</td>
+                            <td>{{ patient.gender }}</td>
                             <td>{{ patient.phone }}</td>
                             <td class="actions">
                                 <a href="{{ url_for('patient_details', patient_id=patient.patient_id) }}" title="View"><i class="fas fa-eye"></i></a>

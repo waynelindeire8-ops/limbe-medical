@@ -1219,6 +1219,15 @@ def update_invoice(bill_id):
         flash(f'Error updating invoice: {e}', 'error')
     return redirect(url_for('billing_dashboard'))
 
+@app.route('/billing/delete/<bill_id>')
+def delete_bill(bill_id):
+    if hms.delete_bill(bill_id):
+        flash('Bill deleted successfully!', 'success')
+        notify('Bill deleted', bill_id, 'admin')
+    else:
+        flash('Error deleting bill!', 'error')
+    return redirect(url_for('billing_dashboard'))
+
 @app.route('/billing/payment', methods=['POST'])
 def process_payment():
     try:

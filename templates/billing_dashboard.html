@@ -142,6 +142,7 @@
                 <div class="tab" onclick="switchTab('report')">Generate Report</div>
                 <div class="tab" onclick="switchTab('invoice')">Bulk Invoice</div>
                 <div class="tab" onclick="switchTab('individual')">Individual Invoice</div>
+                <div class="tab" onclick="switchTab('cash')">Cash Invoice</div>
             </div>
 
             <!-- Search Tab -->
@@ -177,6 +178,9 @@
                                 <a href="#" onclick="editInvoice('{{ bill.bill_id }}')" style="color: #ffc107; margin-right: 10px;" title="Edit Invoice"><i class="fas fa-edit"></i></a>
                                 {% if bill.status == 'Pending' %}
                                 <a href="#" onclick="openPaymentModal('{{ bill.bill_id }}', '{{ bill.amount }}')" style="color: #28a745;" title="Process Payment"><i class="fas fa-credit-card"></i></a>
+                                {% endif %}
+                                {% if current_role == 'admin' %}
+                                <a href="{{ url_for('delete_bill', bill_id=bill.bill_id) }}" style="color: #dc3545; margin-left: 10px;" title="Delete Bill" onclick="return confirm('Are you sure you want to delete this bill?')"><i class="fas fa-trash"></i></a>
                                 {% endif %}
                             </td>
                         </tr>
@@ -256,14 +260,46 @@
                             <label>Select Provider</label>
                             <select name="provider" required>
                                 <option value="">-- Select Provider --</option>
-                                <option value="Medical Aid Society of Malawi (MASM)">Medical Aid Society of Malawi (MASM)</option>
-                                <option value="Umoyo Health Care Insurance (UHCI)">Umoyo Health Care Insurance (UHCI)</option>
-                                <option value="Precious Medical International (PMI)">Precious Medical International (PMI)</option>
-                                <option value="Medlife Services Limited">Medlife Services Limited</option>
-                                <option value="Horizon Health Limited">Horizon Health Limited</option>
-                                <option value="MedHealth">MedHealth</option>
-                                <option value="Wella Medical Aid Society">Wella Medical Aid Society</option>
-                                <option value="Libertas General Insurance Company Limited">Libertas General Insurance Company Limited</option>
+                 <option value="Medical Aid Society of Malawi (MASM)">Medical Aid Society of Malawi (MASM)</option>
+<option value="Central Health Medical Aid">Central Health Medical Aid</option>
+<option value="Umoyo Health Care Insurance Company">Umoyo Health Care Insurance Company</option>
+<option value="Wella Medical Aid Society Limited">Wella Medical Aid Society Limited</option>
+<option value="Precious Medical International">Precious Medical International</option>
+<option value="NABMAS (National Bank Medical Aid Scheme)">NABMAS (National Bank Medical Aid Scheme)</option>
+<option value="MedPlus Medical Solutions">MedPlus Medical Solutions</option>
+<option value="Bakresa Medical Centre">Bakresa Medical Centre</option>
+<option value="MedHealth Malawi">MedHealth Malawi</option>
+<option value="Cura Health Management">Cura Health Management</option>
+<option value="Medlife Services Limited">Medlife Services Limited</option>
+<option value="Lifeline Malawi">Lifeline Malawi</option>
+<option value="Malmed Healthcare Services">Malmed Healthcare Services</option>
+<option value="Adventist Health Services Malawi">Adventist Health Services Malawi</option>
+<option value="Partners In Health Malawi">Partners In Health Malawi</option>
+<option value="Liberty Life Malawi">Liberty Life Malawi</option>
+<option value="Old Mutual Malawi">Old Mutual Malawi</option>
+<option value="NICO Life Insurance Company">NICO Life Insurance Company</option>
+<option value="NICO General Insurance">NICO General Insurance</option>
+<option value="Alliance Insurance Company Malawi">Alliance Insurance Company Malawi</option>
+<option value="General Alliance Insurance Malawi">General Alliance Insurance Malawi</option>
+<option value="Reunion Insurance Company Malawi">Reunion Insurance Company Malawi</option>
+<option value="Hollard Insurance Malawi">Hollard Insurance Malawi</option>
+<option value="Sanlam Malawi">Sanlam Malawi</option>
+<option value="Britam Insurance Malawi">Britam Insurance Malawi</option>
+<option value="Madison Life Insurance Malawi">Madison Life Insurance Malawi</option>
+<option value="Bupa Global">Bupa Global</option>
+<option value="Cigna Global">Cigna Global</option>
+<option value="Allianz Care">Allianz Care</option>
+<option value="AXA Global Healthcare">AXA Global Healthcare</option>
+<option value="Aetna International">Aetna International</option>
+<option value="William Russell International">William Russell International</option>
+<option value="Airtel Money Thanzi Medical Aid">Airtel Money Thanzi Medical Aid</option>
+<option value="Inclusivity Health Platform">Inclusivity Health Platform</option>
+<option value="Airtel Insurance Health Cover">Airtel Insurance Health Cover</option>
+<option value="Mwaiwathu Private Hospital">Mwaiwathu Private Hospital</option>
+<option value="Blantyre Adventist Hospital">Blantyre Adventist Hospital</option>
+<option value="Beit CURE International Hospital Malawi">Beit CURE International Hospital Malawi</option>
+<option value="MedPlus Clinics">MedPlus Clinics</option>
+<option value="Bakresa Health Services">Bakresa Health Services</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -361,6 +397,60 @@
                 </div>
             </div>
 
+            <!-- Cash Invoice Tab -->
+            <div id="cash" class="tab-content">
+                <div class="form-card" style="max-width: 1000px;">
+                    <h3>Create New Cash Invoice</h3>
+                    <form action="/invoice" method="post">
+                        <input type="hidden" name="provider" value="Cash">
+                        <div class="form-group">
+                            <label>Invoice Date</label>
+                            <input type="date" name="invoice_date" value="{{ today_date }}" required>
+                        </div>
+                        <div class="invoice-table-container">
+                            <table class="bill-table" id="cash-items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Patient Name</th>
+                                        <th>ID NO.</th>
+                                        <th>CON</th>
+                                        <th>DRUG</th>
+                                        <th>LAB</th>
+                                        <th>Amount</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cash-items-body">
+                                    <tr class="cash-row">
+                                        <td><input type="date" name="item_date[]" required></td>
+                                        <td>
+                                            <select name="item_patient_id[]" class="patient-select" required>
+                                                <option value="">-- Select Patient --</option>
+                                                {% for p in patients %}
+                                                <option value="{{ p.patient_id }}" data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                                        <td><input type="number" name="item_con[]" value="0" step="0.01"></td>
+                                        <td><input type="number" name="item_drug[]" value="0" step="0.01"></td>
+                                        <td><input type="number" name="item_lab[]" value="0" step="0.01"></td>
+                                        <td><input type="number" name="item_amount[]" value="0" step="0.01" class="cash-row-amount" readonly></td>
+                                        <td><button type="button" class="remove-item">×</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" id="add-cash-item" class="btn-outline" style="margin-top: 10px;"><i class="fas fa-plus"></i> Add Row</button>
+                        <div style="margin-top: 20px; text-align: right;">
+                            <h4>Total: MWK <span id="cash-total">0.00</span></h4>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 20px;">Save Cash Invoice</button>
+                    </form>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -415,6 +505,41 @@
                 `;
                 updateIndividualTotal();
             }
+
+            // Reset Cash Invoice form
+            if (tabName === 'cash') {
+                const form = document.querySelector('#cash form');
+                form.reset();
+                document.getElementById('cash-items-body').innerHTML = `
+                    <tr class="cash-row">
+                        <td><input type="date" name="item_date[]" required></td>
+                        <td>
+                            <select name="item_patient_id[]" class="patient-select" required>
+                                <option value="">-- Select Patient --</option>
+                                {% for p in patients %}
+                                <option value="{{ p.patient_id }}" data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                        <td><input type="number" name="item_con[]" value="0" step="0.01"></td>
+                        <td><input type="number" name="item_drug[]" value="0" step="0.01"></td>
+                        <td><input type="number" name="item_lab[]" value="0" step="0.01"></td>
+                        <td><input type="number" name="item_amount[]" value="0" step="0.01" class="cash-row-amount" readonly></td>
+                        <td><button type="button" class="remove-item">×</button></td>
+                    </tr>
+                `;
+                
+                // Initialize Choices for the initial row
+                new Choices(document.querySelector('#cash-items-body .patient-select'), {
+                    searchEnabled: true,
+                    itemSelectText: '',
+                    placeholder: true,
+                    placeholderValue: '-- Select Patient --',
+                });
+                
+                updateCashTotal();
+            }
         }
 
         function openPaymentModal(billId, amount) {
@@ -433,52 +558,115 @@
                     
                     // Determine if it's bulk or individual
                     if (bill.provider) {
-                        // Bulk Invoice
-                        switchTab('invoice');
-                        
-                        // Update form action for update
-                        const form = document.querySelector('#invoice form');
-                        form.action = `/invoice/update/${billId}`;
-                        form.dataset.lastMode = 'edit';
-                        document.querySelector('#invoice h3').innerText = `Edit Bulk Invoice #${billId}`;
-                        
-                        // Populate basic info
-                        form.querySelector('[name="provider"]').value = bill.provider || "";
-                        form.querySelector('[name="invoice_date"]').value = bill.created_date || "";
-                        
-                        // Populate items
-                        const body = document.getElementById('invoice-items-body');
-                        body.innerHTML = ''; // Clear existing
-                        
-                        if (bill.items && bill.items.length > 0) {
-                            bill.items.forEach(item => {
-                                const row = document.createElement('tr');
-                                row.classList.add('invoice-row');
-                                row.innerHTML = `
-                                    <td><input type="date" name="item_date[]" value="${item.date}" required></td>
-                                    <td>
-                                        <select name="item_patient_id[]" class="patient-select" required>
-                                            <option value="">-- Select Patient --</option>
-                                            {% for p in patients %}
-                                            <option value="{{ p.patient_id }}" ${item.patient_id === '{{ p.patient_id }}' ? 'selected' : ''} data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </td>
-                                    <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
-                                    <td><input type="number" name="item_con[]" value="${item.con || 0}" step="0.01"></td>
-                                    <td><input type="number" name="item_drug[]" value="${item.drug || 0}" step="0.01"></td>
-                                    <td><input type="number" name="item_lab[]" value="${item.lab || 0}" step="0.01"></td>
-                                    <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="row-amount" readonly></td>
-                                    <td><button type="button" class="remove-item">×</button></td>
-                                `;
-                                body.appendChild(row);
-                            });
+                        if (bill.provider === 'Cash') {
+                            // Cash Invoice
+                            switchTab('cash');
+                            
+                            // Update form action for update
+                            const form = document.querySelector('#cash form');
+                            form.action = `/invoice/update/${billId}`;
+                            document.querySelector('#cash h3').innerText = `Edit Cash Invoice #${billId}`;
+                            
+                            // Populate basic info
+                            form.querySelector('[name="invoice_date"]').value = bill.created_date || "";
+                            
+                            // Populate items
+                            const body = document.getElementById('cash-items-body');
+                            body.innerHTML = ''; // Clear existing
+                            
+                            if (bill.items && bill.items.length > 0) {
+                                bill.items.forEach(item => {
+                                    const row = document.createElement('tr');
+                                    row.classList.add('cash-row');
+                                    row.innerHTML = `
+                                        <td><input type="date" name="item_date[]" value="${item.date}" required></td>
+                                        <td>
+                                            <select name="item_patient_id[]" class="patient-select" required>
+                                                <option value="">-- Select Patient --</option>
+                                                {% for p in patients %}
+                                                <option value="{{ p.patient_id }}" ${item.patient_id === '{{ p.patient_id }}' ? 'selected' : ''} data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
+                                        <td><input type="number" name="item_con[]" value="${item.con || 0}" step="0.01"></td>
+                                        <td><input type="number" name="item_drug[]" value="${item.drug || 0}" step="0.01"></td>
+                                        <td><input type="number" name="item_lab[]" value="${item.lab || 0}" step="0.01"></td>
+                                        <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="cash-row-amount" readonly></td>
+                                        <td><button type="button" class="remove-item">×</button></td>
+                                    `;
+                                    body.appendChild(row);
+                                    
+                                    // Initialize Choices for the new select
+                                    new Choices(row.querySelector('.patient-select'), {
+                                        searchEnabled: true,
+                                        itemSelectText: '',
+                                        placeholder: true,
+                                        placeholderValue: '-- Select Patient --',
+                                    });
+                                });
+                            } else {
+                                // If no items, add one empty row
+                                document.getElementById('add-cash-item').click();
+                            }
+                            
+                            updateCashTotal();
                         } else {
-                            // If no items, add one empty row
-                            document.getElementById('add-item').click();
+                            // Bulk Invoice
+                            switchTab('invoice');
+                            
+                            // Update form action for update
+                            const form = document.querySelector('#invoice form');
+                            form.action = `/invoice/update/${billId}`;
+                            form.dataset.lastMode = 'edit';
+                            document.querySelector('#invoice h3').innerText = `Edit Bulk Invoice #${billId}`;
+                            
+                            // Populate basic info
+                            form.querySelector('[name="provider"]').value = bill.provider || "";
+                            form.querySelector('[name="invoice_date"]').value = bill.created_date || "";
+                            
+                            // Populate items
+                            const body = document.getElementById('invoice-items-body');
+                            body.innerHTML = ''; // Clear existing
+                            
+                            if (bill.items && bill.items.length > 0) {
+                                bill.items.forEach(item => {
+                                    const row = document.createElement('tr');
+                                    row.classList.add('invoice-row');
+                                    row.innerHTML = `
+                                        <td><input type="date" name="item_date[]" value="${item.date}" required></td>
+                                        <td>
+                                            <select name="item_patient_id[]" class="patient-select" required>
+                                                <option value="">-- Select Patient --</option>
+                                                {% for p in patients %}
+                                                <option value="{{ p.patient_id }}" ${item.patient_id === '{{ p.patient_id }}' ? 'selected' : ''} data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                        <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
+                                        <td><input type="number" name="item_con[]" value="${item.con || 0}" step="0.01"></td>
+                                        <td><input type="number" name="item_drug[]" value="${item.drug || 0}" step="0.01"></td>
+                                        <td><input type="number" name="item_lab[]" value="${item.lab || 0}" step="0.01"></td>
+                                        <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="row-amount" readonly></td>
+                                        <td><button type="button" class="remove-item">×</button></td>
+                                    `;
+                                    body.appendChild(row);
+                                    
+                                    // Initialize Choices for the new select
+                                    new Choices(row.querySelector('.patient-select'), {
+                                        searchEnabled: true,
+                                        itemSelectText: '',
+                                        placeholder: true,
+                                        placeholderValue: '-- Select Patient --',
+                                    });
+                                });
+                            } else {
+                                // If no items, add one empty row
+                                document.getElementById('add-item').click();
+                            }
+                            
+                            updateTotal();
                         }
-                        
-                        updateTotal();
                     } else {
                         // Individual Invoice or Standard Bill
                         switchTab('individual');
@@ -618,6 +806,69 @@
                 total += parseFloat(input.value) || 0;
             });
             document.getElementById('individual-total').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        // Cash Invoice Logic
+        document.getElementById('add-cash-item').addEventListener('click', function() {
+            var body = document.getElementById('cash-items-body');
+            var newRow = document.createElement('tr');
+            newRow.classList.add('cash-row');
+            newRow.innerHTML = `
+                <td><input type="date" name="item_date[]" required></td>
+                <td>
+                    <select name="item_patient_id[]" class="patient-select" required>
+                        <option value="">-- Select Patient --</option>
+                        {% for p in patients %}
+                        <option value="{{ p.patient_id }}" data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                <td><input type="number" name="item_con[]" value="0" step="0.01"></td>
+                <td><input type="number" name="item_drug[]" value="0" step="0.01"></td>
+                <td><input type="number" name="item_lab[]" value="0" step="0.01"></td>
+                <td><input type="number" name="item_amount[]" value="0" step="0.01" class="cash-row-amount" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
+            body.appendChild(newRow);
+            
+            // Initialize Choices for the new select
+            new Choices(newRow.querySelector('.patient-select'), {
+                searchEnabled: true,
+                itemSelectText: '',
+                placeholder: true,
+                placeholderValue: '-- Select Patient --',
+            });
+        });
+
+        document.getElementById('cash').addEventListener('input', function(e) {
+            if (e.target.name === 'item_con[]' || e.target.name === 'item_drug[]' || e.target.name === 'item_lab[]') {
+                updateCashRowAmount(e.target.closest('tr'));
+                updateCashTotal();
+            }
+        });
+
+        document.getElementById('cash-items-body').addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-item')) {
+                e.target.closest('tr').remove();
+                updateCashTotal();
+            }
+        });
+
+        function updateCashRowAmount(row) {
+            var con = parseFloat(row.querySelector('[name="item_con[]"]').value) || 0;
+            var drug = parseFloat(row.querySelector('[name="item_drug[]"]').value) || 0;
+            var lab = parseFloat(row.querySelector('[name="item_lab[]"]').value) || 0;
+            var amount = con + drug + lab;
+            row.querySelector('.cash-row-amount').value = amount.toFixed(2);
+        }
+
+        function updateCashTotal() {
+            var total = 0;
+            document.querySelectorAll('.cash-row-amount').forEach(function(input) {
+                total += parseFloat(input.value) || 0;
+            });
+            document.getElementById('cash-total').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
     </script>
 </body>
