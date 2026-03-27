@@ -477,24 +477,25 @@
             document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
             document.getElementById(tabName).classList.add('active');
 
+            // Skip reset if we are currently populating for edit (handled by editInvoice)
+            if (window.isEditing) return;
+
             // Reset Invoice form if switching to it normally
-            if (tabName === 'invoice' && !document.getElementById('invoice').dataset.editing) {
+            if (tabName === 'invoice') {
                 const form = document.querySelector('#invoice form');
                 form.action = '/invoice';
                 document.querySelector('#invoice h3').innerText = 'Create New Bulk Invoice';
-                // Only reset if it was previously editing
-                if (form.dataset.lastMode === 'edit') {
-                    form.reset();
-                    document.getElementById('invoice-items-body').innerHTML = '';
-                    document.getElementById('add-item').click();
-                    updateTotal();
-                }
-                form.dataset.lastMode = 'create';
+                form.reset();
+                document.getElementById('invoice-items-body').innerHTML = '';
+                document.getElementById('add-item').click();
+                updateTotal();
             }
             
             // Reset Individual Invoice form
             if (tabName === 'individual') {
                 const form = document.querySelector('#individual form');
+                form.action = '/invoice/individual';
+                document.querySelector('#individual h3').innerText = 'Create New Individual Invoice';
                 form.reset();
                 document.getElementById('individual-items-body').innerHTML = `
                     <tr class="individual-row">
@@ -509,6 +510,8 @@
             // Reset Cash Invoice form
             if (tabName === 'cash') {
                 const form = document.querySelector('#cash form');
+                form.action = '/invoice';
+                document.querySelector('#cash h3').innerText = 'Create New Cash Invoice';
                 form.reset();
                 document.getElementById('cash-items-body').innerHTML = `
                     <tr class="cash-row">
@@ -548,11 +551,13 @@
         }
 
         function editInvoice(billId) {
+            window.isEditing = true; // Set global flag to prevent switchTab from resetting
             fetch(`/api/bill/${billId}`)
                 .then(response => response.json())
                 .then(bill => {
                     if (bill.error) {
                         alert(bill.error);
+                        window.isEditing = false;
                         return;
                     }
                     
@@ -618,7 +623,6 @@
                             // Update form action for update
                             const form = document.querySelector('#invoice form');
                             form.action = `/invoice/update/${billId}`;
-                            form.dataset.lastMode = 'edit';
                             document.querySelector('#invoice h3').innerText = `Edit Bulk Invoice #${billId}`;
                             
                             // Populate basic info
@@ -709,6 +713,7 @@
                         
                         updateIndividualTotal();
                     }
+                    window.isEditing = false;
                 });
         }
 

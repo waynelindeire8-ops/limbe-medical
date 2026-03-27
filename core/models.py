@@ -4,7 +4,7 @@ Matches Limbe Medical project structure
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from datetime import datetime
 
 
@@ -55,6 +55,8 @@ class Appointment:
     status: str  # scheduled, completed, cancelled
     reason: str = ""
     notes: str = ""
+    department: str = ""
+    priority: str = ""
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -65,12 +67,16 @@ class MedicalRecord:
     record_id: str
     patient_id: str
     doctor_id: str
-    visit_date: str
-    diagnosis: str
-    treatment: str
+    visit_date: str = ""
+    date: str = ""
+    diagnosis: str = ""
+    treatment: str = ""
     prescription: str = ""
+    prescriptions: str = ""
     notes: str = ""
+    consult_reason: str = ""
     vital_signs: str = ""  # JSON string with BP, HR, Temp, etc.
+    details: Dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -98,6 +104,11 @@ class Bill:
     status: str  # pending, paid, overdue
     payment_method: str = ""
     issue_date: str = field(default_factory=lambda: datetime.now().isoformat())
+    created_date: str = ""
+    provider: str = ""
+    items: List[Dict[str, Any]] = field(default_factory=list)
+    services: str = ""
+    appointment_id: str = ""
     due_date: str = ""
     paid_date: str = ""
     description: str = ""
