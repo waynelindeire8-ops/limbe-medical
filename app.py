@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, jsonify
 import datetime
 import os
 from werkzeug.utils import secure_filename
 from functools import wraps
+from dataclasses import asdict
 from main import HospitalManagementSystem
 from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord, QueueItem
 
@@ -1161,8 +1162,8 @@ def update_individual_invoice(bill_id):
 def get_bill_json(bill_id):
     bill = hms.get_bill(bill_id)
     if not bill:
-        return {'error': 'Bill not found'}, 404
-    return asdict(bill)
+        return jsonify({'error': 'Bill not found'}), 404
+    return jsonify(asdict(bill))
 
 @app.route('/invoice/update/<bill_id>', methods=['POST'])
 def update_invoice(bill_id):
