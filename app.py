@@ -415,14 +415,15 @@ def patient_details(patient_id):
 
 @app.route('/patient/<patient_id>/upload_file', methods=['POST'])
 def upload_patient_file(patient_id):
+    redirect_url = request.form.get('redirect_url') or url_for('patient_details', patient_id=patient_id)
     if 'file' not in request.files:
         flash('No file part', 'error')
-        return redirect(url_for('patient_details', patient_id=patient_id))
+        return redirect(redirect_url)
     
     file = request.files['file']
     if file.filename == '':
         flash('No selected file', 'error')
-        return redirect(url_for('patient_details', patient_id=patient_id))
+        return redirect(redirect_url)
     
     if file:
         filename = secure_filename(file.filename)
@@ -443,16 +444,17 @@ def upload_patient_file(patient_id):
             if os.path.exists(temp_path):
                 os.remove(temp_path)
                 
-    return redirect(url_for('patient_details', patient_id=patient_id))
+    return redirect(redirect_url)
 
 @app.route('/patient/<patient_id>/delete_file')
 def delete_patient_file(patient_id):
     rel_path = request.args.get('path')
+    redirect_url = request.args.get('redirect_url') or url_for('patient_details', patient_id=patient_id)
     if hms.delete_patient_file(patient_id, rel_path):
         flash('File deleted successfully!', 'success')
     else:
         flash('Error deleting file!', 'error')
-    return redirect(url_for('patient_details', patient_id=patient_id))
+    return redirect(redirect_url)
 
 @app.route('/download_file')
 def download_file():
@@ -686,7 +688,8 @@ def view_medical_records(patient_id):
         return redirect(url_for('patients'))
 
     records = hms.get_patient_medical_records(patient_id)
-    return render_template('view_medical_records.html', patient=patient, records=records, active_page='patients', hms=hms)
+    files = hms.patient_files.get(patient_id, [])
+    return render_template('view_medical_records.html', patient=patient, records=records, files=files, active_page='patients', hms=hms)
 
 @app.route('/schedule_appointment', methods=['GET', 'POST'])
 def schedule_appointment():
