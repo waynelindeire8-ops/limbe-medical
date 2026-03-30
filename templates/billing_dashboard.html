@@ -78,8 +78,9 @@
             border-radius: 6px;
         }
         .invoice-table-container {
-            overflow-x: auto;
+            overflow-x: visible; /* Avoid clipping dropdowns */
             margin-top: 15px;
+            min-height: 400px; /* Ensure space for dropdowns */
         }
         .bill-table input, .bill-table select {
             width: 100%;
@@ -104,7 +105,16 @@
             background: #cc0000;
         }
         .bill-table .choices__inner {
-            min-width: 250px; /* Adjust as needed */
+            min-width: 250px;
+            min-height: 42px; /* Set height to accommodate two lines */
+            display: flex;
+            align-items: center;
+        }
+        .choices__list--dropdown {
+            z-index: 1000 !important; /* Ensure dropdown is on top */
+        }
+        .bill-table td {
+            overflow: visible !important;
         }
     </style>
 </head>
@@ -492,6 +502,8 @@
                     removeItemButton: false,
                     placeholder: true,
                     placeholderValue: '-- Select --',
+                    position: 'bottom',
+                    shouldSort: false,
                 });
             });
         });
@@ -571,6 +583,8 @@
                     itemSelectText: '',
                     placeholder: true,
                     placeholderValue: '-- Select Patient --',
+                    position: 'bottom',
+                    shouldSort: false,
                 });
                 
                 updateCashTotal();
@@ -640,11 +654,13 @@
                                         
                                         // Initialize Choices for the new select
                                         new Choices(row.querySelector('.patient-select'), {
-                                            searchEnabled: true,
-                                            itemSelectText: '',
-                                            placeholder: true,
-                                            placeholderValue: '-- Select Patient --',
-                                        });
+                                        searchEnabled: true,
+                                        itemSelectText: '',
+                                        placeholder: true,
+                                        placeholderValue: '-- Select Patient --',
+                                        position: 'bottom',
+                                        shouldSort: false,
+                                    });
                                     });
                                 } else {
                                     // If no items, add one empty row
@@ -694,11 +710,13 @@
                                         
                                         // Initialize Choices for the new select
                                         new Choices(row.querySelector('.patient-select'), {
-                                            searchEnabled: true,
-                                            itemSelectText: '',
-                                            placeholder: true,
-                                            placeholderValue: '-- Select Patient --',
-                                        });
+                                        searchEnabled: true,
+                                        itemSelectText: '',
+                                        placeholder: true,
+                                        placeholderValue: '-- Select Patient --',
+                                        position: 'bottom',
+                                        shouldSort: false,
+                                    });
                                     });
                                 } else {
                                     // If no items, add one empty row
@@ -791,6 +809,8 @@
                 itemSelectText: '',
                 placeholder: true,
                 placeholderValue: '-- Select Patient --',
+                position: 'bottom',
+                shouldSort: false,
             });
         });
 
@@ -888,6 +908,8 @@
                 itemSelectText: '',
                 placeholder: true,
                 placeholderValue: '-- Select Patient --',
+                position: 'bottom',
+                shouldSort: false,
             });
         });
 
