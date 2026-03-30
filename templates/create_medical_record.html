@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Medical Record</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .form-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .back-link {
+            display: block;
+            margin-bottom: 20px;
+            color: #4361ee;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+        {% include 'sidebar.html' %}
+        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+            <a href="{{ url_for('patients') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Patients</a>
+            <div class="form-container">
+                <h2>Create Medical Record</h2>
+                <br>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="patient_id">Patient</label>
+                        <select id="patient_id" name="patient_id" required>
+                            {% for p in patients %}
+                                <option value="{{ p.patient_id }}" {% if patient_id == p.patient_id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="doctor_id">Doctor</label>
+                        <select id="doctor_id" name="doctor_id" required>
+                            {% for d in doctors %}
+                                <option value="{{ d.doctor_id }}">{{ d.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="visit_date">Visit Date</label>
+                        <input type="date" id="visit_date" name="visit_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="diagnosis">Diagnosis</label>
+                        <textarea id="diagnosis" name="diagnosis" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="treatment">Treatment</label>
+                        <textarea id="treatment" name="treatment" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="prescription">Prescription</label>
+                        <textarea id="prescription" name="prescription" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" name="notes" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%;">Create Record</button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

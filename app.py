@@ -652,6 +652,32 @@ def delete_doctor(doctor_id):
         flash('Error deleting doctor!', 'error')
     return redirect(url_for('doctors'))
 
+@app.route('/create_medical_record', methods=['GET', 'POST'])
+def create_medical_record():
+    patient_id = request.args.get('patient_id')
+    patients = hms.patients
+    doctors = hms.doctors
+
+    if request.method == 'POST':
+        try:
+            new_record = MedicalRecord(
+                record_id=hms.generate_id("MR"),
+                patient_id=request.form['patient_id'],
+                doctor_id=request.form['doctor_id'],
+                visit_date=request.form['visit_date'],
+                diagnosis=request.form['diagnosis'],
+                treatment=request.form['treatment'],
+                prescription=request.form.get('prescription', ''),
+                notes=request.form.get('notes', '')
+            )
+            hms.add_medical_record(new_record)
+            flash('Medical record created successfully!', 'success')
+            return redirect(url_for('patients'))
+        except Exception as e:
+            flash(f'Error creating medical record: {e}', 'error')
+
+    return render_template('create_medical_record.html', patients=patients, doctors=doctors, patient_id=patient_id, active_page='patients')
+
 @app.route('/patients/<patient_id>/records')
 def view_medical_records(patient_id):
     patient = hms.get_patient(patient_id)
