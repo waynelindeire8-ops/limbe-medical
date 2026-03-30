@@ -119,7 +119,7 @@
                     <div class="detail-block">{{ record.consult_reason }}</div>
                 </div>
                 
-                <div class="section-title">Medical Examination</div>
+                <div class="section-title">Vital Signs</div>
                 <div class="exam-stats">
                     <div class="stat-box">
                         <label>Blood Pressure</label>
@@ -159,15 +159,6 @@
                     <label>Treatment Plan</label>
                     <div class="detail-block">{{ record.treatment }}</div>
                 </div>
-                <div class="info-item">
-                    <label>Prescriptions</label>
-                    <div class="detail-block" style="font-family: monospace;">{{ record.prescriptions }}</div>
-                </div>
-
-                {% if record.notes %}
-                <div class="section-title">Clinical Notes</div>
-                <div class="detail-block">{{ record.notes }}</div>
-                {% endif %}
                 
                 {% if record.details.get('notes') %}
                 <div class="section-title">Office Notes</div>

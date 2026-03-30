@@ -132,7 +132,7 @@
     </div>
 
     <div class="section">
-        <div class="section-title">Medical Examination</div>
+        <div class="section-title">Vital Signs</div>
         <div class="exam-grid">
             <div class="exam-item">
                 <label>Blood Pressure</label>
@@ -173,22 +173,6 @@
             {{ record.treatment }}
         </div>
     </div>
-
-    <div class="section">
-        <div class="section-title">Prescriptions</div>
-        <div class="content-box" style="font-family: 'Courier New', Courier, monospace; background: #f4f4f4; padding: 10px; border-radius: 4px;">
-            {{ record.prescriptions or 'No prescriptions recorded.' }}
-        </div>
-    </div>
-
-    {% if record.notes %}
-    <div class="section">
-        <div class="section-title">Clinical Notes</div>
-        <div class="content-box">
-            {{ record.notes }}
-        </div>
-    </div>
-    {% endif %}
     
     {% if record.details.get('notes') %}
     <div class="section">

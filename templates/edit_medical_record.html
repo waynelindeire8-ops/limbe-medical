@@ -152,7 +152,7 @@
                             <input type="number" name="pain_level" min="0" max="10" value="{{ record.details.get('pain_level', '0') }}" style="width: 60px; flex: none;">
                         </div>
                         
-                        <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">Medical Examination</div>
+                        <div style="font-size: 14px; font-weight: bold; margin-bottom: 5px;">Vital Signs</div>
                         <div class="medical-exam-grid">
                             <div class="exam-item">
                                 <label>Blood Pressure:</label>
@@ -185,16 +185,6 @@
                         <div class="form-group">
                             <label>Treatment:</label>
                             <textarea name="treatment" required>{{ record.treatment }}</textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Prescriptions:</label>
-                            <textarea name="prescriptions">{{ record.prescriptions }}</textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Clinical Notes:</label>
-                            <textarea name="notes">{{ record.notes }}</textarea>
                         </div>
                     </div>
                     
