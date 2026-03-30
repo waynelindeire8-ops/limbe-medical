@@ -128,14 +128,11 @@
         <div class="content-box">
             <strong>Reason for Visit:</strong><br>
             {{ record.consult_reason }}
-            <br><br>
-            <strong>Main Symptoms:</strong><br>
-            {{ record.details.get('main_symptoms', 'None recorded') }} (Duration: {{ record.details.get('symptoms_duration', 'N/A') }})
         </div>
     </div>
 
     <div class="section">
-        <div class="section-title">Physical Examination</div>
+        <div class="section-title">Medical Examination</div>
         <div class="exam-grid">
             <div class="exam-item">
                 <label>Blood Pressure</label>
@@ -162,7 +159,7 @@
     <div class="section">
         <div class="section-title">Assessment & Diagnosis</div>
         <div class="content-box">
-            <strong>Preliminary Diagnosis:</strong><br>
+            <strong>Medical Examination:</strong><br>
             {{ record.details.get('preliminary_diagnosis', 'None') }}
             <br><br>
             <strong>Final Diagnosis:</strong><br>

@@ -119,17 +119,6 @@
                     <div class="detail-block">{{ record.consult_reason }}</div>
                 </div>
                 
-                <div class="info-grid">
-                    <div class="info-item">
-                        <label>Main Symptoms</label>
-                        <div class="detail-block">{{ record.details.get('main_symptoms', 'None recorded') }}</div>
-                    </div>
-                    <div class="info-item">
-                        <label>Symptoms Duration</label>
-                        <div class="detail-block">{{ record.details.get('symptoms_duration', 'Not specified') }}</div>
-                    </div>
-                </div>
-
                 <div class="section-title">Medical Examination</div>
                 <div class="exam-stats">
                     <div class="stat-box">
@@ -159,7 +148,7 @@
 
                 <div class="section-title">Diagnosis & Treatment</div>
                 <div class="info-item" style="margin-bottom: 15px;">
-                    <label>Preliminary Diagnosis</label>
+                    <label>Medical Examination</label>
                     <div class="detail-block">{{ record.details.get('preliminary_diagnosis', 'None') }}</div>
                 </div>
                 <div class="info-item" style="margin-bottom: 15px;">

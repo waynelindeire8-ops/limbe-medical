@@ -148,16 +148,6 @@
                         </div>
                         
                         <div class="form-group">
-                            <label>Main Symptoms:</label>
-                            <textarea name="main_symptoms">{{ record.details.get('main_symptoms', '') }}</textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Symptoms Duration:</label>
-                            <input type="text" name="symptoms_duration" value="{{ record.details.get('symptoms_duration', '') }}">
-                        </div>
-                        
-                        <div class="form-group">
                             <label>Pain Level (0-10):</label>
                             <input type="number" name="pain_level" min="0" max="10" value="{{ record.details.get('pain_level', '0') }}" style="width: 60px; flex: none;">
                         </div>
@@ -183,7 +173,7 @@
                         </div>
                         
                         <div class="form-group">
-                            <label>Preliminary Diagnosis:</label>
+                            <label>Medical Examination:</label>
                             <textarea name="preliminary_diagnosis">{{ record.details.get('preliminary_diagnosis', '') }}</textarea>
                         </div>
                         
