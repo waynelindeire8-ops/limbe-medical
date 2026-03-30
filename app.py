@@ -652,6 +652,16 @@ def delete_doctor(doctor_id):
         flash('Error deleting doctor!', 'error')
     return redirect(url_for('doctors'))
 
+@app.route('/patients/<patient_id>/records')
+def view_medical_records(patient_id):
+    patient = hms.get_patient(patient_id)
+    if not patient:
+        flash('Patient not found!', 'error')
+        return redirect(url_for('patients'))
+
+    records = hms.get_patient_medical_records(patient_id)
+    return render_template('view_medical_records.html', patient=patient, records=records, active_page='patients', hms=hms)
+
 @app.route('/schedule_appointment', methods=['GET', 'POST'])
 def schedule_appointment():
     doctors = hms.get_available_doctors()
