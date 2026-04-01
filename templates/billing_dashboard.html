@@ -227,10 +227,10 @@
                     </thead>
                     <tbody>
                         {% for bill in bills %}
-                        <tr>
+                        <tr ondblclick="window.location.href='{{ url_for('patients', search=bill.patient_name) }}'" style="cursor: pointer;" title="Double click to search patient">
                             <td>{{ bill.bill_id }}</td>
                             <td>{{ bill.date }}</td>
-                            <td>{{ bill.patient_name }}</td>
+                            <td><a href="{{ url_for('patients', search=bill.patient_name) }}" style="color: #4361ee; text-decoration: none;">{{ bill.patient_name }}</a></td>
                             <td>MWK{{ bill.amount }}</td>
                             <td><span class="status-badge status-{{ bill.status|lower }}">{{ bill.status }}</span></td>
                             <td>

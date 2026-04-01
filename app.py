@@ -1696,6 +1696,7 @@ def medical_records():
 
 @app.route('/medical_records/add', methods=['GET', 'POST'])
 def add_medical_record():
+    patient_id = request.args.get('patient_id')
     if request.method == 'POST':
         try:
             details = {
@@ -1831,7 +1832,7 @@ def add_medical_record():
     patients = hms.patients
     doctors = hms.doctors
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    return render_template('add_medical_record.html', patients=patients, doctors=doctors, today=today, active_page='medical_records')
+    return render_template('add_medical_record.html', patients=patients, doctors=doctors, today=today, patient_id=patient_id, active_page='medical_records')
 
 @app.route('/medical_records/edit/<record_id>', methods=['GET', 'POST'])
 def edit_medical_record(record_id):

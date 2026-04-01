@@ -92,7 +92,7 @@
                     </div>
                     <div class="appointment-list" id="queueList">
                         {% for item in queue %}
-                        <div class="appointment-item" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid {% if item.triage_level == '1' %}#dc3545{% elif item.triage_level == '2' %}#fd7e14{% elif item.triage_level == '3' %}#ffc107{% else %}#28a745{% endif %}; padding-left: 15px; margin-bottom: 10px; background: #fcfcfc;">
+                        <div class="appointment-item" ondblclick="window.location.href='{{ url_for('patients', search=item.patient_name) }}'" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid {% if item.triage_level == '1' %}#dc3545{% elif item.triage_level == '2' %}#fd7e14{% elif item.triage_level == '3' %}#ffc107{% else %}#28a745{% endif %}; padding-left: 15px; margin-bottom: 10px; background: #fcfcfc; cursor: pointer;" title="Double click to search patient">
                             <div class="appt-info">
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <h4 style="margin: 0;">{{ item.patient_name }}</h4>
@@ -139,10 +139,10 @@
                         </div>
                         <div class="appointment-list" id="apptList" style="max-height: 300px; overflow-y: auto;">
                             {% for appt in recent_appointments %}
-                            <div class="appointment-item" style="padding: 10px 0; border-bottom: 1px solid #eee;">
+                            {% set patient = hms.get_patient(appt.patient_id) %}
+                            <div class="appointment-item" ondblclick="window.location.href='{{ url_for('patients', search=patient.first_name + ' ' + patient.last_name if patient else appt.patient_id) }}'" style="padding: 10px 0; border-bottom: 1px solid #eee; cursor: pointer;" title="Double click to search patient">
                                 <div class="appt-info">
                                     <div style="font-weight: 600; font-size: 14px;">
-                                    {% set patient = hms.get_patient(appt.patient_id) %}
                                     {% if patient %}
                                         {{ patient.first_name }} {{ patient.last_name }}
                                     {% else %}
@@ -174,7 +174,7 @@
                             </div>
                             <div class="action-item">
                                 <div class="action-icon"><i class="fas fa-notes-medical"></i> Create Medical Record</div>
-                                <a href="{{ url_for('create_medical_record') }}" class="btn-sm" style="text-decoration: none;">Create</a>
+                                <a href="{{ url_for('add_medical_record') }}" class="btn-sm" style="text-decoration: none;">Create</a>
                             </div>
                             <div class="action-item">
                                 <div class="action-icon"><i class="fas fa-flask"></i> View Lab Results</div>

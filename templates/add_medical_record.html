@@ -124,7 +124,7 @@
                             <select name="patient_id" required>
                                 <option value="">Select Patient</option>
                                 {% for p in patients %}
-                                <option value="{{ p.patient_id }}">{{ p.first_name }} {{ p.last_name }} ({{ p.patient_id }})</option>
+                                <option value="{{ p.patient_id }}" {% if patient_id == p.patient_id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }} ({{ p.patient_id }})</option>
                                 {% endfor %}
                             </select>
                         </div>
