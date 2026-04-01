@@ -342,15 +342,22 @@ class HospitalManagementSystem:
         return self.get_patient(patient_id)
 
     def search_patients(self, search_term: str) -> List[Patient]:
-        search_term = search_term.lower()
-        return [
-            p for p in self.patients
-            if search_term in p.first_name.lower()
-            or search_term in p.last_name.lower()
-            or search_term in (p.first_name.lower() + " " + p.last_name.lower())
-            or search_term in (p.last_name.lower() + " " + p.first_name.lower())
-            or search_term in p.patient_id.lower()
-        ]
+        search_term = search_term.lower().strip()
+        if not search_term:
+            return self.patients
+            
+        search_parts = search_term.split()
+        
+        results = []
+        for p in self.patients:
+            full_name = f"{p.first_name} {p.last_name}".lower()
+            reverse_name = f"{p.last_name} {p.first_name}".lower()
+            patient_id = p.patient_id.lower()
+            
+            # Check if all parts of search term are in the full name or ID
+            if all(part in full_name or part in reverse_name or part in patient_id for part in search_parts):
+                results.append(p)
+        return results
 
     def update_patient(self, patient_id: str, **kwargs) -> bool:
         patient = self.get_patient(patient_id)
@@ -395,16 +402,23 @@ class HospitalManagementSystem:
         return [d for d in self.doctors if d.status.lower() == "available"]
 
     def search_doctors(self, search_term: str) -> List[Doctor]:
-        search_term = search_term.lower()
-        return [
-            d for d in self.doctors
-            if search_term in d.first_name.lower()
-            or search_term in d.last_name.lower()
-            or search_term in (d.first_name.lower() + " " + d.last_name.lower())
-            or search_term in (d.last_name.lower() + " " + d.first_name.lower())
-            or search_term in d.doctor_id.lower()
-            or search_term in d.specialty.lower()
-        ]
+        search_term = search_term.lower().strip()
+        if not search_term:
+            return self.doctors
+            
+        search_parts = search_term.split()
+        
+        results = []
+        for d in self.doctors:
+            full_name = f"{d.first_name} {d.last_name}".lower()
+            reverse_name = f"{d.last_name} {d.first_name}".lower()
+            doctor_id = d.doctor_id.lower()
+            specialty = d.specialty.lower()
+            
+            # Check if all parts of search term are in the full name, ID, or specialty
+            if all(part in full_name or part in reverse_name or part in doctor_id or part in specialty for part in search_parts):
+                results.append(d)
+        return results
 
     def update_doctor(self, doctor_id: str, **kwargs) -> bool:
         doctor = self.get_doctor(doctor_id)
@@ -439,7 +453,11 @@ class HospitalManagementSystem:
         return True
 
     def search_appointments(self, search_term: str) -> List[Appointment]:
-        search_term = search_term.lower()
+        search_term = search_term.lower().strip()
+        if not search_term:
+            return self.appointments
+            
+        search_parts = search_term.split()
         
         # Get patient and doctor names for filtering
         matching_appointments = []
@@ -447,16 +465,24 @@ class HospitalManagementSystem:
             patient = self.get_patient(a.patient_id)
             doctor = self.get_doctor(a.doctor_id)
             
-            p_name = f"{patient.first_name} {patient.last_name}" if patient else ""
-            d_name = f"{doctor.first_name} {doctor.last_name}" if doctor else ""
+            p_name = f"{patient.first_name} {patient.last_name}".lower() if patient else ""
+            p_reverse = f"{patient.last_name} {patient.first_name}".lower() if patient else ""
+            d_name = f"{doctor.first_name} {doctor.last_name}".lower() if doctor else ""
+            d_reverse = f"{doctor.last_name} {doctor.first_name}".lower() if doctor else ""
             
-            if (search_term in a.appointment_id.lower() or
-                search_term in a.patient_id.lower() or
-                search_term in a.doctor_id.lower() or
-                search_term in a.appointment_date.lower() or
-                search_term in a.status.lower() or
-                search_term in p_name.lower() or
-                search_term in d_name.lower()):
+            combined_text = (
+                a.appointment_id.lower() + " " +
+                a.patient_id.lower() + " " +
+                a.doctor_id.lower() + " " +
+                a.appointment_date.lower() + " " +
+                a.status.lower() + " " +
+                p_name + " " +
+                p_reverse + " " +
+                d_name + " " +
+                d_reverse
+            )
+            
+            if all(part in combined_text for part in search_parts):
                 matching_appointments.append(a)
         
         return matching_appointments

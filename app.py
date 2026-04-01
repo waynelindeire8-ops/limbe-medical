@@ -979,7 +979,8 @@ def view_schedule():
 @app.route('/billing')
 def billing_dashboard():
     # Filter for search if needed
-    search_term = request.args.get('search', '').lower()
+    search_term = request.args.get('search', '').lower().strip()
+    search_parts = search_term.split()
     
     # Sort bills by date descending (newest first)
     all_bills = sorted(hms.bills, key=lambda x: (x.created_date or ''), reverse=True)
@@ -996,12 +997,16 @@ def billing_dashboard():
         p_full = f"{p_first} {p_last}"
         p_reverse = f"{p_last} {p_first}"
         
-        if search_term and not (search_term in bill.bill_id.lower() or 
-                               search_term in p_full or 
-                               search_term in p_reverse or
-                               search_term in p_first or
-                               search_term in p_last or
-                               search_term in bill.status.lower()):
+        bill_text = (
+            bill.bill_id.lower() + " " +
+            p_full + " " +
+            p_reverse + " " +
+            p_first + " " +
+            p_last + " " +
+            bill.status.lower()
+        )
+        
+        if search_term and not all(part in bill_text for part in search_parts):
             continue
             
         display_bills.append({
@@ -1568,7 +1573,8 @@ def billing_reports():
 
 @app.route('/prescriptions')
 def prescriptions():
-    search_term = request.args.get('search', '').lower()
+    search_term = request.args.get('search', '').lower().strip()
+    search_parts = search_term.split()
     all_rx = sorted(hms.prescriptions, key=lambda x: (x.date or ''), reverse=True)
     def map_display(rx):
         patient = hms.get_patient(rx.patient_id)
@@ -1592,15 +1598,15 @@ def prescriptions():
         }
     display_list = [map_display(rx) for rx in all_rx]
     if search_term:
-        display_list = [d for d in display_list if (
-            search_term in d['prescription_id'].lower() or
-            search_term in d['patient_name'].lower() or
-            search_term in d['patient_reverse'].lower() or
-            search_term in d['doctor_name'].lower() or
-            search_term in d['doctor_full'].lower() or
-            search_term in d['doctor_reverse'].lower() or
-            search_term in d['medication'].lower()
-        )]
+        display_list = [d for d in display_list if all(part in (
+            d['prescription_id'].lower() + " " +
+            d['patient_name'].lower() + " " +
+            d['patient_reverse'].lower() + " " +
+            d['doctor_name'].lower() + " " +
+            d['doctor_full'].lower() + " " +
+            d['doctor_reverse'].lower() + " " +
+            d['medication'].lower()
+        ) for part in search_parts)]
     return render_template('prescriptions.html', prescriptions=display_list, active_page='prescriptions', search_term=search_term)
 
 @app.route('/prescriptions/add', methods=['GET', 'POST'])
@@ -1689,7 +1695,8 @@ def print_prescription(prescription_id):
 
 @app.route('/medical_records')
 def medical_records():
-    search_term = request.args.get('search', '').lower()
+    search_term = request.args.get('search', '').lower().strip()
+    search_parts = search_term.split()
     all_records = sorted(hms.medical_records, key=lambda x: (x.date or ''), reverse=True)
     
     display_list = []
@@ -1707,15 +1714,19 @@ def medical_records():
         d_reverse = f"{d_last} {d_first}"
         d_name_short = f"dr. {d_last}" if d_last else ""
         
-        if (search_term in record.record_id.lower() or
-            search_term in p_full or
-            search_term in p_reverse or
-            search_term in p_first or
-            search_term in p_last or
-            search_term in d_full or
-            search_term in d_reverse or
-            search_term in d_name_short or
-            search_term in record.diagnosis.lower()):
+        record_text = (
+            record.record_id.lower() + " " +
+            p_full + " " +
+            p_reverse + " " +
+            p_first + " " +
+            p_last + " " +
+            d_full + " " +
+            d_reverse + " " +
+            d_name_short + " " +
+            record.diagnosis.lower()
+        )
+        
+        if all(part in record_text for part in search_parts):
             display_list.append({
                 'record_id': record.record_id,
                 'date': record.date,
