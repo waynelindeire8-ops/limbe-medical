@@ -6,7 +6,6 @@
     <title>Billing Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
     <style>
         .tabs {
             display: flex;
@@ -113,15 +112,6 @@
         .remove-item:hover {
             background: #cc0000;
         }
-        .bill-table .choices__inner {
-            min-width: 250px;
-            min-height: 42px; /* Set height to accommodate two lines */
-            display: flex;
-            align-items: center;
-        }
-        .choices__list--dropdown {
-            z-index: 1000 !important; /* Ensure dropdown is on top */
-        }
         .bill-table td {
             overflow: visible !important;
         }
@@ -148,6 +138,31 @@
         }
         .remove-mini-input {
             color: #dc3545;
+        }
+
+        .autocomplete-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .autocomplete-input,
+        .autocomplete-suggestion {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box; /* Ensure padding doesn't affect width */
+        }
+
+        .autocomplete-suggestion {
+            position: absolute;
+            top: 0;
+            left: 0;
+            color: #a0a0a0; /* Greyed-out text */
+            background-color: transparent;
+            z-index: 1; /* Place suggestion behind the input text */
+            pointer-events: none; /* Allow clicks to go through to the input */
         }
     </style>
 </head>
@@ -244,12 +259,11 @@
                     <form action="{{ url_for('create_bill') }}" method="post">
                         <div class="form-group">
                             <label>Select Patient</label>
-                            <select name="patient_id" required>
-                                <option value="">-- Select Patient --</option>
-                                {% for p in patients %}
-                                <option value="{{ p.patient_id }}">{{ p.first_name }} {{ p.last_name }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="autocomplete-container">
+                                <input type="hidden" name="patient_id" class="autocomplete-value">
+                                <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                <div class="autocomplete-suggestion"></div>
+                            </div>
                         </div>
                         <div class="invoice-table-container">
                             <table class="bill-table" id="create-items-table">
@@ -326,70 +340,11 @@
                     <form action="/invoice" method="post">
                         <div class="form-group">
                             <label>Select Provider</label>
-                            <select name="provider" required>
-                                <option value="">-- Select Provider --</option>
-                 <option value="Medical Aid Society of Malawi (MASM)">Medical Aid Society of Malawi (MASM)</option>
-<option value="Central Health Medical Aid">Central Health Medical Aid</option>
-<option value="Umoyo Health Care Insurance Company">Umoyo Health Care Insurance Company</option>
-<option value="Wella Medical Aid Society Limited">Wella Medical Aid Society Limited</option>
-<option value="Precious Medical International">Precious Medical International</option>
-<option value="NABMAS (National Bank Medical Aid Scheme)">NABMAS (National Bank Medical Aid Scheme)</option>
-<option value="MedPlus Medical Solutions">MedPlus Medical Solutions</option>
-<option value="Bakresa Medical Centre">Bakresa Medical Centre</option>
-<option value="MedHealth Malawi">MedHealth Malawi</option>
-<option value="Cura Health Management">Cura Health Management</option>
-<option value="Medlife Services Limited">Medlife Services Limited</option>
-<option value="Lifeline Malawi">Lifeline Malawi</option>
-<option value="Malmed Healthcare Services">Malmed Healthcare Services</option>
-<option value="Adventist Health Services Malawi">Adventist Health Services Malawi</option>
-<option value="Partners In Health Malawi">Partners In Health Malawi</option>
-<option value="Liberty Life Malawi">Liberty Life Malawi</option>
-<option value="Old Mutual Malawi">Old Mutual Malawi</option>
-<option value="NICO Life Insurance Company">NICO Life Insurance Company</option>
-<option value="NICO General Insurance">NICO General Insurance</option>
-<option value="Alliance Insurance Company Malawi">Alliance Insurance Company Malawi</option>
-<option value="General Alliance Insurance Malawi">General Alliance Insurance Malawi</option>
-<option value="Reunion Insurance Company Malawi">Reunion Insurance Company Malawi</option>
-<option value="Hollard Insurance Malawi">Hollard Insurance Malawi</option>
-<option value="Sanlam Malawi">Sanlam Malawi</option>
-<option value="Britam Insurance Malawi">Britam Insurance Malawi</option>
-<option value="Madison Life Insurance Malawi">Madison Life Insurance Malawi</option>
-<option value="Bupa Global">Bupa Global</option>
-<option value="Cigna Global">Cigna Global</option>
-<option value="Allianz Care">Allianz Care</option>
-<option value="AXA Global Healthcare">AXA Global Healthcare</option>
-<option value="Aetna International">Aetna International</option>
-<option value="William Russell International">William Russell International</option>
-<option value="Airtel Money Thanzi Medical Aid">Airtel Money Thanzi Medical Aid</option>
-<option value="Inclusivity Health Platform">Inclusivity Health Platform</option>
-<option value="Airtel Insurance Health Cover">Airtel Insurance Health Cover</option>
-<option value="Mwaiwathu Private Hospital">Mwaiwathu Private Hospital</option>
-<option value="Blantyre Adventist Hospital">Blantyre Adventist Hospital</option>
-<option value="Beit CURE International Hospital Malawi">Beit CURE International Hospital Malawi</option>
-<option value="MedPlus Clinics">MedPlus Clinics</option>
-<option value="Bakresa Health Services">Bakresa Health Services</option>
-<option value="Libertas General Insurance Company Limited">Libertas General Insurance Company Limited</option> 
- <option value="First Capital Bank Medical Scheme">First Capital Bank Medical Scheme</option> 
- <option value="Standard Bank Medical Scheme">Standard Bank Medical Scheme</option> 
- <option value="Press Corporation Medical Scheme">Press Corporation Medical Scheme</option> 
- <option value="Illovo Sugar Medical Scheme">Illovo Sugar Medical Scheme</option> 
- <option value="AHL Commodities Exchange">AHL Commodities Exchange</option> 
- 
- <option value="Tea Brokers Central Africa Limited">Tea Brokers Central Africa Limited</option> 
- <option value="Eastern Produce Malawi Limited">Eastern Produce Malawi Limited</option> 
- <option value="Satemwa Tea and Coffee Estates">Satemwa Tea and Coffee Estates</option> 
- <option value="Lujeri Tea Estates Limited">Lujeri Tea Estates Limited</option> 
- <option value="Thyolo Tea Estates Limited">Thyolo Tea Estates Limited</option> 
- <option value="Conforzi Tea Estates Limited">Conforzi Tea Estates Limited</option> 
- <option value="Makandi Tea and Coffee Estates">Makandi Tea and Coffee Estates</option> 
- <option value="Malawi Tea 2020 Trust">Malawi Tea 2020 Trust</option> 
- <option value="Smallholder Tea Authority">Smallholder Tea Authority</option> 
- <option value="Malawi Tea Association">Malawi Tea Association</option> 
- <option value="Auction Holdings Limited">Auction Holdings Limited</option> 
- <option value="Malawi Agricultural and Industrial Investment Corporation">Malawi Agricultural and Industrial Investment Corporation</option> 
- <option value="Export Development Fund Limited">Export Development Fund Limited</option> 
- <option value="National Bank of Malawi Medical Scheme">National Bank of Malawi Medical Scheme</option>
-                            </select>
+                            <div class="autocomplete-container">
+                                <input type="hidden" name="provider" class="autocomplete-value">
+                                <input type="text" class="autocomplete-input" data-source="providers" placeholder="-- Select Provider --">
+                                <div class="autocomplete-suggestion"></div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Invoice Date</label>
@@ -413,12 +368,11 @@
                                     <tr class="invoice-row">
                                         <td><input type="date" name="item_date[]" required></td>
                                         <td>
-                                            <select name="item_patient_id[]" class="patient-select" required>
-                                                <option value="">-- Select Patient --</option>
-                                                {% for p in patients %}
-                                                <option value="{{ p.patient_id }}" data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
-                                                {% endfor %}
-                                            </select>
+                                            <div class="autocomplete-container">
+                                                <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                                                <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                                <div class="autocomplete-suggestion"></div>
+                                            </div>
                                         </td>
                                         <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
                                         <td><input type="number" name="item_con[]" value="0" step="0.01"></td>
@@ -462,12 +416,11 @@
                     <form action="/invoice/individual" method="post">
                         <div class="form-group">
                             <label>Select Patient</label>
-                            <select name="patient_id" required>
-                                <option value="">-- Select Patient --</option>
-                                {% for p in patients %}
-                                <option value="{{ p.patient_id }}">{{ p.first_name }} {{ p.last_name }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="autocomplete-container">
+                                <input type="hidden" name="patient_id" class="autocomplete-value">
+                                <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                <div class="autocomplete-suggestion"></div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Invoice Date</label>
@@ -554,12 +507,11 @@
                                     <tr class="cash-row">
                                         <td><input type="date" name="item_date[]" required></td>
                                         <td>
-                                            <select name="item_patient_id[]" class="patient-select" required>
-                                                <option value="">-- Select Patient --</option>
-                                                {% for p in patients %}
-                                                <option value="{{ p.patient_id }}" data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
-                                                {% endfor %}
-                                            </select>
+                                            <div class="autocomplete-container">
+                                                <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                                                <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                                <div class="autocomplete-suggestion"></div>
+                                            </div>
                                         </td>
                                         <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
                                         <td><input type="number" name="item_con[]" value="0" step="0.01"></td>
@@ -599,27 +551,117 @@
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script>
         window.isEditing = false;
 
-        function initializeChoices(container) {
-            const elements = container.querySelectorAll('select:not([data-choices-initialized])');
-            elements.forEach(el => {
-                el.setAttribute('data-choices-initialized', 'true');
-                new Choices(el, {
-                    searchEnabled: true,
-                    itemSelectText: '',
-                    removeItemButton: false,
-                    placeholder: true,
-                    placeholderValue: el.querySelector('option[value=""]') ? el.querySelector('option[value=""]').textContent : 'Select an option',
-                    shouldSort: false,
+        const autocompleteData = {
+            patients: [
+                {% for p in patients %}
+                { value: "{{ p.patient_id }}", text: "{{ p.first_name }} {{ p.last_name }}" },
+                {% endfor %}
+            ],
+            providers: [
+                { value: "Medical Aid Society of Malawi (MASM)", text: "Medical Aid Society of Malawi (MASM)" },
+                { value: "Central Health Medical Aid", text: "Central Health Medical Aid" },
+                { value: "Umoyo Health Care Insurance Company", text: "Umoyo Health Care Insurance Company" },
+                { value: "Wella Medical Aid Society Limited", text: "Wella Medical Aid Society Limited" },
+                { value: "Precious Medical International", text: "Precious Medical International" },
+                { value: "NABMAS (National Bank Medical Aid Scheme)", text: "NABMAS (National Bank Medical Aid Scheme)" },
+                { value: "MedPlus Medical Solutions", text: "MedPlus Medical Solutions" },
+                { value: "Bakresa Medical Centre", text: "Bakresa Medical Centre" },
+                { value: "MedHealth Malawi", text: "MedHealth Malawi" },
+                { value: "Cura Health Management", text: "Cura Health Management" },
+                { value: "Medlife Services Limited", text: "Medlife Services Limited" },
+                { value: "Lifeline Malawi", text: "Lifeline Malawi" },
+                { value: "Malmed Healthcare Services", text: "Malmed Healthcare Services" },
+                { value: "Adventist Health Services Malawi", text: "Adventist Health Services Malawi" },
+                { value: "Partners In Health Malawi", text: "Partners In Health Malawi" },
+                { value: "Liberty Life Malawi", text: "Liberty Life Malawi" },
+                { value: "Old Mutual Malawi", text: "Old Mutual Malawi" },
+                { value: "NICO Life Insurance Company", text: "NICO Life Insurance Company" },
+                { value: "NICO General Insurance", text: "NICO General Insurance" },
+                { value: "Alliance Insurance Company Malawi", text: "Alliance Insurance Company Malawi" },
+                { value: "General Alliance Insurance Malawi", text: "General Alliance Insurance Malawi" },
+                { value: "Reunion Insurance Company Malawi", text: "Reunion Insurance Company Malawi" },
+                { value: "Hollard Insurance Malawi", text: "Hollard Insurance Malawi" },
+                { value: "Sanlam Malawi", text: "Sanlam Malawi" },
+                { value: "Britam Insurance Malawi", text: "Britam Insurance Malawi" },
+                { value: "Madison Life Insurance Malawi", text: "Madison Life Insurance Malawi" },
+                { value: "Bupa Global", text: "Bupa Global" },
+                { value: "Cigna Global", text: "Cigna Global" },
+                { value: "Allianz Care", text: "Allianz Care" },
+                { value: "AXA Global Healthcare", text: "AXA Global Healthcare" },
+                { value: "Aetna International", text: "Aetna International" },
+                { value: "William Russell International", text: "William Russell International" },
+                { value: "Airtel Money Thanzi Medical Aid", text: "Airtel Money Thanzi Medical Aid" },
+                { value: "Inclusivity Health Platform", text: "Inclusivity Health Platform" },
+                { value: "Airtel Insurance Health Cover", text: "Airtel Insurance Health Cover" },
+                { value: "Mwaiwathu Private Hospital", text: "Mwaiwathu Private Hospital" },
+                { value: "Blantyre Adventist Hospital", text: "Blantyre Adventist Hospital" },
+                { value: "Beit CURE International Hospital Malawi", text: "Beit CURE International Hospital Malawi" },
+                { value: "MedPlus Clinics", text: "MedPlus Clinics" },
+                { value: "Bakresa Health Services", text: "Bakresa Health Services" },
+                { value: "Libertas General Insurance Company Limited", text: "Libertas General Insurance Company Limited" },
+                { value: "First Capital Bank Medical Scheme", text: "First Capital Bank Medical Scheme" },
+                { value: "Standard Bank Medical Scheme", text: "Standard Bank Medical Scheme" },
+                { value: "Press Corporation Medical Scheme", text: "Press Corporation Medical Scheme" },
+                { value: "Illovo Sugar Medical Scheme", text: "Illovo Sugar Medical Scheme" },
+                { value: "AHL Commodities Exchange", text: "AHL Commodities Exchange" },
+                { value: "Tea Brokers Central Africa Limited", text: "Tea Brokers Central Africa Limited" },
+                { value: "Eastern Produce Malawi Limited", text: "Eastern Produce Malawi Limited" },
+                { value: "Satemwa Tea and Coffee Estates", text: "Satemwa Tea and Coffee Estates" },
+                { value: "Lujeri Tea Estates Limited", text: "Lujeri Tea Estates Limited" },
+                { value: "Thyolo Tea Estates Limited", text: "Thyolo Tea Estates Limited" },
+                { value: "Conforzi Tea Estates Limited", text: "Conforzi Tea Estates Limited" },
+                { value: "Makandi Tea and Coffee Estates", text: "Makandi Tea and Coffee Estates" },
+                { value: "Malawi Tea 2020 Trust", text: "Malawi Tea 2020 Trust" },
+                { value: "Smallholder Tea Authority", text: "Smallholder Tea Authority" },
+                { value: "Malawi Tea Association", text: "Malawi Tea Association" },
+                { value: "Auction Holdings Limited", text: "Auction Holdings Limited" },
+                { value: "Malawi Agricultural and Industrial Investment Corporation", text: "Malawi Agricultural and Industrial Investment Corporation" },
+                { value: "Export Development Fund Limited", text: "Export Development Fund Limited" },
+                { value: "National Bank of Malawi Medical Scheme", text: "National Bank of Malawi Medical Scheme" },
+            ]
+        };
+
+        function setupAutocomplete(container) {
+            const inputs = container.querySelectorAll('.autocomplete-input');
+            inputs.forEach(input => {
+                const suggestionBox = input.nextElementSibling;
+                const valueInput = input.previousElementSibling;
+                const source = autocompleteData[input.dataset.source] || [];
+
+                input.addEventListener('input', () => {
+                    const query = input.value.toLowerCase();
+                    if (query.length === 0) {
+                        suggestionBox.textContent = '';
+                        valueInput.value = '';
+                        return;
+                    }
+
+                    const match = source.find(item => item.text.toLowerCase().startsWith(query));
+
+                    if (match) {
+                        suggestionBox.textContent = match.text;
+                        valueInput.value = match.value;
+                    } else {
+                        suggestionBox.textContent = '';
+                        valueInput.value = '';
+                    }
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    if ((e.key === 'Tab' || e.key === 'Enter') && suggestionBox.textContent) {
+                        e.preventDefault();
+                        input.value = suggestionBox.textContent;
+                        suggestionBox.textContent = '';
+                    }
                 });
             });
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            initializeChoices(document.body);
+            setupAutocomplete(document.body);
         });
 
         // Helper to update mini-input totals
@@ -768,36 +810,8 @@
                 form.action = '/invoice';
                 document.querySelector('#cash h3').innerText = 'Create New Cash Invoice';
                 form.reset();
-                document.getElementById('cash-items-body').innerHTML = `
-                    <tr class="cash-row">
-                        <td><input type="date" name="item_date[]" required></td>
-                        <td>
-                            <select name="item_patient_id[]" class="patient-select" required>
-                                <option value="">-- Select Patient --</option>
-                                {% for p in patients %}
-                                <option value="{{ p.patient_id }}" data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                        <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
-                        <td><input type="number" name="item_con[]" value="0" step="0.01"></td>
-                        <td><input type="number" name="item_drug[]" value="0" step="0.01"></td>
-                        <td><input type="number" name="item_lab[]" value="0" step="0.01"></td>
-                        <td><input type="number" name="item_amount[]" value="0" step="0.01" class="cash-row-amount" readonly></td>
-                        <td><button type="button" class="remove-item">×</button></td>
-                    </tr>
-                `;
-                
-                // Initialize Choices for the initial row
-                new Choices(document.querySelector('#cash-items-body .patient-select'), {
-                    searchEnabled: true,
-                    itemSelectText: '',
-                    placeholder: true,
-                    placeholderValue: '-- Select Patient --',
-                    position: 'bottom',
-                    shouldSort: false,
-                });
-                
+                document.getElementById('cash-items-body').innerHTML = '';
+                document.getElementById('add-cash-item').click();
                 updateCashTotal();
             }
         }
@@ -847,12 +861,11 @@
                                         row.innerHTML = `
                                             <td><input type="date" name="item_date[]" value="${item.date}" required></td>
                                             <td>
-                                                <select name="item_patient_id[]" class="patient-select" required>
-                                                    <option value="">-- Select Patient --</option>
-                                                    {% for p in patients %}
-                                                    <option value="{{ p.patient_id }}" ${item.patient_id === '{{ p.patient_id }}' ? 'selected' : ''} data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
-                                                    {% endfor %}
-                                                </select>
+                                                <div class="autocomplete-container">
+                                                    <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                                                    <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                                    <div class="autocomplete-suggestion"></div>
+                                                </div>
                                             </td>
                                             <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
                                             <td><input type="number" name="item_con[]" value="${item.con || 0}" step="0.01"></td>
@@ -877,17 +890,14 @@
                                             <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="cash-row-amount" readonly></td>
                                             <td><button type="button" class="remove-item">×</button></td>
                                         `;
+                                        const patientInput = row.querySelector('[data-source="patients"]');
+                                        const patientValueInput = row.querySelector('[name="item_patient_id[]"]');
+                                        const patientMatch = autocompleteData.patients.find(p => p.value === item.patient_id);
+                                        if (patientMatch) {
+                                            patientInput.value = patientMatch.text;
+                                            patientValueInput.value = patientMatch.value;
+                                        }
                                         body.appendChild(row);
-                                        
-                                        // Initialize Choices for the new select
-                                        new Choices(row.querySelector('.patient-select'), {
-                                        searchEnabled: true,
-                                        itemSelectText: '',
-                                        placeholder: true,
-                                        placeholderValue: '-- Select Patient --',
-                                        position: 'bottom',
-                                        shouldSort: false,
-                                    });
                                     });
                                 } else {
                                     // If no items, add one empty row
@@ -895,6 +905,7 @@
                                 }
                                 
                                 updateCashTotal();
+                                setupAutocomplete(form);
                             } else {
                                 // Bulk Invoice
                                 switchTab('invoice');
@@ -905,8 +916,13 @@
                                 document.querySelector('#invoice h3').innerText = `Edit Bulk Invoice #${billId}`;
                                 
                                 // Populate basic info
-                                form.querySelector('[name="provider"]').value = bill.provider || "";
-                                form.querySelector('[name="invoice_date"]').value = bill.created_date || "";
+                                const providerInput = form.querySelector('[data-source="providers"]');
+                                const providerValueInput = form.querySelector('[name="provider"]');
+                                const providerMatch = autocompleteData.providers.find(p => p.value === bill.provider);
+                                if (providerMatch) {
+                                    providerInput.value = providerMatch.text;
+                                    providerValueInput.value = providerMatch.value;
+                                }
                                 
                                 // Populate items
                                 const body = document.getElementById('invoice-items-body');
@@ -919,12 +935,11 @@
                                         row.innerHTML = `
                                             <td><input type="date" name="item_date[]" value="${item.date}" required></td>
                                             <td>
-                                                <select name="item_patient_id[]" class="patient-select" required>
-                                                    <option value="">-- Select Patient --</option>
-                                                    {% for p in patients %}
-                                                    <option value="{{ p.patient_id }}" ${item.patient_id === '{{ p.patient_id }}' ? 'selected' : ''} data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
-                                                    {% endfor %}
-                                                </select>
+                                                <div class="autocomplete-container">
+                                                    <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                                                    <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                                    <div class="autocomplete-suggestion"></div>
+                                                </div>
                                             </td>
                                             <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
                                             <td><input type="number" name="item_con[]" value="${item.con || 0}" step="0.01"></td>
@@ -949,17 +964,14 @@
                                             <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="row-amount" readonly></td>
                                             <td><button type="button" class="remove-item">×</button></td>
                                         `;
+                                        const patientInput = row.querySelector('[data-source="patients"]');
+                                        const patientValueInput = row.querySelector('[name="item_patient_id[]"]');
+                                        const patientMatch = autocompleteData.patients.find(p => p.value === item.patient_id);
+                                        if (patientMatch) {
+                                            patientInput.value = patientMatch.text;
+                                            patientValueInput.value = patientMatch.value;
+                                        }
                                         body.appendChild(row);
-                                        
-                                        // Initialize Choices for the new select
-                                        new Choices(row.querySelector('.patient-select'), {
-                                        searchEnabled: true,
-                                        itemSelectText: '',
-                                        placeholder: true,
-                                        placeholderValue: '-- Select Patient --',
-                                        position: 'bottom',
-                                        shouldSort: false,
-                                    });
                                     });
                                 } else {
                                     // If no items, add one empty row
@@ -967,6 +979,7 @@
                                 }
                                 
                                 updateTotal();
+                                setupAutocomplete(form);
                             }
                         } else {
                             // Individual Invoice or Standard Bill
@@ -978,7 +991,13 @@
                             document.querySelector('#individual h3').innerText = `Edit Individual Invoice #${billId}`;
                             
                             // Populate basic info
-                            form.querySelector('[name="patient_id"]').value = bill.patient_id || "";
+                            const patientInput = form.querySelector('[data-source="patients"]');
+                            const patientValueInput = form.querySelector('[name="patient_id"]');
+                            const patientMatch = autocompleteData.patients.find(p => p.value === bill.patient_id);
+                            if (patientMatch) {
+                                patientInput.value = patientMatch.text;
+                                patientValueInput.value = patientMatch.value;
+                            }
                             form.querySelector('[name="invoice_date"]').value = bill.created_date || "";
                             
                             // Populate items
@@ -1024,15 +1043,32 @@
                                     <td><input type="date" name="ind_date[]" value="${bill.date || ''}" required></td>
                                     <td><input type="text" name="ind_id_no[]" value="" placeholder="ID NO."></td>
                                     <td><input type="number" name="ind_con[]" value="${bill.amount || 0}" step="0.01"></td>
-                                    <td><input type="number" name="ind_drug[]" value="0" step="0.01"></td>
-                                    <td><input type="number" name="ind_lab[]" value="0" step="0.01"></td>
+                                    <td>
+                                        <div class="mini-input-container">
+                                            <div class="mini-input-row">
+                                                <input type="number" class="mini-drug" value="0" step="0.01">
+                                                <button type="button" class="add-mini-input" data-type="drug">+</button>
+                                            </div>
+                                            <input type="hidden" name="ind_drug[]" value="0" class="ind-row-total-drug">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="mini-input-container">
+                                            <div class="mini-input-row">
+                                                <input type="number" class="mini-lab" value="0" step="0.01">
+                                                <button type="button" class="add-mini-input" data-type="lab">+</button>
+                                            </div>
+                                            <input type="hidden" name="ind_lab[]" value="0" class="ind-row-total-lab">
+                                        </div>
+                                    </td>
                                     <td><input type="number" name="ind_amount[]" class="ind-row-amount" value="${bill.amount || 0}" step="0.01" readonly></td>
                                     <td><button type="button" class="remove-item">×</button></td>
-                                `;
+                                `
                                 body.appendChild(row);
                             }
                             
                             updateIndividualTotal();
+                            setupAutocomplete(form);
                         }
                     } catch (err) {
                         console.error('Error populating form:', err);
@@ -1054,12 +1090,11 @@
             newRow.innerHTML = `
                 <td><input type="date" name="item_date[]" required></td>
                 <td>
-                    <select name="item_patient_id[]" class="patient-select" required>
-                        <option value="">-- Select Patient --</option>
-                        {% for p in patients %}
-                        <option value="{{ p.patient_id }}" data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="autocomplete-container">
+                        <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                        <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                        <div class="autocomplete-suggestion"></div>
+                    </div>
                 </td>
                 <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
                 <td><input type="number" name="item_con[]" value="0" step="0.01"></td>
@@ -1085,16 +1120,7 @@
                 <td><button type="button" class="remove-item">×</button></td>
             `;
             body.appendChild(newRow);
-            
-            // Initialize Choices for the new select
-            new Choices(newRow.querySelector('.patient-select'), {
-                searchEnabled: true,
-                itemSelectText: '',
-                placeholder: true,
-                placeholderValue: '-- Select Patient --',
-                position: 'bottom',
-                shouldSort: false,
-            });
+            setupAutocomplete(newRow);
         });
 
         document.getElementById('invoice').addEventListener('input', function(e) {
@@ -1158,6 +1184,7 @@
                 <td><button type="button" class="remove-item">×</button></td>
             `;
             body.appendChild(newRow);
+            setupAutocomplete(newRow);
         });
 
         document.getElementById('individual').addEventListener('input', function(e) {
@@ -1198,12 +1225,11 @@
             newRow.innerHTML = `
                 <td><input type="date" name="item_date[]" required></td>
                 <td>
-                    <select name="item_patient_id[]" class="patient-select" required>
-                        <option value="">-- Select Patient --</option>
-                        {% for p in patients %}
-                        <option value="{{ p.patient_id }}" data-name="{{ p.first_name }} {{ p.last_name }}">{{ p.first_name }} {{ p.last_name }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="autocomplete-container">
+                        <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                        <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                        <div class="autocomplete-suggestion"></div>
+                    </div>
                 </td>
                 <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
                 <td><input type="number" name="item_con[]" value="0" step="0.01"></td>
@@ -1229,16 +1255,7 @@
                 <td><button type="button" class="remove-item">×</button></td>
             `;
             body.appendChild(newRow);
-            
-            // Initialize Choices for the new select
-            new Choices(newRow.querySelector('.patient-select'), {
-                searchEnabled: true,
-                itemSelectText: '',
-                placeholder: true,
-                placeholderValue: '-- Select Patient --',
-                position: 'bottom',
-                shouldSort: false,
-            });
+            setupAutocomplete(newRow);
         });
 
         document.getElementById('cash').addEventListener('input', function(e) {
