@@ -1108,24 +1108,33 @@ def handle_individual_invoice():
         patient_id = request.form.get('patient_id')
         invoice_date = request.form.get('invoice_date')
         
-        descriptions = request.form.getlist('ind_description[]')
+        dates = request.form.getlist('ind_date[]')
+        id_nos = request.form.getlist('ind_id_no[]')
+        cons = request.form.getlist('ind_con[]')
+        drugs = request.form.getlist('ind_drug[]')
+        labs = request.form.getlist('ind_lab[]')
         amounts = request.form.getlist('ind_amount[]')
 
         invoice_items = []
         total_amount = 0
         services_summary = []
         
-        for i in range(len(descriptions)):
-            if not descriptions[i]: continue
+        for i in range(len(dates)):
+            if not dates[i]: continue
             
             amt = float(amounts[i])
             total_amount += amt
             
-            invoice_items.append({
-                'description': descriptions[i],
+            item = {
+                'date': dates[i],
+                'id_no': id_nos[i],
+                'con': float(cons[i]),
+                'drug': float(drugs[i]),
+                'lab': float(labs[i]),
                 'amount': amt
-            })
-            services_summary.append(f"{descriptions[i]} (${amt})")
+            }
+            invoice_items.append(item)
+            services_summary.append(f"Individual services on {dates[i]} (${amt})")
 
         if not invoice_items:
             flash('No items added to invoice', 'error')
@@ -1161,24 +1170,33 @@ def update_individual_invoice(bill_id):
         patient_id = request.form.get('patient_id')
         invoice_date = request.form.get('invoice_date')
         
-        descriptions = request.form.getlist('ind_description[]')
+        dates = request.form.getlist('ind_date[]')
+        id_nos = request.form.getlist('ind_id_no[]')
+        cons = request.form.getlist('ind_con[]')
+        drugs = request.form.getlist('ind_drug[]')
+        labs = request.form.getlist('ind_lab[]')
         amounts = request.form.getlist('ind_amount[]')
 
         invoice_items = []
         total_amount = 0
         services_summary = []
         
-        for i in range(len(descriptions)):
-            if not descriptions[i]: continue
+        for i in range(len(dates)):
+            if not dates[i]: continue
             
             amt = float(amounts[i])
             total_amount += amt
             
-            invoice_items.append({
-                'description': descriptions[i],
+            item = {
+                'date': dates[i],
+                'id_no': id_nos[i],
+                'con': float(cons[i]),
+                'drug': float(drugs[i]),
+                'lab': float(labs[i]),
                 'amount': amt
-            })
-            services_summary.append(f"{descriptions[i]} (${amt})")
+            }
+            invoice_items.append(item)
+            services_summary.append(f"Individual services on {dates[i]} (${amt})")
 
         if not invoice_items:
             flash('No items added to invoice', 'error')

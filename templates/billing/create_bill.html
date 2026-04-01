@@ -39,12 +39,22 @@
             margin-bottom: 10px;
             align-items: center;
         }
-        .item-row input {
-            flex: 1;
+        .invoice-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .item-row {
+            display: flex;
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .item-row input[type="text"] {
+            flex-grow: 1;
+            margin-right: 10px;
         }
         .item-row input[type="number"] {
-            width: 100px;
-            flex: 0 0 100px;
+            width: 120px;
         }
         .remove-btn {
             background-color: #f72585;
@@ -81,9 +91,11 @@
                     </div>
 
                     <div class="item-list" id="itemList">
-                        <div class="item-row">
-                            <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
-                            <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" required>
+                        <div class="invoice-item">
+                            <div class="item-row">
+                                <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
+                                <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" required>
+                            </div>
                             <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
@@ -102,20 +114,22 @@
     <script>
         function addItem() {
             const list = document.getElementById('itemList');
-            const row = document.createElement('div');
-            row.className = 'item-row';
-            row.innerHTML = `
-                <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
-                <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" required>
+            const item = document.createElement('div');
+            item.className = 'invoice-item';
+            item.innerHTML = `
+                <div class="item-row">
+                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
+                    <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" required>
+                </div>
                 <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
             `;
-            list.appendChild(row);
+            list.appendChild(item);
         }
 
         function removeItem(btn) {
-            const row = btn.parentNode;
-            if (document.querySelectorAll('.item-row').length > 1) {
-                row.remove();
+            const item = btn.parentNode;
+            if (document.querySelectorAll('.invoice-item').length > 1) {
+                item.remove();
             } else {
                 alert("At least one item is required.");
             }

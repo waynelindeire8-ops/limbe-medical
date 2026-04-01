@@ -49,6 +49,23 @@
             color: #4361ee;
             text-decoration: none;
         }
+        .invoice-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .item-row {
+            display: flex;
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .item-row input[type="text"] {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .item-row input[type="number"] {
+            width: 120px;
+        }
     </style>
 </head>
 <body>
@@ -63,9 +80,19 @@
                 <p style="color: #666; margin-bottom: 20px;">Patient: {{ patient.first_name }} {{ patient.last_name }}</p>
                 <form method="POST">
                     <div class="form-group">
-                        <label for="services">Services / Items (comma-separated with prices)</label>
-                        <textarea id="services" name="services" rows="5" required>{{ bill.services }}</textarea>
-                        <small style="color: #888;">Example: Consultation ($50.00), X-Ray ($30.00)</small>
+                        <label>Services / Items</label>
+                        <div id="itemList">
+                            {% for item in bill.items %}
+                            <div class="invoice-item">
+                                <div class="item-row">
+                                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" value="{{ item.description }}" required>
+                                    <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" value="{{ item.cost }}" required>
+                                </div>
+                                <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn-add" onclick="addItem()"><i class="fas fa-plus"></i> Add Item</button>
                     </div>
                     <div class="form-group">
                         <label for="amount">Total Amount (MWK)</label>
@@ -84,5 +111,30 @@
             </div>
         </main>
     </div>
+
+    <script>
+        function addItem() {
+            const list = document.getElementById('itemList');
+            const item = document.createElement('div');
+            item.className = 'invoice-item';
+            item.innerHTML = `
+                <div class="item-row">
+                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
+                    <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" required>
+                </div>
+                <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
+            `;
+            list.appendChild(item);
+        }
+
+        function removeItem(btn) {
+            const item = btn.parentNode;
+            if (document.querySelectorAll('.invoice-item').length > 1) {
+                item.remove();
+            } else {
+                alert("At least one item is required.");
+            }
+        }
+    </script>
 </body>
 </html>
