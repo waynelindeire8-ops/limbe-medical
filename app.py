@@ -203,7 +203,7 @@ def dashboard():
         active_queue = [q for q in hms.queue if getattr(q, 'status', '') != 'Completed']
         sorted_queue = []
         try:
-            sorted_queue = sorted(active_queue, key=lambda x: (getattr(x, 'arrival_time', '') or ''))
+            sorted_queue = sorted(active_queue, key=lambda x: (getattr(x, 'check_in_time', '') or ''))
         except Exception as e:
             print(f"[ERROR] Sorting queue failed: {e}")
             sorted_queue = active_queue
@@ -991,8 +991,16 @@ def billing_dashboard():
         p_name = f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
         
         # Search filter
+        p_first = patient.first_name.lower() if patient else ""
+        p_last = patient.last_name.lower() if patient else ""
+        p_full = f"{p_first} {p_last}"
+        p_reverse = f"{p_last} {p_first}"
+        
         if search_term and not (search_term in bill.bill_id.lower() or 
-                               search_term in p_name.lower() or 
+                               search_term in p_full or 
+                               search_term in p_reverse or
+                               search_term in p_first or
+                               search_term in p_last or
                                search_term in bill.status.lower()):
             continue
             
@@ -1565,11 +1573,20 @@ def prescriptions():
     def map_display(rx):
         patient = hms.get_patient(rx.patient_id)
         doctor = hms.get_doctor(rx.doctor_id)
+        p_name = f"{patient.first_name} {patient.last_name}" if patient else 'Unknown'
+        p_reverse = f"{patient.last_name} {patient.first_name}" if patient else 'Unknown'
+        d_name = f"Dr. {doctor.last_name}" if doctor else 'Unknown'
+        d_full = f"{doctor.first_name} {doctor.last_name}" if doctor else 'Unknown'
+        d_reverse = f"{doctor.last_name} {doctor.first_name}" if doctor else 'Unknown'
+        
         return {
             'prescription_id': rx.prescription_id,
             'date': rx.date,
-            'patient_name': f"{patient.first_name} {patient.last_name}" if patient else 'Unknown',
-            'doctor_name': f"Dr. {doctor.last_name}" if doctor else 'Unknown',
+            'patient_name': p_name,
+            'patient_reverse': p_reverse,
+            'doctor_name': d_name,
+            'doctor_full': d_full,
+            'doctor_reverse': d_reverse,
             'medication': rx.medication,
             'status': rx.status
         }
@@ -1578,7 +1595,10 @@ def prescriptions():
         display_list = [d for d in display_list if (
             search_term in d['prescription_id'].lower() or
             search_term in d['patient_name'].lower() or
+            search_term in d['patient_reverse'].lower() or
             search_term in d['doctor_name'].lower() or
+            search_term in d['doctor_full'].lower() or
+            search_term in d['doctor_reverse'].lower() or
             search_term in d['medication'].lower()
         )]
     return render_template('prescriptions.html', prescriptions=display_list, active_page='prescriptions', search_term=search_term)
@@ -1676,18 +1696,31 @@ def medical_records():
     for record in all_records:
         patient = hms.get_patient(record.patient_id)
         doctor = hms.get_doctor(record.doctor_id)
-        p_name = f"{patient.first_name} {patient.last_name}" if patient else 'Unknown'
-        d_name = f"Dr. {doctor.last_name}" if doctor else 'Unknown'
+        p_first = patient.first_name.lower() if patient else ""
+        p_last = patient.last_name.lower() if patient else ""
+        p_full = f"{p_first} {p_last}"
+        p_reverse = f"{p_last} {p_first}"
+        
+        d_first = doctor.first_name.lower() if doctor else ""
+        d_last = doctor.last_name.lower() if doctor else ""
+        d_full = f"{d_first} {d_last}"
+        d_reverse = f"{d_last} {d_first}"
+        d_name_short = f"dr. {d_last}" if d_last else ""
         
         if (search_term in record.record_id.lower() or
-            search_term in p_name.lower() or
-            search_term in d_name.lower() or
+            search_term in p_full or
+            search_term in p_reverse or
+            search_term in p_first or
+            search_term in p_last or
+            search_term in d_full or
+            search_term in d_reverse or
+            search_term in d_name_short or
             search_term in record.diagnosis.lower()):
             display_list.append({
                 'record_id': record.record_id,
                 'date': record.date,
-                'patient_name': p_name,
-                'doctor_name': d_name,
+                'patient_name': f"{patient.first_name} {patient.last_name}" if patient else 'Unknown',
+                'doctor_name': f"Dr. {doctor.last_name}" if doctor else 'Unknown',
                 'diagnosis': record.diagnosis,
                 'consult_reason': record.consult_reason
             })

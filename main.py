@@ -347,6 +347,8 @@ class HospitalManagementSystem:
             p for p in self.patients
             if search_term in p.first_name.lower()
             or search_term in p.last_name.lower()
+            or search_term in (p.first_name.lower() + " " + p.last_name.lower())
+            or search_term in (p.last_name.lower() + " " + p.first_name.lower())
             or search_term in p.patient_id.lower()
         ]
 
@@ -398,6 +400,8 @@ class HospitalManagementSystem:
             d for d in self.doctors
             if search_term in d.first_name.lower()
             or search_term in d.last_name.lower()
+            or search_term in (d.first_name.lower() + " " + d.last_name.lower())
+            or search_term in (d.last_name.lower() + " " + d.first_name.lower())
             or search_term in d.doctor_id.lower()
             or search_term in d.specialty.lower()
         ]
@@ -436,14 +440,26 @@ class HospitalManagementSystem:
 
     def search_appointments(self, search_term: str) -> List[Appointment]:
         search_term = search_term.lower()
-        return [
-            a for a in self.appointments
-            if search_term in a.appointment_id.lower()
-            or search_term in a.patient_id.lower()
-            or search_term in a.doctor_id.lower()
-            or search_term in a.appointment_date.lower()
-            or search_term in a.status.lower()
-        ]
+        
+        # Get patient and doctor names for filtering
+        matching_appointments = []
+        for a in self.appointments:
+            patient = self.get_patient(a.patient_id)
+            doctor = self.get_doctor(a.doctor_id)
+            
+            p_name = f"{patient.first_name} {patient.last_name}" if patient else ""
+            d_name = f"{doctor.first_name} {doctor.last_name}" if doctor else ""
+            
+            if (search_term in a.appointment_id.lower() or
+                search_term in a.patient_id.lower() or
+                search_term in a.doctor_id.lower() or
+                search_term in a.appointment_date.lower() or
+                search_term in a.status.lower() or
+                search_term in p_name.lower() or
+                search_term in d_name.lower()):
+                matching_appointments.append(a)
+        
+        return matching_appointments
 
     def get_patient_appointments(self, patient_id: str) -> List[Appointment]:
         return [a for a in self.appointments if a.patient_id == patient_id]
