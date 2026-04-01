@@ -68,8 +68,6 @@ class Prescription:
     doctor_id: str = ""
     date: str = ""
     medication: str = ""
-    dosage: str = ""
-    frequency: str = ""
     duration: str = ""
     notes: str = ""
     status: str = ""

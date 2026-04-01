@@ -88,8 +88,6 @@ class Prescription:
     patient_id: str
     doctor_id: str
     medication_name: str
-    dosage: str
-    frequency: str
     duration: str
     instructions: str = ""
     issued_date: str = field(default_factory=lambda: datetime.now().isoformat())

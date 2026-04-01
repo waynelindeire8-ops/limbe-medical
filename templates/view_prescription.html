@@ -41,21 +41,20 @@
                 <div style="margin-top: 20px;">
                     <h3 style="margin-bottom: 10px;">Prescription Details</h3>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                        <div>
-                            <div style="color:#666;">Medication</div>
-                            <div style="font-weight:600;">{{ rx.medication }}</div>
+                        <div style="grid-column: 1 / span 2; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <label style="display: block; color: #666; margin-bottom: 5px;">Medications</label>
+                            <div style="font-weight: 600; font-size: 1.1em;">
+                                {% set meds = rx.medication.split(', ') %}
+                                <ul style="margin: 0; padding-left: 20px;">
+                                    {% for med in meds %}
+                                    <li>{{ med }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
                         </div>
-                        <div>
-                            <div style="color:#666;">Dosage</div>
-                            <div style="font-weight:600;">{{ rx.dosage }}</div>
-                        </div>
-                        <div>
-                            <div style="color:#666;">Frequency</div>
-                            <div style="font-weight:600;">{{ rx.frequency }}</div>
-                        </div>
-                        <div>
-                            <div style="color:#666;">Duration</div>
-                            <div style="font-weight:600;">{{ rx.duration }}</div>
+                        <div style="grid-column: 1 / span 2;">
+                            <label style="display: block; color: #666; margin-bottom: 5px;">Duration</label>
+                            <div style="font-weight: 500;">{{ rx.duration }}</div>
                         </div>
                     </div>
                     <div style="margin-top: 16px;">

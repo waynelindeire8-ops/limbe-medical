@@ -58,21 +58,18 @@
         </div>
 
         <div class="section" style="border: 1px dashed #ccc; padding: 16px; border-radius: 8px;">
-            <div class="label">Medication</div>
-            <div class="value" style="font-size: 18px;">{{ rx.medication }}</div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px;">
-                <div>
-                    <div class="label">Dosage</div>
-                    <div class="value">{{ rx.dosage }}</div>
-                </div>
-                <div>
-                    <div class="label">Frequency</div>
-                    <div class="value">{{ rx.frequency }}</div>
-                </div>
-                <div>
-                    <div class="label">Duration</div>
-                    <div class="value">{{ rx.duration }}</div>
-                </div>
+            <div class="label">Medications</div>
+            <div class="value" style="font-size: 18px;">
+                {% set meds = rx.medication.split(', ') %}
+                <ul style="margin: 5px 0 0 0; padding-left: 20px;">
+                    {% for med in meds %}
+                    <li>{{ med }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div style="margin-top: 12px;">
+                <div class="label">Duration</div>
+                <div class="value">{{ rx.duration }}</div>
             </div>
             {% if rx.notes %}
             <div class="section">

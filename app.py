@@ -1589,14 +1589,14 @@ def add_prescription():
     doctors = hms.doctors
     if request.method == 'POST':
         try:
+            medications = request.form.getlist('medication[]')
+            medication_str = ", ".join(medications)
             new_rx = Prescription(
                 prescription_id=hms.generate_id('RX'),
                 patient_id=request.form['patient_id'],
                 doctor_id=request.form['doctor_id'],
                 date=request.form['date'],
-                medication=request.form['medication'],
-                dosage=request.form['dosage'],
-                frequency=request.form['frequency'],
+                medication=medication_str,
                 duration=request.form['duration'],
                 notes=request.form.get('notes',''),
                 status=request.form.get('status','Active')
@@ -1619,14 +1619,14 @@ def edit_prescription(prescription_id):
     doctors = hms.doctors
     if request.method == 'POST':
         try:
+            medications = request.form.getlist('medication[]')
+            medication_str = ", ".join(medications)
             updated = Prescription(
                 prescription_id=rx.prescription_id,
                 patient_id=request.form['patient_id'],
                 doctor_id=request.form['doctor_id'],
                 date=request.form['date'],
-                medication=request.form['medication'],
-                dosage=request.form['dosage'],
-                frequency=request.form['frequency'],
+                medication=medication_str,
                 duration=request.form['duration'],
                 notes=request.form.get('notes',''),
                 status=request.form.get('status','Active')

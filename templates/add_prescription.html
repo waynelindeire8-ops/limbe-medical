@@ -45,18 +45,16 @@
                         </select>
                     </div>
                     <div style="grid-column: 1 / span 2;">
-                        <label>Medication</label>
-                        <input type="text" name="medication" required placeholder="Medication name" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                        <label>Medications</label>
+                        <div id="medication-list">
+                            <div class="medication-item" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                <input type="text" name="medication[]" required placeholder="Medication name" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                                <button type="button" onclick="removeMedication(this)" class="btn btn-danger" style="background: #ff4d4d; color: white; border: none; border-radius: 8px; padding: 0 15px; display: none;">×</button>
+                            </div>
+                        </div>
+                        <button type="button" onclick="addMedication()" class="btn btn-outline" style="margin-top: 5px; background: #f0f2f5; border: 1px solid #ddd; border-radius: 8px; padding: 5px 15px; cursor: pointer;"><i class="fas fa-plus"></i> Add Another Medication</button>
                     </div>
-                    <div>
-                        <label>Dosage</label>
-                        <input type="text" name="dosage" required placeholder="e.g., 500mg" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                    </div>
-                    <div>
-                        <label>Frequency</label>
-                        <input type="text" name="frequency" required placeholder="e.g., twice daily" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                    </div>
-                    <div>
+                    <div style="grid-column: 1 / span 2;">
                         <label>Duration</label>
                         <input type="text" name="duration" required placeholder="e.g., 7 days" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                     </div>
@@ -73,6 +71,38 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script>
+        function addMedication() {
+            const list = document.getElementById('medication-list');
+            const newItem = document.createElement('div');
+            newItem.className = 'medication-item';
+            newItem.style.display = 'flex';
+            newItem.style.gap = '10px';
+            newItem.style.marginBottom = '10px';
+            newItem.innerHTML = `
+                <input type="text" name="medication[]" required placeholder="Medication name" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                <button type="button" onclick="removeMedication(this)" class="btn btn-danger" style="background: #ff4d4d; color: white; border: none; border-radius: 8px; padding: 0 15px;">×</button>
+            `;
+            list.appendChild(newItem);
+            updateRemoveButtons();
+        }
+
+        function removeMedication(btn) {
+            btn.closest('.medication-item').remove();
+            updateRemoveButtons();
+        }
+
+        function updateRemoveButtons() {
+            const items = document.querySelectorAll('.medication-item');
+            items.forEach(item => {
+                const btn = item.querySelector('.btn-danger');
+                if (items.length > 1) {
+                    btn.style.display = 'block';
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const selectElements = document.querySelectorAll('select');
             selectElements.forEach(select => {
