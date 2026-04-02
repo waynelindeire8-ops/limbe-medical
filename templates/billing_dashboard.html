@@ -220,6 +220,7 @@
                             <th>Bill ID</th>
                             <th>Date</th>
                             <th>Patient</th>
+                            <th>Services</th>
                             <th>Amount</th>
                             <th>Status</th>
                             <th>Actions</th>
@@ -231,9 +232,11 @@
                             <td>{{ bill.bill_id }}</td>
                             <td>{{ bill.date }}</td>
                             <td><a href="{{ url_for('patients', search=bill.patient_name) }}" style="color: #4361ee; text-decoration: none;">{{ bill.patient_name }}</a></td>
+                            <td>{{ bill.services }}</td>
                             <td>MWK{{ bill.amount }}</td>
                             <td><span class="status-badge status-{{ bill.status|lower }}">{{ bill.status }}</span></td>
                             <td>
+                                <a href="{{ url_for('view_bill', bill_id=bill.bill_id) }}" class="btn-action" title="View Bill"><i class="fas fa-eye"></i></a>
                                 <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
                                 <a href="{{ url_for('export_invoice_csv', bill_id=bill.bill_id) }}" style="color: #27ae60; margin-right: 10px;" title="Export to Excel"><i class="fas fa-file-excel"></i></a>
                                 <a href="#" onclick="editInvoice('{{ bill.bill_id }}')" style="color: #ffc107; margin-right: 10px;" title="Edit Invoice"><i class="fas fa-edit"></i></a>
@@ -246,7 +249,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="6" style="text-align: center; color: #888;">No bills found.</td></tr>
+                        <tr><td colspan="7" style="text-align: center; color: #888;">No bills found.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -561,66 +564,9 @@
                 {% endfor %}
             ],
             providers: [
-                { value: "Medical Aid Society of Malawi (MASM)", text: "Medical Aid Society of Malawi (MASM)" },
-                { value: "Central Health Medical Aid", text: "Central Health Medical Aid" },
-                { value: "Umoyo Health Care Insurance Company", text: "Umoyo Health Care Insurance Company" },
-                { value: "Wella Medical Aid Society Limited", text: "Wella Medical Aid Society Limited" },
-                { value: "Precious Medical International", text: "Precious Medical International" },
-                { value: "NABMAS (National Bank Medical Aid Scheme)", text: "NABMAS (National Bank Medical Aid Scheme)" },
-                { value: "MedPlus Medical Solutions", text: "MedPlus Medical Solutions" },
-                { value: "Bakresa Medical Centre", text: "Bakresa Medical Centre" },
-                { value: "MedHealth Malawi", text: "MedHealth Malawi" },
-                { value: "Cura Health Management", text: "Cura Health Management" },
-                { value: "Medlife Services Limited", text: "Medlife Services Limited" },
-                { value: "Lifeline Malawi", text: "Lifeline Malawi" },
-                { value: "Malmed Healthcare Services", text: "Malmed Healthcare Services" },
-                { value: "Adventist Health Services Malawi", text: "Adventist Health Services Malawi" },
-                { value: "Partners In Health Malawi", text: "Partners In Health Malawi" },
-                { value: "Liberty Life Malawi", text: "Liberty Life Malawi" },
-                { value: "Old Mutual Malawi", text: "Old Mutual Malawi" },
-                { value: "NICO Life Insurance Company", text: "NICO Life Insurance Company" },
-                { value: "NICO General Insurance", text: "NICO General Insurance" },
-                { value: "Alliance Insurance Company Malawi", text: "Alliance Insurance Company Malawi" },
-                { value: "General Alliance Insurance Malawi", text: "General Alliance Insurance Malawi" },
-                { value: "Reunion Insurance Company Malawi", text: "Reunion Insurance Company Malawi" },
-                { value: "Hollard Insurance Malawi", text: "Hollard Insurance Malawi" },
-                { value: "Sanlam Malawi", text: "Sanlam Malawi" },
-                { value: "Britam Insurance Malawi", text: "Britam Insurance Malawi" },
-                { value: "Madison Life Insurance Malawi", text: "Madison Life Insurance Malawi" },
-                { value: "Bupa Global", text: "Bupa Global" },
-                { value: "Cigna Global", text: "Cigna Global" },
-                { value: "Allianz Care", text: "Allianz Care" },
-                { value: "AXA Global Healthcare", text: "AXA Global Healthcare" },
-                { value: "Aetna International", text: "Aetna International" },
-                { value: "William Russell International", text: "William Russell International" },
-                { value: "Airtel Money Thanzi Medical Aid", text: "Airtel Money Thanzi Medical Aid" },
-                { value: "Inclusivity Health Platform", text: "Inclusivity Health Platform" },
-                { value: "Airtel Insurance Health Cover", text: "Airtel Insurance Health Cover" },
-                { value: "Mwaiwathu Private Hospital", text: "Mwaiwathu Private Hospital" },
-                { value: "Blantyre Adventist Hospital", text: "Blantyre Adventist Hospital" },
-                { value: "Beit CURE International Hospital Malawi", text: "Beit CURE International Hospital Malawi" },
-                { value: "MedPlus Clinics", text: "MedPlus Clinics" },
-                { value: "Bakresa Health Services", text: "Bakresa Health Services" },
-                { value: "Libertas General Insurance Company Limited", text: "Libertas General Insurance Company Limited" },
-                { value: "First Capital Bank Medical Scheme", text: "First Capital Bank Medical Scheme" },
-                { value: "Standard Bank Medical Scheme", text: "Standard Bank Medical Scheme" },
-                { value: "Press Corporation Medical Scheme", text: "Press Corporation Medical Scheme" },
-                { value: "Illovo Sugar Medical Scheme", text: "Illovo Sugar Medical Scheme" },
-                { value: "AHL Commodities Exchange", text: "AHL Commodities Exchange" },
-                { value: "Tea Brokers Central Africa Limited", text: "Tea Brokers Central Africa Limited" },
-                { value: "Eastern Produce Malawi Limited", text: "Eastern Produce Malawi Limited" },
-                { value: "Satemwa Tea and Coffee Estates", text: "Satemwa Tea and Coffee Estates" },
-                { value: "Lujeri Tea Estates Limited", text: "Lujeri Tea Estates Limited" },
-                { value: "Thyolo Tea Estates Limited", text: "Thyolo Tea Estates Limited" },
-                { value: "Conforzi Tea Estates Limited", text: "Conforzi Tea Estates Limited" },
-                { value: "Makandi Tea and Coffee Estates", text: "Makandi Tea and Coffee Estates" },
-                { value: "Malawi Tea 2020 Trust", text: "Malawi Tea 2020 Trust" },
-                { value: "Smallholder Tea Authority", text: "Smallholder Tea Authority" },
-                { value: "Malawi Tea Association", text: "Malawi Tea Association" },
-                { value: "Auction Holdings Limited", text: "Auction Holdings Limited" },
-                { value: "Malawi Agricultural and Industrial Investment Corporation", text: "Malawi Agricultural and Industrial Investment Corporation" },
-                { value: "Export Development Fund Limited", text: "Export Development Fund Limited" },
-                { value: "National Bank of Malawi Medical Scheme", text: "National Bank of Malawi Medical Scheme" },
+                {% for p in hms_providers %}
+                { value: "{{ p }}", text: "{{ p }}" },
+                {% endfor %}
             ]
         };
 

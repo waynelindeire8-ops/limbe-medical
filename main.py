@@ -125,7 +125,8 @@ class HospitalManagementSystem:
 
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
-        except Exception:
+        except Exception as e:
+            print(f"[ERROR] Failed to save data: {e}")
             pass
 
     def load_data(self) -> None:
@@ -698,6 +699,27 @@ class HospitalManagementSystem:
                     pass
                 return True
         return False
+
+
+
+    def search_inventory(self, search_term: str) -> List[InventoryItem]:
+        search_term = search_term.lower().strip()
+        if not search_term:
+            return self.inventory
+
+        search_parts = search_term.split()
+
+        results = []
+        for item in self.inventory:
+            item_text = (
+                item.name.lower() + " " +
+                (item.category or '').lower() + " " +
+                item.item_id.lower()
+            )
+
+            if all(part in item_text for part in search_parts):
+                results.append(item)
+        return results
 
     # ---------- Inventory ----------
     def add_inventory_item(self, item: InventoryItem) -> bool:

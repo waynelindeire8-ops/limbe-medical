@@ -100,6 +100,8 @@ class InventoryItem:
     strength: str = ""
     batch_number: str = ""
     notes: str = ""
+    is_medicine: bool = False
+    billing_codes: dict = field(default_factory=dict)  # e.g. {"provider1": "code1", "provider2": "code2"}
 
 
 @dataclass

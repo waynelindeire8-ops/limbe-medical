@@ -90,17 +90,22 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="inventory_search">Add Item from Inventory</label>
+                        <input type="text" id="inventory_search" class="form-control" placeholder="Search for an item...">
+                        <div id="inventory_results"></div>
+                    </div>
+
                     <div class="item-list" id="itemList">
-                        <div class="invoice-item">
-                            <div class="item-row">
-                                <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
-                                <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" required>
-                            </div>
-                            <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
-                        </div>
+                        <!-- Items will be added here dynamically -->
                     </div>
                     
-                    <button type="button" class="btn-add" onclick="addItem()"><i class="fas fa-plus"></i> Add Item</button>
+                    <button type="button" class="btn-add" onclick="addItem()"><i class="fas fa-plus"></i> Add Custom Item</button>
+
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label for="total_amount">Total Amount</label>
+                        <input type="text" id="total_amount" name="total_amount" class="form-control" readonly>
+                    </div>
 
                     <div class="form-actions" style="margin-top: 30px; display: flex; justify-content: flex-end; gap: 10px;">
                         <a href="{{ url_for('billing_dashboard') }}" class="btn btn-outline">Cancel</a>
@@ -112,28 +117,62 @@
     </div>
 
     <script>
-        function addItem() {
-            const list = document.getElementById('itemList');
-            const item = document.createElement('div');
-            item.className = 'invoice-item';
-            item.innerHTML = `
+        let inventory = {{ inventory | tojson }};
+
+        document.getElementById('inventory_search').addEventListener('keyup', function() {
+            let searchTerm = this.value.toLowerCase();
+            let resultsContainer = document.getElementById('inventory_results');
+            resultsContainer.innerHTML = '';
+            if (searchTerm.length < 2) return;
+
+            let filteredItems = inventory.filter(item => item.name.toLowerCase().includes(searchTerm));
+            filteredItems.forEach(item => {
+                let div = document.createElement('div');
+                div.innerHTML = `${item.name} - ${item.unit_price}`;
+                div.onclick = () => {
+                    addItem(item.name, item.unit_price);
+                    document.getElementById('inventory_search').value = '';
+                    resultsContainer.innerHTML = '';
+                };
+                resultsContainer.appendChild(div);
+            });
+        });
+
+        function addItem(name = '', cost = '') {
+            const itemList = document.getElementById('itemList');
+            const itemRow = document.createElement('div');
+            itemRow.className = 'invoice-item';
+            itemRow.innerHTML = `
                 <div class="item-row">
-                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
-                    <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" required>
+                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" value="${name}" required>
+                    <input type="number" name="costs[]" class="form-control cost-input" placeholder="Cost (MWK)" step="0.01" min="0" value="${cost}" oninput="updateTotal()" required>
                 </div>
                 <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
             `;
-            list.appendChild(item);
+            itemList.appendChild(itemRow);
+            updateTotal();
         }
 
-        function removeItem(btn) {
-            const item = btn.parentNode;
-            if (document.querySelectorAll('.invoice-item').length > 1) {
-                item.remove();
-            } else {
-                alert("At least one item is required.");
-            }
+        function removeItem(button) {
+            button.parentElement.remove();
+            updateTotal();
         }
+
+        function updateTotal() {
+            let total = 0;
+            document.querySelectorAll('.cost-input').forEach(input => {
+                total += parseFloat(input.value) || 0;
+            });
+            document.getElementById('total_amount').value = total.toFixed(2);
+        }
+
+        // Add a default item if the list is empty on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.querySelectorAll('.invoice-item').length === 0) {
+                addItem();
+            }
+            updateTotal();
+        });
     </script>
 </body>
 </html>

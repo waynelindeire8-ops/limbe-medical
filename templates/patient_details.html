@@ -151,20 +151,20 @@
                             <span>{{ patient.phone }}</span>
                         </div>
                         <div class="info-item">
+                            <label>Scheme Provider</label>
+                            <span>{{ patient.scheme_provider or 'Not Specified' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Scheme Type</label>
+                            <span>{{ patient.scheme_type or 'Not Specified' }}</span>
+                        </div>
+                        <div class="info-item">
                             <label>Email</label>
                             <span>{{ patient.email }}</span>
                         </div>
                         <div class="info-item">
                             <label>Emergency Contact</label>
                             <span>{{ patient.emergency_contact }}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Scheme Provider</label>
-                            <span>{{ patient.scheme_provider or 'None' }}</span>
-                        </div>
-                        <div class="info-item">
-                            <label>Scheme Type</label>
-                            <span>{{ patient.scheme_type or 'None' }}</span>
                         </div>
                         <div class="info-item" style="grid-column: span 2;">
                             <label>Address</label>

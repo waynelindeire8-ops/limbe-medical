@@ -103,12 +103,9 @@
                         <label for="scheme_provider">Scheme Provider</label>
                         <select id="scheme_provider" name="scheme_provider">
                             <option value="" {% if not patient.scheme_provider %}selected{% endif %}>Select Provider (Optional)</option>
-                            <option value="MASM" {% if patient.scheme_provider == 'MASM' %}selected{% endif %}>MASM</option>
-                            <option value="Precious" {% if patient.scheme_provider == 'Precious' %}selected{% endif %}>Precious</option>
-                            <option value="Liberty" {% if patient.scheme_provider == 'Liberty' %}selected{% endif %}>Liberty Health</option>
-                            <option value="MedHealth" {% if patient.scheme_provider == 'MedHealth' %}selected{% endif %}>MedHealth</option>
-                            <option value="BlueCross" {% if patient.scheme_provider == 'BlueCross' %}selected{% endif %}>BlueCross</option>
-                            <option value="Other" {% if patient.scheme_provider == 'Other' %}selected{% endif %}>Other</option>
+                            {% for provider in providers %}
+                            <option value="{{ provider }}" {% if patient.scheme_provider == provider %}selected{% endif %}>{{ provider }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="form-group">

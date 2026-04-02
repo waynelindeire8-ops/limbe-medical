@@ -52,7 +52,7 @@
                             <select name="patient_id" required>
                                 <option value="">-- Choose Patient --</option>
                                 {% for p in patients %}
-                                <option value="{{ p.patient_id }}">{{ p.first_name }} {{ p.last_name }} ({{ p.patient_id }})</option>
+                                <option value="{{ p.patient_id }}">{{ p.first_name }} {{ p.last_name }} ({{ p.patient_id }}) {% if p.scheme_provider %}- {{ p.scheme_provider }}{% endif %}</option>
                                 {% endfor %}
                             </select>
                         </div>

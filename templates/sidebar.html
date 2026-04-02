@@ -50,6 +50,10 @@
         <a href="{{ url_for('prescriptions') }}" class="menu-item {% if active_page == 'prescriptions' %}active{% endif %}" title="Prescriptions"><i class="fas fa-capsules"></i></a>
         {% endif %}
 
+        {% if current_role in ['admin', 'cashier', 'nurse'] %}
+        <a href="{{ url_for('inventory') }}" class="menu-item {% if active_page == 'inventory' %}active{% endif %}" title="Inventory"><i class="fas fa-boxes"></i></a>
+        {% endif %}
+
         {% if current_role in ['admin', 'admin doctor', 'admin_doctor'] %}
         <a href="{{ url_for('admin_users') }}" class="menu-item {% if active_page == 'admin_users' %}active{% endif %}" title="User Management"><i class="fas fa-users-cog"></i></a>
         {% endif %}

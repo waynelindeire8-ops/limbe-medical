@@ -5,11 +5,75 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 from dataclasses import asdict
 from main import HospitalManagementSystem
-from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord, QueueItem
+from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord, QueueItem, InventoryItem, User, LabResult
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key'  # Needed for flashing messages
 hms = HospitalManagementSystem()
+
+# Providers List for Billing and Inventory
+PROVIDERS = [
+    "Medical Aid Society of Malawi (MASM)",
+    "Central Health Medical Aid",
+    "Umoyo Health Care Insurance Company",
+    "Wella Medical Aid Society Limited",
+    "Precious Medical International",
+    "NABMAS (National Bank Medical Aid Scheme)",
+    "MedPlus Medical Solutions",
+    "Bakresa Medical Centre",
+    "MedHealth Malawi",
+    "Cura Health Management",
+    "Medlife Services Limited",
+    "Lifeline Malawi",
+    "Malmed Healthcare Services",
+    "Adventist Health Services Malawi",
+    "Partners In Health Malawi",
+    "Liberty Life Malawi",
+    "Old Mutual Malawi",
+    "NICO Life Insurance Company",
+    "NICO General Insurance",
+    "Alliance Insurance Company Malawi",
+    "General Alliance Insurance Malawi",
+    "Reunion Insurance Company Malawi",
+    "Hollard Insurance Malawi",
+    "Sanlam Malawi",
+    "Britam Insurance Malawi",
+    "Madison Life Insurance Malawi",
+    "Bupa Global",
+    "Cigna Global",
+    "Allianz Care",
+    "AXA Global Healthcare",
+    "Aetna International",
+    "William Russell International",
+    "Airtel Money Thanzi Medical Aid",
+    "Inclusivity Health Platform",
+    "Airtel Insurance Health Cover",
+    "Mwaiwathu Private Hospital",
+    "Blantyre Adventist Hospital",
+    "Beit CURE International Hospital Malawi",
+    "MedPlus Clinics",
+    "Bakresa Health Services",
+    "Libertas General Insurance Company Limited",
+    "First Capital Bank Medical Scheme",
+    "Standard Bank Medical Scheme",
+    "Press Corporation Medical Scheme",
+    "Illovo Sugar Medical Scheme",
+    "AHL Commodities Exchange",
+    "Tea Brokers Central Africa Limited",
+    "Eastern Produce Malawi Limited",
+    "Satemwa Tea and Coffee Estates",
+    "Lujeri Tea Estates Limited",
+    "Thyolo Tea Estates Limited",
+    "Conforzi Tea Estates Limited",
+    "Makandi Tea and Coffee Estates",
+    "Malawi Tea 2020 Trust",
+    "Smallholder Tea Authority",
+    "Malawi Tea Association",
+    "Auction Holdings Limited",
+    "Malawi Agricultural and Industrial Investment Corporation",
+    "Export Development Fund Limited",
+    "National Bank of Malawi Medical Scheme"
+]
 
 # Notifications helper
 def notify(subject: str, content: str, recipient_id: str = 'all'):
@@ -526,7 +590,7 @@ def add_patient():
         except Exception as e:
             flash(f'Error adding patient: {e}', 'error')
     
-    return render_template('add_patient.html', active_page='patients')
+    return render_template('add_patient.html', active_page='patients', providers=PROVIDERS)
 
 @app.route('/edit_patient/<patient_id>', methods=['GET', 'POST'])
 def edit_patient(patient_id):
@@ -576,7 +640,7 @@ def edit_patient(patient_id):
             print(f"[ERROR] edit_patient exception: {e}")
             flash(f'Error updating patient: {e}', 'error')
 
-    return render_template('edit_patient.html', patient=patient, active_page='patients')
+    return render_template('edit_patient.html', patient=patient, active_page='patients', providers=PROVIDERS)
 
 
 @app.route('/delete_patient/<patient_id>')
@@ -1030,31 +1094,44 @@ def billing_dashboard():
                            pending_amount=pending_amount,
                            total_bills=total_bills,
                            today_date=datetime.datetime.now().strftime("%Y-%m-%d"),
-                           active_page='billing')
+                           active_page='billing',
+                           hms_providers=PROVIDERS)
 
-@app.route('/billing/create', methods=['POST'])
+@app.route('/billing/create', methods=['GET', 'POST'])
 def create_bill():
-    try:
-        patient_id = request.form.get('patient_id')
-        services = request.form.get('services')
-        amount = float(request.form.get('amount'))
-        
-        new_bill = Bill(
-            bill_id=hms.generate_id("INV"),
-            patient_id=patient_id,
-            appointment_id="", 
-            amount=amount,
-            services=services,
-            status="Pending",
-            created_date=datetime.datetime.now().strftime("%Y-%m-%d")
-        )
-        
-        hms.create_bill(new_bill)
-        flash('Bill created successfully!', 'success')
-        notify('Bill created', new_bill.bill_id, 'cashier')
-    except Exception as e:
-        flash(f'Error creating bill: {e}', 'error')
-    return redirect(url_for('billing_dashboard'))
+    if request.method == 'POST':
+        try:
+            patient_id = request.form.get('patient_id')
+            items = request.form.getlist('items[]')
+            costs = request.form.getlist('costs[]')
+            
+            bill_items = []
+            total_amount = 0
+            for i in range(len(items)):
+                if items[i] and costs[i]:
+                    cost = float(costs[i])
+                    bill_items.append({"name": items[i], "cost": cost})
+                    total_amount += cost
+
+            new_bill = Bill(
+                bill_id=hms.generate_id("INV"),
+                patient_id=patient_id,
+                appointment_id="", 
+                amount=total_amount,
+                services=", ".join(items),
+                items=bill_items,
+                status="Pending",
+                created_date=datetime.datetime.now().strftime("%Y-%m-%d")
+            )
+            
+            hms.create_bill(new_bill)
+            flash('Bill created successfully!', 'success')
+            notify('Bill created', new_bill.bill_id, 'cashier')
+            return redirect(url_for('billing_dashboard'))
+        except Exception as e:
+            flash(f'Error creating bill: {e}', 'error')
+    
+    return render_template('billing/create_bill.html', patients=hms.patients, inventory=hms.inventory, active_page='billing')
 
 @app.route('/invoice', methods=['POST'])
 def handle_invoice():
@@ -1726,15 +1803,17 @@ def medical_records():
             record.diagnosis.lower()
         )
         
-        if all(part in record_text for part in search_parts):
-            display_list.append({
-                'record_id': record.record_id,
-                'date': record.date,
-                'patient_name': f"{patient.first_name} {patient.last_name}" if patient else 'Unknown',
-                'doctor_name': f"Dr. {doctor.last_name}" if doctor else 'Unknown',
-                'diagnosis': record.diagnosis,
-                'consult_reason': record.consult_reason
-            })
+        if search_term and not all(part in record_text for part in search_parts):
+            continue
+
+        display_list.append({
+            'record_id': record.record_id,
+            'date': record.date,
+            'patient_name': f"{patient.first_name} {patient.last_name}" if patient else 'Unknown',
+            'doctor_name': f"Dr. {doctor.last_name}" if doctor else 'Unknown',
+            'diagnosis': record.diagnosis,
+            'consult_reason': record.consult_reason
+        })
             
     return render_template('medical_records.html', records=display_list, active_page='medical_records', search_term=search_term)
 
@@ -2167,5 +2246,100 @@ def disable_user_2fa(username):
         flash(f'Error disabling 2FA for {username}!', 'error')
     return redirect(url_for('admin_users'))
 
+# ==================================
+# 📦 INVENTORY
+# ==================================
+
+@app.route('/inventory')
+def inventory():
+    search_term = request.args.get('search', '')
+    if search_term:
+        inventory_items = hms.search_inventory(search_term)
+    else:
+        inventory_items = hms.inventory
+    return render_template('inventory.html', inventory=inventory_items, active_page='inventory', search_term=search_term)
+
+@app.route('/inventory/add', methods=['GET', 'POST'])
+def add_inventory_item():
+    if request.method == 'POST':
+        try:
+            billing_codes = {}
+            providers = request.form.getlist('provider[]')
+            codes = request.form.getlist('code[]')
+            for i in range(len(providers)):
+                if providers[i] and codes[i]:
+                    billing_codes[providers[i]] = codes[i]
+
+            new_item = InventoryItem(
+                item_id=hms.generate_id("ITEM"),
+                name=request.form.get('name', 'Unknown Item'),
+                category=request.form.get('category', ''),
+                quantity=int(request.form.get('quantity') or 0),
+                unit_price=float(request.form.get('unit_price') or 0.0),
+                supplier=request.form.get('supplier', ''),
+                expiry_date=request.form.get('expiry_date', ''),
+                min_quantity=int(request.form.get('min_quantity') or 0),
+                is_medicine='is_medicine' in request.form,
+                billing_codes=billing_codes
+            )
+            print(f"DEBUG: Adding inventory item: {new_item}") # Debug print
+            if hms.add_inventory_item(new_item):
+                flash('Inventory item added successfully!', 'success')
+            else:
+                flash('Failed to add inventory item to system.', 'error')
+            return redirect(url_for('inventory'))
+        except Exception as e:
+            print(f"DEBUG: Error adding item: {e}") # Debug print
+            flash(f'Error adding item: {e}', 'error')
+    return render_template('add_inventory_item.html', active_page='inventory', providers=PROVIDERS)
+
+@app.route('/inventory/edit/<item_id>', methods=['GET', 'POST'])
+def edit_inventory_item(item_id):
+    item = hms.get_inventory_item(item_id)
+    if not item:
+        flash('Inventory item not found!', 'error')
+        return redirect(url_for('inventory'))
+
+    if request.method == 'POST':
+        try:
+            billing_codes = {}
+            providers = request.form.getlist('provider[]')
+            codes = request.form.getlist('code[]')
+            for i in range(len(providers)):
+                if providers[i] and codes[i]:
+                    billing_codes[providers[i]] = codes[i]
+
+            item.name = request.form.get('name', 'Unknown Item')
+            item.category = request.form.get('category', '')
+            item.quantity = int(request.form.get('quantity') or 0)
+            item.unit_price = float(request.form.get('unit_price') or 0.0)
+            item.supplier = request.form.get('supplier', '')
+            item.expiry_date = request.form.get('expiry_date', '')
+            item.min_quantity = int(request.form.get('min_quantity') or 0)
+            item.is_medicine = 'is_medicine' in request.form
+            item.billing_codes = billing_codes
+            
+            if hms.update_inventory_item(item):
+                flash('Inventory item updated successfully!', 'success')
+            else:
+                flash('Failed to update inventory item in system.', 'error')
+            return redirect(url_for('inventory'))
+        except Exception as e:
+            flash(f'Error updating item: {e}', 'error')
+
+    return render_template('edit_inventory_item.html', item=item, active_page='inventory', providers=PROVIDERS)
+
+@app.route('/inventory/delete/<item_id>')
+def delete_inventory_item(item_id):
+    if hms.delete_inventory_item(item_id):
+        flash('Inventory item deleted successfully!', 'success')
+    else:
+        flash('Error deleting item!', 'error')
+    return redirect(url_for('inventory'))
+
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # On some systems, the reloader can cause threading issues with background initializations.
+    # We use threaded=True (default) and can try use_reloader=False if issues persist.
+    app.run(debug=True, port=5000, threaded=True)

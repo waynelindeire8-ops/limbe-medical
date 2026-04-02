@@ -2,7 +2,13 @@ import os
 import json
 from supabase import create_client, Client
 
+_supabase_client = None
+
 def get_supabase_client() -> Client:
+    global _supabase_client
+    if _supabase_client is not None:
+        return _supabase_client
+
     # On Render or other cloud platforms, env vars are often strings.
     # We strip whitespace just in case.
     url = os.environ.get("SUPABASE_URL", "").strip()
@@ -27,7 +33,8 @@ def get_supabase_client() -> Client:
         return None
         
     try:
-        return create_client(url, key)
+        _supabase_client = create_client(url, key)
+        return _supabase_client
     except Exception as e:
         print(f"[ERROR] Failed to create Supabase client: {e}")
         return None
