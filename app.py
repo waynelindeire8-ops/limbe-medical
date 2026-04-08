@@ -1079,8 +1079,8 @@ def billing_dashboard():
     search_term = request.args.get('search', '').lower().strip()
     search_parts = search_term.split()
     
-    # Sort bills by date descending (newest first)
-    all_bills = sorted(hms.bills, key=lambda x: (x.created_date or ''), reverse=True)
+    # Sort bills by timestamp descending (newest first), falling back to date if timestamp missing
+    all_bills = sorted(hms.bills, key=lambda x: (x.created_at or x.created_date or ''), reverse=True)
     
     # Resolve patient names for display
     display_bills = []
@@ -1123,6 +1123,7 @@ def billing_dashboard():
     return render_template('billing_dashboard.html', 
                            bills=display_bills, 
                            patients=hms.patients,
+                           inventory=hms.inventory,
                            total_revenue=total_revenue,
                            pending_amount=pending_amount,
                            total_bills=total_bills,
@@ -1135,27 +1136,76 @@ def create_bill():
     if request.method == 'POST':
         try:
             patient_id = request.form.get('patient_id')
-            items = request.form.getlist('items[]')
-            costs = request.form.getlist('costs[]')
             
-            bill_items = []
-            total_amount = 0
-            for i in range(len(items)):
-                if items[i] and costs[i]:
-                    cost = float(costs[i])
-                    bill_items.append({"name": items[i], "cost": cost})
-                    total_amount += cost
+            # Check if it's the dashboard's "Create Bill" tab fields
+            if request.form.getlist('item_date[]'):
+                dates = request.form.getlist('item_date[]')
+                id_nos = request.form.getlist('item_id_no[]')
+                cons = request.form.getlist('item_con[]')
+                drugs = request.form.getlist('item_drug[]')
+                labs = request.form.getlist('item_lab[]')
+                amounts = request.form.getlist('item_amount[]')
+                
+                invoice_items = []
+                total_amount = 0
+                services_summary = []
+                
+                for i in range(len(dates)):
+                    if not dates[i]: continue
+                    
+                    amt = float(amounts[i])
+                    total_amount += amt
+                    
+                    item = {
+                        'date': dates[i],
+                        'id_no': id_nos[i],
+                        'con': float(cons[i]),
+                        'drug': float(drugs[i]),
+                        'lab': float(labs[i]),
+                        'amount': amt
+                    }
+                    invoice_items.append(item)
+                    services_summary.append(f"Services on {dates[i]} (${amt})")
+                
+                if not invoice_items:
+                    flash('No items added to invoice', 'error')
+                    return redirect(url_for('billing_dashboard'))
+                
+                new_bill = Bill(
+                    bill_id=hms.generate_id("INV"),
+                    patient_id=patient_id,
+                    appointment_id="",
+                    amount=total_amount,
+                    services=", ".join(services_summary),
+                    status="Pending",
+                    created_date=datetime.datetime.now().strftime("%Y-%m-%d"),
+                    items=invoice_items,
+                    created_at=datetime.datetime.now().isoformat()
+                )
+            else:
+                # Old style / legacy form support
+                items = request.form.getlist('items[]')
+                costs = request.form.getlist('costs[]')
+                provider = request.form.get('provider') or 'Cash'
+                bill_items = []
+                total_amount = 0
+                for i in range(len(items)):
+                    if items[i] and costs[i]:
+                        cost = float(costs[i])
+                        bill_items.append({"name": items[i], "cost": cost, "provider": provider})
+                        total_amount += cost
 
-            new_bill = Bill(
-                bill_id=hms.generate_id("INV"),
-                patient_id=patient_id,
-                appointment_id="", 
-                amount=total_amount,
-                services=", ".join(items),
-                items=bill_items,
-                status="Pending",
-                created_date=datetime.datetime.now().strftime("%Y-%m-%d")
-            )
+                new_bill = Bill(
+                    bill_id=hms.generate_id("INV"),
+                    patient_id=patient_id,
+                    appointment_id="", 
+                    amount=total_amount,
+                    services=", ".join(items),
+                    items=bill_items,
+                    status="Pending",
+                    created_date=datetime.datetime.now().strftime("%Y-%m-%d"),
+                    created_at=datetime.datetime.now().isoformat()
+                )
             
             hms.create_bill(new_bill)
             flash('Bill created successfully!', 'success')
@@ -1164,7 +1214,7 @@ def create_bill():
         except Exception as e:
             flash(f'Error creating bill: {e}', 'error')
     
-    return render_template('billing/create_bill.html', patients=hms.patients, inventory=hms.inventory, active_page='billing')
+    return render_template('billing/create_bill.html', patients=hms.patients, inventory=hms.inventory, providers=PROVIDERS, active_page='billing')
 
 @app.route('/invoice', methods=['POST'])
 def handle_invoice():
@@ -1214,7 +1264,8 @@ def handle_invoice():
             status="Pending",
             created_date=invoice_date,
             provider=provider,
-            items=invoice_items
+            items=invoice_items,
+            created_at=datetime.datetime.now().isoformat()
         )
         
         hms.create_bill(new_bill)
@@ -1271,7 +1322,8 @@ def handle_individual_invoice():
             services=", ".join(services_summary),
             status="Pending",
             created_date=invoice_date,
-            items=invoice_items
+            items=invoice_items,
+            created_at=datetime.datetime.now().isoformat()
         )
         
         hms.create_bill(new_bill)

@@ -91,6 +91,15 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="provider">Scheme Provider (for code mapping)</label>
+                        <select name="provider" id="provider" class="form-control">
+                            {% for p in providers %}
+                            <option value="{{ p }}" {% if p == 'Cash' %}selected{% endif %}>{{ p }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label for="inventory_search">Add Item from Inventory</label>
                         <input type="text" id="inventory_search" class="form-control" placeholder="Search for an item...">
                         <div id="inventory_results"></div>
@@ -128,9 +137,13 @@
             let filteredItems = inventory.filter(item => item.name.toLowerCase().includes(searchTerm));
             filteredItems.forEach(item => {
                 let div = document.createElement('div');
-                div.innerHTML = `${item.name} - ${item.unit_price}`;
+                const provider = document.getElementById('provider').value;
+                const code = (item.billing_codes && item.billing_codes[provider]) ? item.billing_codes[provider] : (Object.keys(item.billing_codes || {})[0] || '');
+                const display = code ? `[${code}] ${item.name}` : item.name;
+                div.innerHTML = `${display} - ${item.unit_price}`;
                 div.onclick = () => {
-                    addItem(item.name, item.unit_price);
+                    const desc = code ? `[${code}] ${item.name}` : item.name;
+                    addItem(desc, item.unit_price, true);
                     document.getElementById('inventory_search').value = '';
                     resultsContainer.innerHTML = '';
                 };
@@ -138,14 +151,14 @@
             });
         });
 
-        function addItem(name = '', cost = '') {
+        function addItem(name = '', cost = '', fromInventory = false) {
             const itemList = document.getElementById('itemList');
             const itemRow = document.createElement('div');
             itemRow.className = 'invoice-item';
             itemRow.innerHTML = `
                 <div class="item-row">
                     <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" value="${name}" required>
-                    <input type="number" name="costs[]" class="form-control cost-input" placeholder="Cost (MWK)" step="0.01" min="0" value="${cost}" oninput="updateTotal()" required>
+                    <input type="number" name="costs[]" class="form-control cost-input" placeholder="Cost (MWK)" step="0.01" min="0" value="${cost}" oninput="updateTotal()" ${fromInventory ? 'readonly' : ''} required>
                 </div>
                 <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
             `;

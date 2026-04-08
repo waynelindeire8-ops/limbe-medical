@@ -777,7 +777,8 @@ class HospitalInterface:
             amount=amount,
             services=", ".join(services),
             status="Pending",
-            created_date=datetime.now().strftime('%Y-%m-%d')
+            created_date=datetime.now().strftime('%Y-%m-%d'),
+            created_at=datetime.now().isoformat()
         )
         
         if self.hms.create_bill(bill):

@@ -84,6 +84,7 @@ class Bill:
     created_date: str = ""
     provider: str = ""
     items: list = field(default_factory=list)
+    created_at: str = ""  # ISO format timestamp for sorting
 
 
 @dataclass
