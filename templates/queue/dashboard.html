@@ -107,6 +107,7 @@
                 <div class="header-right" style="display: flex; gap: 10px; align-items: center;">
                     <input type="text" id="globalQueueSearch" placeholder="Search patients in queue..." style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 20px; width: 250px; outline: none;">
                     <a href="{{ url_for('queue_checkin') }}" class="btn btn-primary"><i class="fas fa-plus"></i> Check-in Patient</a>
+                    <a href="{{ url_for('queue_clear_all') }}" class="btn btn-primary" style="background-color:#dc3545;" onclick="return confirm('Clear all items from the queue? This cannot be undone.');"><i class="fas fa-trash"></i> Clear All</a>
                 </div>
             </header>
 

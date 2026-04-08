@@ -14,6 +14,7 @@ hms = HospitalManagementSystem()
 
 # Providers List for Billing and Inventory
 PROVIDERS = [
+    "Cash",
     "Medical Aid Society of Malawi (MASM)",
     "Central Health Medical Aid",
     "Umoyo Health Care Insurance Company",
@@ -413,8 +414,10 @@ def queue_checkin():
 
 @app.route('/queue/dashboard')
 def queue_dashboard():
+    # Exclude completed and no-show items from active dashboard
+    active_items = [q for q in hms.queue if (q.status or '').strip() not in ['Completed', 'No-show']]
     queues_by_dept = {}
-    for q in hms.queue:
+    for q in active_items:
         d = q.department or 'General'
         queues_by_dept.setdefault(d, []).append(q)
     for d in queues_by_dept:
@@ -456,6 +459,17 @@ def queue_noshow(queue_id):
     if hms.update_queue_status(queue_id, 'No-show'):
         flash('Marked as no-show.', 'success')
         notify('No-show', queue_id, 'receptionist')
+    return redirect(url_for('queue_dashboard'))
+
+@app.route('/queue/clear_all')
+def queue_clear_all():
+    try:
+        hms.queue = []
+        hms.save_data()
+        flash('Cleared all items from the queue.', 'success')
+        notify('Queue cleared', 'All items cleared', 'receptionist')
+    except Exception as e:
+        flash(f'Error clearing queue: {e}', 'error')
     return redirect(url_for('queue_dashboard'))
 
 @app.route('/patient/<patient_id>')
@@ -2358,27 +2372,50 @@ def inventory_import():
         if not items_text:
             flash('Please paste items to import.', 'error')
             return redirect(url_for('inventory_import'))
-        pattern = re.compile(r'^\s*(\d{4,6})\s+(.+?)\s+(\d+(?:\.\d{1,2})?)\s*$', re.IGNORECASE)
+        # Improved pattern: Handles optional repeated code and various price formats
+        # Matches: [CODE] [OPTIONAL_CODE] ITEM_NAME PRICE
+        # Example: 33157 33157 LONART TABLETS 12S Tablets 500
+        # Example: 32100 ACYCLOVR Cream 15mg 2990
+        pattern = re.compile(r'^\s*(\d{4,6})(?:\s+\d{4,6})?\s+(.+?)\s+([\d,]+(?:\.\d+)?)\s*$', re.IGNORECASE)
         added = 0
         for raw in items_text.splitlines():
             line = raw.strip()
             if not line:
                 continue
+            
             m = pattern.match(line)
-            if not m:
-                # Try alternative: code, item, price separated by tabs or commas
-                parts = re.split(r'[\t,]+', line)
-                if len(parts) >= 3 and parts[0].strip().isdigit():
+            if m:
+                code, item_name, price_str = m.group(1), m.group(2), m.group(3)
+                # Clean price string (remove commas)
+                price = float(price_str.replace(',', ''))
+            else:
+                # Try alternative: split by tabs or multiple spaces
+                parts = re.split(r'\t+|\s{2,}', line)
+                if len(parts) >= 3:
                     code = parts[0].strip()
                     item_name = parts[1].strip()
+                    price_str = parts[2].strip()
                     try:
-                        price = float(parts[2].strip())
-                    except Exception:
-                        price = 0.0
+                        price = float(price_str.replace(',', '').replace('$', ''))
+                    except:
+                        continue
                 else:
-                    continue
-            else:
-                code, item_name, price = m.group(1), m.group(2), float(m.group(3))
+                    # Final fallback: last word is price, first word is code
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        code = parts[0]
+                        price_str = parts[-1]
+                        item_name = " ".join(parts[1:-1])
+                        # If second part is also a code, skip it
+                        if item_name.split()[0].isdigit():
+                            item_name = " ".join(item_name.split()[1:])
+                        try:
+                            price = float(price_str.replace(',', '').replace('$', ''))
+                        except:
+                            continue
+                    else:
+                        continue
+            
             try:
                 new_item = InventoryItem(
                     item_id=hms.generate_id("ITEM"),
@@ -2392,11 +2429,16 @@ def inventory_import():
                     is_medicine=mark_medicine,
                     billing_codes={provider: code}
                 )
-                hms.add_inventory_item(new_item)
+                hms.patients # Just to trigger some activity if needed? No.
+                # Use a more direct append to avoid repeated save_data in loop if possible
+                # but hms.add_inventory_item is the standard way.
+                hms.inventory.append(new_item)
                 added += 1
             except Exception as e:
                 print(f"[WARN] Failed to import line '{line}': {e}")
+        
         if added > 0:
+            hms.save_data()
             flash(f'Imported {added} item(s) for {provider}.', 'success')
         else:
             flash('No items were imported. Please check the format.', 'error')
