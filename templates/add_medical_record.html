@@ -134,7 +134,7 @@
                             <select name="doctor_id" required>
                                 <option value="">Select Doctor</option>
                                 {% for d in doctors %}
-                                <option value="{{ d.doctor_id }}">Dr. {{ d.last_name }} ({{ d.specialization }})</option>
+                                <option value="{{ d.doctor_id }}">Dr. {{ d.last_name }} ({{ d.specialty }})</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -187,6 +187,11 @@
                         <div class="form-group">
                             <label>Treatment:</label>
                             <textarea name="treatment" required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Prescriptions:</label>
+                            <textarea name="prescriptions"></textarea>
                         </div>
                     </div>
                     
@@ -454,7 +459,10 @@
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn-save">Save Record</button>
+                    <div style="float: right; display: flex; gap: 10px; margin-top: 10px;">
+                        <button type="submit" name="action" value="save" class="btn-save">Save Record</button>
+                        <button type="submit" name="action" value="send_to_lab" class="btn-save" style="background-color: #f72585;">Save & Send to Lab</button>
+                    </div>
                     <div style="clear: both;"></div>
                 </form>
             </div>

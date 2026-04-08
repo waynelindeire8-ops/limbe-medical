@@ -21,8 +21,8 @@
                 <div class="form-group">
                     <label>Patient</label>
                     <select name="patient_id" required>
-                        {% for patient in patients %}
-                            <option value="{{ patient.patient_id }}">{{ patient.first_name }} {{ patient.last_name }}</option>
+                        {% for p in patients %}
+                            <option value="{{ p.patient_id }}" {% if patient_id == p.patient_id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }} ({{ p.patient_id }})</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -36,7 +36,7 @@
                 </div>
                 <div class="form-group">
                     <label>Test Date</label>
-                    <input type="date" name="test_date" required>
+                    <input type="date" name="test_date" value="{{ today }}" required>
                 </div>
                 <div class="form-group">
                     <label>Result Value</label>

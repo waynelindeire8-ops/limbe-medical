@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory, jsonify
 import datetime
 import os
+import re
 from werkzeug.utils import secure_filename
 from functools import wraps
 from dataclasses import asdict
@@ -468,6 +469,8 @@ def patient_details(patient_id):
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
     bills = hms.get_patient_bills(patient_id)
+    lab_results = [lr for lr in hms.lab_results if lr.patient_id == patient_id]
+    queue_item = next((q for q in hms.queue if q.patient_id == patient_id and q.status != 'Completed'), None)
     
     return render_template('patient_details.html', 
                            patient=patient, 
@@ -475,7 +478,23 @@ def patient_details(patient_id):
                            appointments=appointments, 
                            medical_records=medical_records,
                            bills=bills,
+                           lab_results=lab_results,
+                           queue_item=queue_item,
                            active_page='patients')
+
+@app.route('/patient/<patient_id>/send_to_lab')
+def send_to_lab(patient_id):
+    queue_item = next((q for q in hms.queue if q.patient_id == patient_id and q.status != 'Completed'), None)
+    if queue_item:
+        queue_item.status = "In Lab"
+        hms.save_data()
+        notify('Lab Request', f"{patient_id} sent to lab", 'lab_assistant')
+        flash('Patient sent to lab.', 'success')
+    else:
+        # Patient not in queue, maybe check them in first?
+        # For simplicity, we'll just say they aren't in the active queue.
+        flash('Patient is not currently in the active queue.', 'error')
+    return redirect(url_for('patient_details', patient_id=patient_id))
 
 @app.route('/patient/<patient_id>/upload_file', methods=['POST'])
 def upload_patient_file(patient_id):
@@ -730,10 +749,10 @@ def create_medical_record():
                 record_id=hms.generate_id("MR"),
                 patient_id=request.form['patient_id'],
                 doctor_id=request.form['doctor_id'],
-                visit_date=request.form['visit_date'],
+                date=request.form.get('visit_date', request.form.get('date', '')),
                 diagnosis=request.form['diagnosis'],
                 treatment=request.form['treatment'],
-                prescription=request.form.get('prescription', ''),
+                prescriptions=request.form.get('prescriptions', request.form.get('prescription', '')),
                 notes=request.form.get('notes', '')
             )
             hms.add_medical_record(new_record)
@@ -1941,13 +1960,26 @@ def add_medical_record():
                 consult_reason=request.form['consult_reason'],
                 diagnosis=request.form['diagnosis'],
                 treatment=request.form['treatment'],
-                prescriptions=request.form['prescriptions'],
+                prescriptions=request.form.get('prescriptions', ''),
                 notes=request.form.get('notes', ''),
                 details=details
             )
             hms.add_medical_record(new_record)
             flash('Medical record added successfully!', 'success')
             notify('Medical record added', new_record.record_id, 'doctor')
+            
+            # Check if doctor wants to send patient to lab
+            if request.form.get('action') == 'send_to_lab':
+                # Find patient in queue and update status
+                queue_item = next((q for q in hms.queue if q.patient_id == new_record.patient_id and q.status != 'Completed'), None)
+                if queue_item:
+                    queue_item.status = "In Lab"
+                    hms.save_data()
+                    notify('Lab Request', f"{new_record.patient_id} sent to lab", 'lab_assistant')
+                    flash('Patient sent to lab.', 'info')
+                else:
+                    flash('Patient not found in active queue, but record saved.', 'warning')
+            
             return redirect(url_for('medical_records'))
         except Exception as e:
             flash(f'Error adding medical record: {e}', 'error')
@@ -1972,28 +2004,37 @@ def edit_medical_record(record_id):
             record.consult_reason = request.form['consult_reason']
             record.diagnosis = request.form['diagnosis']
             record.treatment = request.form['treatment']
-            record.prescriptions = request.form['prescriptions']
+            record.prescriptions = request.form.get('prescriptions', '')
             record.notes = request.form.get('notes', '')
             
-            record.details.update({
-                'main_symptoms': request.form.get('main_symptoms'),
-                'symptoms_duration': request.form.get('symptoms_duration'),
-                'pain_level': request.form.get('pain_level'),
-                'blood_pressure': request.form.get('blood_pressure'),
-                'temperature': request.form.get('temperature'),
-                'heart_rate': request.form.get('heart_rate'),
-                'weight': request.form.get('weight'),
-                'preliminary_diagnosis': request.form.get('preliminary_diagnosis'),
-                'personal_info': request.form.get('personal_info'),
-                'emergency_contact': request.form.get('emergency_contact'),
-                'office_use': request.form.get('office_use'),
-                'authorization_release': request.form.get('authorization_release'),
-                'notes': request.form.get('notes')
-            })
+            # Update only fields present in form
+            for key in [
+                'main_symptoms', 'symptoms_duration', 'pain_level', 'blood_pressure',
+                'temperature', 'heart_rate', 'weight', 'preliminary_diagnosis',
+                'personal_info', 'emergency_contact', 'office_use', 'authorization_release'
+            ]:
+                if key in request.form:
+                    record.details[key] = request.form[key]
+            
+            if 'notes' in request.form:
+                record.details['notes'] = request.form['notes']
             
             hms.update_medical_record(record)
             flash('Medical record updated successfully!', 'success')
             notify('Medical record updated', record_id, 'doctor')
+            
+            # Check if doctor wants to send patient to lab
+            if request.form.get('action') == 'send_to_lab':
+                # Find patient in queue and update status
+                queue_item = next((q for q in hms.queue if q.patient_id == record.patient_id and q.status != 'Completed'), None)
+                if queue_item:
+                    queue_item.status = "In Lab"
+                    hms.save_data()
+                    notify('Lab Request', f"{record.patient_id} sent to lab", 'lab_assistant')
+                    flash('Patient sent to lab.', 'info')
+                else:
+                    flash('Patient not found in active queue, but record updated.', 'warning')
+            
             return redirect(url_for('medical_records'))
         except Exception as e:
             flash(f'Error updating medical record: {e}', 'error')
@@ -2080,6 +2121,7 @@ def lab_results():
 
 @app.route('/lab_results/add', methods=['GET', 'POST'])
 def add_lab_result():
+    patient_id = request.args.get('patient_id')
     if request.method == 'POST':
         try:
             new_result = LabResult(
@@ -2101,7 +2143,8 @@ def add_lab_result():
             flash(f'Error adding lab result: {e}', 'error')
     patients = hms.patients
     doctors = hms.doctors
-    return render_template('add_lab_result.html', patients=patients, doctors=doctors, active_page='lab_results')
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    return render_template('add_lab_result.html', patients=patients, doctors=doctors, patient_id=patient_id, today=today, active_page='lab_results')
 
 @app.route('/lab_results/edit/<result_id>', methods=['GET', 'POST'])
 def edit_lab_result(result_id):
@@ -2122,6 +2165,16 @@ def edit_lab_result(result_id):
             result.notes = request.form.get('notes')
             hms.update_lab_result(result)
             flash('Lab result updated successfully!', 'success')
+            
+            # If status is Completed, notify doctor and potentially update queue
+            if result.status == 'Completed':
+                notify('Lab Results Ready', f"Results for {result.patient_id} are ready", result.doctor_id)
+                queue_item = next((q for q in hms.queue if q.patient_id == result.patient_id and q.status == 'In Lab'), None)
+                if queue_item:
+                    queue_item.status = "Ready for Review"
+                    hms.save_data()
+                    flash('Patient status updated to Ready for Review.', 'info')
+
             return redirect(url_for('lab_results'))
         except Exception as e:
             flash(f'Error updating lab result: {e}', 'error')
@@ -2292,6 +2345,63 @@ def add_inventory_item():
             print(f"DEBUG: Error adding item: {e}") # Debug print
             flash(f'Error adding item: {e}', 'error')
     return render_template('add_inventory_item.html', active_page='inventory', providers=PROVIDERS)
+
+@app.route('/inventory/import', methods=['GET', 'POST'])
+def inventory_import():
+    if request.method == 'POST':
+        provider = request.form.get('provider', '').strip()
+        items_text = request.form.get('items_text', '').strip()
+        mark_medicine = True  # default to medicines
+        if not provider:
+            flash('Please select a scheme provider.', 'error')
+            return redirect(url_for('inventory_import'))
+        if not items_text:
+            flash('Please paste items to import.', 'error')
+            return redirect(url_for('inventory_import'))
+        pattern = re.compile(r'^\s*(\d{4,6})\s+(.+?)\s+(\d+(?:\.\d{1,2})?)\s*$', re.IGNORECASE)
+        added = 0
+        for raw in items_text.splitlines():
+            line = raw.strip()
+            if not line:
+                continue
+            m = pattern.match(line)
+            if not m:
+                # Try alternative: code, item, price separated by tabs or commas
+                parts = re.split(r'[\t,]+', line)
+                if len(parts) >= 3 and parts[0].strip().isdigit():
+                    code = parts[0].strip()
+                    item_name = parts[1].strip()
+                    try:
+                        price = float(parts[2].strip())
+                    except Exception:
+                        price = 0.0
+                else:
+                    continue
+            else:
+                code, item_name, price = m.group(1), m.group(2), float(m.group(3))
+            try:
+                new_item = InventoryItem(
+                    item_id=hms.generate_id("ITEM"),
+                    name=item_name,
+                    category='Medicine',
+                    quantity=0,
+                    unit_price=price,
+                    supplier='',
+                    expiry_date='',
+                    min_quantity=0,
+                    is_medicine=mark_medicine,
+                    billing_codes={provider: code}
+                )
+                hms.add_inventory_item(new_item)
+                added += 1
+            except Exception as e:
+                print(f"[WARN] Failed to import line '{line}': {e}")
+        if added > 0:
+            flash(f'Imported {added} item(s) for {provider}.', 'success')
+        else:
+            flash('No items were imported. Please check the format.', 'error')
+        return redirect(url_for('inventory'))
+    return render_template('inventory_import.html', active_page='inventory', providers=PROVIDERS)
 
 @app.route('/inventory/edit/<item_id>', methods=['GET', 'POST'])
 def edit_inventory_item(item_id):

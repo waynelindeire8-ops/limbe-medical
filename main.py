@@ -711,10 +711,12 @@ class HospitalManagementSystem:
 
         results = []
         for item in self.inventory:
+            billing_text = " ".join([f"{p} {c}" for p, c in (item.billing_codes or {}).items()]).lower()
             item_text = (
                 item.name.lower() + " " +
                 (item.category or '').lower() + " " +
-                item.item_id.lower()
+                item.item_id.lower() + " " +
+                billing_text
             )
 
             if all(part in item_text for part in search_parts):

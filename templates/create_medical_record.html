@@ -44,7 +44,7 @@
                         <label for="doctor_id">Doctor</label>
                         <select id="doctor_id" name="doctor_id" required>
                             {% for d in doctors %}
-                                <option value="{{ d.doctor_id }}">{{ d.name }}</option>
+                                <option value="{{ d.doctor_id }}">Dr. {{ d.last_name }}</option>
                             {% endfor %}
                         </select>
                     </div>

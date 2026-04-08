@@ -129,7 +129,11 @@
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <h2>{{ patient.first_name }} {{ patient.last_name }}</h2>
                         <div>
-                            <a href="{{ url_for('edit_patient', patient_id=patient.patient_id) }}" class="btn-add" style="background-color: #4361ee; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-size: 14px;"><i class="fas fa-edit"></i> Edit Profile</a>
+                            <a href="{{ url_for('add_medical_record', patient_id=patient.patient_id) }}" class="btn-add" style="background-color: #4361ee; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-size: 14px; margin-right: 5px;"><i class="fas fa-plus"></i> New Record</a>
+                            {% if queue_item and queue_item.status != 'In Lab' %}
+                            <a href="{{ url_for('send_to_lab', patient_id=patient.patient_id) }}" class="btn-add" style="background-color: #f72585; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-size: 14px; margin-right: 5px;"><i class="fas fa-flask"></i> Send to Lab</a>
+                            {% endif %}
+                            <a href="{{ url_for('edit_patient', patient_id=patient.patient_id) }}" class="btn-add" style="background-color: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-size: 14px;"><i class="fas fa-edit"></i> Edit Profile</a>
                         </div>
                     </div>
                     
@@ -224,6 +228,7 @@
                     <div class="section-card">
                         <div class="section-header">
                             <h3>Medical Records</h3>
+                            <a href="{{ url_for('medical_records', search=patient.patient_id) }}" style="font-size: 13px; color: #4361ee; text-decoration: none;">View All</a>
                         </div>
                         <div class="table-responsive">
                             <table>
@@ -231,7 +236,7 @@
                                     <tr>
                                         <th>Date</th>
                                         <th>Diagnosis</th>
-                                        <th>Doctor</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -239,11 +244,55 @@
                                     <tr>
                                         <td>{{ record.date }}</td>
                                         <td>{{ record.diagnosis }}</td>
-                                        <td>{{ record.doctor_id }}</td>
+                                        <td>
+                                            <a href="{{ url_for('edit_medical_record', record_id=record.record_id) }}" style="color: #4361ee; margin-right: 10px;" title="Edit"><i class="fas fa-edit"></i></a>
+                                            <a href="{{ url_for('view_medical_record', record_id=record.record_id) }}" style="color: #4361ee;" title="View"><i class="fas fa-eye"></i></a>
+                                        </td>
                                     </tr>
                                     {% else %}
                                     <tr>
                                         <td colspan="3" style="text-align: center; color: #888;">No records found.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Lab Results -->
+                    <div class="section-card">
+                        <div class="section-header">
+                            <h3>Lab Results</h3>
+                            <a href="{{ url_for('add_lab_result', patient_id=patient.patient_id) }}" style="font-size: 13px; color: #4361ee; text-decoration: none;"><i class="fas fa-plus"></i> Add Lab</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Test Name</th>
+                                        <th>Result</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for result in lab_results %}
+                                    <tr>
+                                        <td>{{ result.test_date }}</td>
+                                        <td>{{ result.test_name }}</td>
+                                        <td>{{ result.result_value or '-' }} {{ result.units or '' }}</td>
+                                        <td>
+                                            <span style="padding: 2px 6px; border-radius: 4px; font-size: 12px; 
+                                                {% if result.status == 'Completed' %}background-color: #ebfbee; color: #2b8a3e;
+                                                {% elif result.status == 'Pending' %}background-color: #fff4e6; color: #f08c00;
+                                                {% else %}background-color: #f1f3f5; color: #495057;{% endif %}">
+                                                {{ result.status }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; color: #888;">No lab results found.</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
