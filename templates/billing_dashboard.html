@@ -606,7 +606,12 @@
             ],
             inventory: [
                 {% for item in inventory %}
-                { value: "{{ item.item_id }}", text: "{{ item.name }}", price: {{ item.unit_price }} },
+                { 
+                    value: "{{ item.item_id }}", 
+                    text: "{{ item.name }}", 
+                    price: {{ item.unit_price }},
+                    schemes: {{ item.billing_codes | tojson if item.billing_codes else '{}' }}
+                },
                 {% endfor %}
             ]
         };
@@ -684,7 +689,8 @@
         function populateInventorySelects(scope=document) {
             const opts = ['<option value=\"\"></option>'].concat(
                 autocompleteData.inventory.map(i => {
-                    const label = `${i.text} — ${Number(i.price).toFixed(2)}`;
+                    const schemesText = Object.keys(i.schemes || {}).join(', ');
+                    const label = `${i.text} ${schemesText ? `(${schemesText})` : ''} — ${Number(i.price).toFixed(2)}`;
                     return `<option value=\"${i.value}\" data-price=\"${i.price}\">${label}</option>`;
                 })
             ).join('');
@@ -728,7 +734,18 @@
             // Sort autocomplete data
             autocompleteData.patients.sort((a, b) => a.text.localeCompare(b.text));
             autocompleteData.providers.sort((a, b) => a.text.localeCompare(b.text));
-            autocompleteData.inventory.sort((a, b) => a.text.localeCompare(b.text));
+            
+            // Sort inventory: prioritize items starting with "CASH" (case-insensitive), then alphabetical
+            autocompleteData.inventory.sort((a, b) => {
+                const aText = a.text.toLowerCase();
+                const bText = b.text.toLowerCase();
+                const aIsCash = aText.includes('cash');
+                const bIsCash = bText.includes('cash');
+                
+                if (aIsCash && !bIsCash) return -1;
+                if (!aIsCash && bIsCash) return 1;
+                return a.text.localeCompare(b.text);
+            });
             
             setupAutocomplete(document.body);
             populateInventorySelects(document);

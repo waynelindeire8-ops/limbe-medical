@@ -2541,6 +2541,30 @@ def delete_inventory_item(item_id):
         flash('Error deleting item!', 'error')
     return redirect(url_for('inventory'))
 
+@app.route('/inventory/bulk_price_update', methods=['POST'])
+def inventory_bulk_price_update():
+    try:
+        percentage = float(request.form.get('percentage') or 0.0)
+        if percentage == 0:
+            flash('Percentage must be non-zero.', 'warning')
+            return redirect(url_for('inventory'))
+        
+        factor = 1 + (percentage / 100.0)
+        updated_count = 0
+        for item in hms.inventory:
+            item.unit_price = round(item.unit_price * factor, 2)
+            updated_count += 1
+        
+        if updated_count > 0:
+            hms.save_data()
+            flash(f'Successfully updated prices for {updated_count} items by {percentage}%.', 'success')
+        else:
+            flash('No items found to update.', 'info')
+            
+    except Exception as e:
+        flash(f'Error updating prices: {e}', 'error')
+    return redirect(url_for('inventory'))
+
 
 
 if __name__ == '__main__':
