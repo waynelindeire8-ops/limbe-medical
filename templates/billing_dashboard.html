@@ -619,7 +619,11 @@
         const autocompleteData = {
             patients: [
                 {% for p in patients %}
-                { value: "{{ p.patient_id }}", text: "{{ p.first_name }} {{ p.last_name }}" },
+                { 
+                    value: "{{ p.patient_id }}", 
+                    text: "{{ p.first_name }} {{ p.last_name }}",
+                    scheme: "{{ p.scheme_provider or 'Cash' }}"
+                },
                 {% endfor %}
             ],
             providers: [
@@ -676,6 +680,9 @@
                                 updateCalculations(input.closest('tr'));
                             }
                         }
+
+                        // Trigger change event so other listeners know a selection was made
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
                     } else {
                         suggestionBox.textContent = '';
                         valueInput.value = '';
@@ -712,32 +719,48 @@
         function populateInventorySelects(scope=document, filterProvider = null) {
             let filteredInventory = autocompleteData.inventory;
             
-            const masm = "Medical Aid Society of Malawi (MASM)";
-            const precious = "Precious Medical International";
-
-            // If it's MASM or Precious, filter by that provider.
-            // Otherwise (including 'Cash' or no provider), filter by 'Cash'.
-            let targetFilter = filterProvider || 'Cash';
-            if (targetFilter !== masm && targetFilter !== precious) {
+            // Standardize the provider names for comparison
+            const masmFull = "Medical Aid Society of Malawi (MASM)";
+            const preciousFull = "Precious Medical International";
+            
+            // Determine target filter based on user's rule
+            let targetFilter = (filterProvider || 'Cash').trim();
+            
+            // Normalize targetFilter to match our known schemes if it's a partial match
+            if (targetFilter.toLowerCase().includes('masm') || targetFilter.toLowerCase().includes('medical aid society of malawi')) {
+                targetFilter = masmFull;
+            } else if (targetFilter.toLowerCase().includes('precious')) {
+                targetFilter = preciousFull;
+            } else if (targetFilter.toLowerCase() === 'cash') {
                 targetFilter = 'Cash';
             }
             
-            filteredInventory = autocompleteData.inventory.filter(item => 
-                item.schemes && item.schemes[targetFilter]
-            );
+            // Special rule: MASM and Precious use their own items.
+            // Everyone else uses Cash items.
+            if (targetFilter !== masmFull && targetFilter !== preciousFull) {
+                targetFilter = 'Cash';
+            }
+            
+            console.log(`Filtering items for scheme: ${targetFilter}`);
+
+            filteredInventory = autocompleteData.inventory.filter(item => {
+                if (!item.schemes) return targetFilter === 'Cash';
+                // Check if the item has a billing code for our target scheme
+                return Object.keys(item.schemes).some(s => s.trim() === targetFilter);
+            });
 
             const opts = ['<option value=\"\"></option>'].concat(
                 filteredInventory.map(i => {
                     const schemesText = Object.keys(i.schemes || {}).join(', ');
-                    const label = `${i.text} ${schemesText ? `(${schemesText})` : ''} — ${Number(i.price).toFixed(2)}`;
+                    const label = `${i.text} — MWK${Number(i.price).toFixed(2)} ${schemesText ? `(${schemesText})` : ''}`;
                     return `<option value=\"${i.value}\" data-price=\"${i.price}\">${label}</option>`;
                 })
             ).join('');
+            
             scope.querySelectorAll('select.inventory-select').forEach(sel => {
+                const currentVal = sel.value || sel.dataset.selected;
                 sel.innerHTML = opts;
-                if (sel.dataset.selected) {
-                    sel.value = sel.dataset.selected;
-                }
+                if (currentVal) sel.value = currentVal;
             });
         }
 
@@ -837,11 +860,18 @@
                 const tab = e.target.closest('.tab-content');
                 let provider = null;
                 if (tab) {
-                    const providerInput = tab.querySelector('.autocomplete-input[data-source="providers"]');
-                    if (providerInput) {
-                        provider = providerInput.value;
-                    } else if (tab.id === 'cash') {
-                        provider = 'Cash';
+                    if (tab.id === 'individual') {
+                        const patientInput = tab.querySelector('.autocomplete-input[data-source="patients"]');
+                        const patientId = patientInput.previousElementSibling.value;
+                        const patientMatch = autocompleteData.patients.find(p => p.value === patientId);
+                        provider = patientMatch ? (patientMatch.scheme || 'Cash') : 'Cash';
+                    } else {
+                        const providerInput = tab.querySelector('.autocomplete-input[data-source="providers"]');
+                        if (providerInput) {
+                            provider = providerInput.value;
+                        } else if (tab.id === 'cash') {
+                            provider = 'Cash';
+                        }
                     }
                 }
                 populateInventorySelects(newRow, provider);
@@ -912,6 +942,19 @@
                     populateInventorySelects(invoiceItemsBody, selectedProvider);
                 }
             });
+
+            // Event listener for patient selection change in Individual Invoice tab
+            document.addEventListener('change', function(e) {
+                if (e.target.matches('#individual .autocomplete-input[data-source="patients"]')) {
+                    const patientId = e.target.previousElementSibling.value; // the hidden valueInput
+                    const patientMatch = autocompleteData.patients.find(p => p.value === patientId);
+                    if (patientMatch) {
+                         const scheme = patientMatch.scheme || 'Cash';
+                         const individualItemsBody = document.getElementById('individual-items-body');
+                         populateInventorySelects(individualItemsBody, scheme);
+                     }
+                 }
+             });
 
         function switchTab(tabName) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1365,7 +1408,11 @@
                             
                             updateIndividualTotal();
                             setupAutocomplete(form);
-                            populateInventorySelects(form);
+                            
+                            // Determine scheme for individual invoice
+                            const patientMatchForScheme = autocompleteData.patients.find(p => p.value === bill.patient_id);
+                            const currentScheme = patientMatchForScheme ? (patientMatchForScheme.scheme || 'Cash') : 'Cash';
+                            populateInventorySelects(form, currentScheme);
                         }
                     } catch (err) {
                         console.error('Error populating form:', err);
@@ -1511,7 +1558,13 @@
             `;
             body.appendChild(newRow);
             setupAutocomplete(newRow);
-            populateInventorySelects(newRow);
+            
+            // Get selected patient's scheme
+            const patientInput = document.querySelector('#individual .autocomplete-input[data-source="patients"]');
+            const patientId = patientInput.previousElementSibling.value;
+            const patientMatch = autocompleteData.patients.find(p => p.value === patientId);
+            const scheme = patientMatch ? (patientMatch.scheme || 'Cash') : 'Cash';
+            populateInventorySelects(newRow, scheme);
         });
 
         document.getElementById('individual').addEventListener('input', function(e) {
