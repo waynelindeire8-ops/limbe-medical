@@ -940,17 +940,28 @@
                         <td>
                             <input type="hidden" name="item_con_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="con"></select>
-                            <input type="number" name="item_con[]" value="0" step="0.01" readonly>
+                            <div class="mini-input-row">
+                                <span style="font-size: 10px; color: #888;">Price:</span>
+                                <input type="number" name="item_con[]" value="0" step="0.01" readonly style="width: 80px;">
+                            </div>
                         </td>
                         <td>
                             <input type="hidden" name="item_drug_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="drug"></select>
-                            <input type="number" name="item_drug[]" value="0" step="0.01" readonly>
+                            <div class="mini-input-row">
+                                <input type="number" name="item_drug_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
+                                <span style="font-size: 10px; color: #888;">x</span>
+                                <input type="number" name="item_drug[]" value="0" step="0.01" readonly style="width: 80px;">
+                            </div>
                         </td>
                         <td>
                             <input type="hidden" name="item_lab_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="lab"></select>
-                            <input type="number" name="item_lab[]" value="0" step="0.01" readonly>
+                            <div class="mini-input-row">
+                                <input type="number" name="item_lab_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
+                                <span style="font-size: 10px; color: #888;">x</span>
+                                <input type="number" name="item_lab[]" value="0" step="0.01" readonly style="width: 80px;">
+                            </div>
                         </td>
                         <td><input type="number" name="item_amount[]" class="create-row-amount" value="0" step="0.01" readonly></td>
                         <td><button type="button" class="remove-item">×</button></td>
@@ -988,14 +999,19 @@
                         <td>
                             <input type="hidden" name="ind_con_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="con"></select>
-                            <input type="number" name="ind_con[]" value="0" step="0.01" readonly>
+                            <div class="mini-input-row">
+                                <span style="font-size: 10px; color: #888;">Price:</span>
+                                <input type="number" name="ind_con[]" value="0" step="0.01" readonly style="width: 80px;">
+                            </div>
                         </td>
                         <td>
                             <div class="mini-input-container">
                                 <div class="mini-input-row">
                                     <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
                                     <select class="inventory-select" data-kind="drug"></select>
-                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly>
+                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                    <span style="font-size: 10px; color: #888;">x</span>
+                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
                                     <button type="button" class="add-mini-input" data-type="drug">+</button>
                                 </div>
                                 <input type="hidden" name="ind_drug[]" value="0" class="ind-row-total-drug">
@@ -1006,7 +1022,9 @@
                                 <div class="mini-input-row">
                                     <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
                                     <select class="inventory-select" data-kind="lab"></select>
-                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly>
+                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                    <span style="font-size: 10px; color: #888;">x</span>
+                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
                                     <button type="button" class="add-mini-input" data-type="lab">+</button>
                                 </div>
                                 <input type="hidden" name="ind_lab[]" value="0" class="ind-row-total-lab">
@@ -1551,7 +1569,9 @@
                         <div class="mini-input-row">
                             <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="drug"></select>
-                            <input type="number" class="mini-drug" value="0" step="0.01" readonly>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
                             <button type="button" class="add-mini-input" data-type="drug">+</button>
                         </div>
                         <input type="hidden" name="item_drug[]" value="0" class="cash-row-total-drug">
@@ -1562,7 +1582,9 @@
                         <div class="mini-input-row">
                             <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="lab"></select>
-                            <input type="number" class="mini-lab" value="0" step="0.01" readonly>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
                             <button type="button" class="add-mini-input" data-type="lab">+</button>
                         </div>
                         <input type="hidden" name="item_lab[]" value="0" class="cash-row-total-lab">
@@ -1617,17 +1639,28 @@
                 <td>
                     <input type="hidden" name="item_con_id[]" class="autocomplete-value">
                     <select class="inventory-select" data-kind="con"></select>
-                    <input type="number" name="item_con[]" value="0" step="0.01" readonly>
+                    <div class="mini-input-row">
+                        <span style="font-size: 10px; color: #888;">Price:</span>
+                        <input type="number" name="item_con[]" value="0" step="0.01" readonly style="width: 80px;">
+                    </div>
                 </td>
                 <td>
                     <input type="hidden" name="item_drug_id[]" class="autocomplete-value">
                     <select class="inventory-select" data-kind="drug"></select>
-                    <input type="number" name="item_drug[]" value="0" step="0.01" readonly>
+                    <div class="mini-input-row">
+                        <input type="number" name="item_drug_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
+                        <span style="font-size: 10px; color: #888;">x</span>
+                        <input type="number" name="item_drug[]" value="0" step="0.01" readonly style="width: 80px;">
+                    </div>
                 </td>
                 <td>
                     <input type="hidden" name="item_lab_id[]" class="autocomplete-value">
                     <select class="inventory-select" data-kind="lab"></select>
-                    <input type="number" name="item_lab[]" value="0" step="0.01" readonly>
+                    <div class="mini-input-row">
+                        <input type="number" name="item_lab_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
+                        <span style="font-size: 10px; color: #888;">x</span>
+                        <input type="number" name="item_lab[]" value="0" step="0.01" readonly style="width: 80px;">
+                    </div>
                 </td>
                 <td><input type="number" name="item_amount[]" class="create-row-amount" value="0" step="0.01" readonly></td>
                 <td><button type="button" class="remove-item">×</button></td>
