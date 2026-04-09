@@ -149,6 +149,7 @@ class QueueItem:
     doctor_name: str = ""
     # Added details
     triage_level: str = "3" # 1 (Critical) to 5 (Non-urgent)
+    date_added: str = ""  # New field for date added
     vitals: dict = field(default_factory=dict) # {bp: "120/80", temp: "36.5", weight: "70"}
     assigned_nurse_id: str = ""
     last_called_time: str = ""

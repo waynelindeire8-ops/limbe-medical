@@ -136,6 +136,9 @@
                                 <div style="font-size: 12px; color: #888; margin-top: 4px;">
                                     <i class="far fa-clock"></i> {{ q.arrival_time }} &bull; 
                                     <span class="priority-badge priority-{{ q.priority }}">{{ q.priority }}</span>
+                                    {% if q.date_added %}
+                                    &bull; <span style="font-size: 10px; color: #888;">Added: {{ q.date_added }}</span>
+                                    {% endif %}
                                 </div>
                             </div>
                             

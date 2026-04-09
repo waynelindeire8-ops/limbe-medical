@@ -686,9 +686,19 @@
         }
 
         // Populate inventory selects with options
-        function populateInventorySelects(scope=document) {
+        function populateInventorySelects(scope=document, filterProvider = null) {
+            let filteredInventory = autocompleteData.inventory;
+            if (filterProvider && filterProvider !== 'Cash') {
+                filteredInventory = autocompleteData.inventory.filter(item => 
+                    item.schemes && item.schemes[filterProvider]
+                );
+            } else if (filterProvider === 'Cash') {
+                // If provider is Cash, show all items
+                filteredInventory = autocompleteData.inventory;
+            }
+
             const opts = ['<option value=\"\"></option>'].concat(
-                autocompleteData.inventory.map(i => {
+                filteredInventory.map(i => {
                     const schemesText = Object.keys(i.schemes || {}).join(', ');
                     const label = `${i.text} ${schemesText ? `(${schemesText})` : ''} — ${Number(i.price).toFixed(2)}`;
                     return `<option value=\"${i.value}\" data-price=\"${i.price}\">${label}</option>`;
@@ -783,7 +793,7 @@
                     <button type="button" class="remove-mini-input">×</button>
                 `;
                 container.insertBefore(newRow, container.querySelector('input[type="hidden"]'));
-                populateInventorySelects(newRow);
+                populateInventorySelects(newRow, currentProvider);
             }
             if (e.target.classList.contains('remove-mini-input')) {
                 const container = e.target.closest('.mini-input-container');
@@ -808,26 +818,35 @@
         });
 
         // Handle mini-input changes
-        document.addEventListener('input', function(e) {
-            if (e.target.classList.contains('mini-drug') || e.target.classList.contains('mini-lab')) {
-                const row = e.target.closest('tr');
-                const prefix = row.classList.contains('individual-row') ? 'ind' : (row.classList.contains('cash-row') ? 'cash' : '');
-                
-                if (row.classList.contains('individual-row')) {
-                    updateMiniTotals(row, 'ind');
-                    updateIndividualRowAmount(row);
-                    updateIndividualTotal();
-                } else if (row.classList.contains('cash-row')) {
-                    updateMiniTotals(row, 'cash');
-                    updateCashRowAmount(row);
-                    updateCashTotal();
-                } else if (row.classList.contains('invoice-row')) {
-                    updateMiniTotals(row);
-                    updateRowAmount(row);
-                    updateTotal();
+            document.addEventListener('input', function(e) {
+                if (e.target.classList.contains('mini-drug') || e.target.classList.contains('mini-lab')) {
+                    const row = e.target.closest('tr');
+                    const prefix = row.classList.contains('individual-row') ? 'ind' : (row.classList.contains('cash-row') ? 'cash' : '');
+                    
+                    if (row.classList.contains('individual-row')) {
+                        updateMiniTotals(row, 'ind');
+                        updateIndividualRowAmount(row);
+                        updateIndividualTotal();
+                    } else if (row.classList.contains('cash-row')) {
+                        updateMiniTotals(row, 'cash');
+                        updateCashRowAmount(row);
+                        updateCashTotal();
+                    } else if (row.classList.contains('invoice-row')) {
+                        updateMiniTotals(row);
+                        updateRowAmount(row);
+                        updateTotal();
+                    }
                 }
-            }
-        });
+            });
+
+            // Event listener for provider selection change in Bulk Invoice tab
+            document.addEventListener('change', function(e) {
+                if (e.target.matches('#invoice .autocomplete-input[data-source="providers"]')) {
+                    const selectedProvider = e.target.value;
+                    const invoiceItemsBody = document.getElementById('invoice-items-body');
+                    populateInventorySelects(invoiceItemsBody, selectedProvider);
+                }
+            });
 
         function switchTab(tabName) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -885,6 +904,10 @@
                 document.getElementById('invoice-items-body').innerHTML = '';
                 document.getElementById('add-item').click();
                 updateTotal();
+                // Re-populate inventory selects based on selected provider
+                const providerInput = form.querySelector('.autocomplete-input[data-source="providers"]');
+                const selectedProvider = providerInput ? providerInput.value : null;
+                populateInventorySelects(document.getElementById('invoice-items-body'), selectedProvider);
             }
             
             // Reset Individual Invoice form
@@ -941,6 +964,7 @@
                 document.getElementById('cash-items-body').innerHTML = '';
                 document.getElementById('add-cash-item').click();
                 updateCashTotal();
+                populateInventorySelects(document.getElementById('cash-items-body'), 'Cash');
             }
         }
 
@@ -981,6 +1005,9 @@
                                 // Populate items
                                 const body = document.getElementById('cash-items-body');
                                 body.innerHTML = ''; // Clear existing
+                                
+                                // Populate inventory selects with 'Cash' filter
+                                populateInventorySelects(body, 'Cash');
                                 
                                 if (bill.items && bill.items.length > 0) {
                                     bill.items.forEach(item => {
@@ -1064,6 +1091,9 @@
                                 // Populate items
                                 const body = document.getElementById('invoice-items-body');
                                 body.innerHTML = ''; // Clear existing
+                                
+                                // Populate inventory selects with the bill's provider
+                                populateInventorySelects(body, bill.provider);
                                 
                                 if (bill.items && bill.items.length > 0) {
                                     bill.items.forEach(item => {

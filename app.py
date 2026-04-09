@@ -74,7 +74,8 @@ PROVIDERS = [
     "Auction Holdings Limited",
     "Malawi Agricultural and Industrial Investment Corporation",
     "Export Development Fund Limited",
-    "National Bank of Malawi Medical Scheme"
+    "National Bank of Malawi Medical Scheme",
+    "Sable Medical"
 ]
 
 # Notifications helper
@@ -341,6 +342,7 @@ def add_to_queue(patient_id):
                 visit_reason='',
                 special_category='',
                 check_in_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                date_added=datetime.datetime.now().strftime("%Y-%m-%d"),
                 assigned_doctor_id='',
                 triage_level='3',
                 vitals={}
@@ -394,6 +396,7 @@ def queue_checkin():
                 status="Waiting",
                 priority=urgency,
                 arrival_time=datetime.datetime.now().strftime("%H:%M"),
+                date_added=datetime.datetime.now().strftime("%Y-%m-%d"),
                 estimated_wait=hms.estimate_wait_time(dept),
                 department=dept,
                 visit_reason=reason,

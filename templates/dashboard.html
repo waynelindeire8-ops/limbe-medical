@@ -110,6 +110,9 @@
                                     {% if item.priority != 'Routine' %}
                                     &bull; <span style="color: #dc3545; font-weight: bold;">{{ item.priority }}</span>
                                     {% endif %}
+                                    {% if item.date_added %}
+                                    &bull; <span style="font-size: 10px; color: #888;">Added: {{ item.date_added }}</span>
+                                    {% endif %}
                                 </p>
                             </div>
                             <div class="appt-actions" style="display: flex; gap: 5px;">
