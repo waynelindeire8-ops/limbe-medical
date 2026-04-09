@@ -54,28 +54,7 @@ PROVIDERS = [
     "Blantyre Adventist Hospital",
     "Beit CURE International Hospital Malawi",
     "MedPlus Clinics",
-    "Bakresa Health Services",
-    "Libertas General Insurance Company Limited",
-    "First Capital Bank Medical Scheme",
-    "Standard Bank Medical Scheme",
-    "Press Corporation Medical Scheme",
-    "Illovo Sugar Medical Scheme",
-    "AHL Commodities Exchange",
-    "Tea Brokers Central Africa Limited",
-    "Eastern Produce Malawi Limited",
-    "Satemwa Tea and Coffee Estates",
-    "Lujeri Tea Estates Limited",
-    "Thyolo Tea Estates Limited",
-    "Conforzi Tea Estates Limited",
-    "Makandi Tea and Coffee Estates",
-    "Malawi Tea 2020 Trust",
-    "Smallholder Tea Authority",
-    "Malawi Tea Association",
-    "Auction Holdings Limited",
-    "Malawi Agricultural and Industrial Investment Corporation",
-    "Export Development Fund Limited",
-    "National Bank of Malawi Medical Scheme",
-    "Sable Medical"
+    "Bakresa Health Services"
 ]
 
 # Notifications helper

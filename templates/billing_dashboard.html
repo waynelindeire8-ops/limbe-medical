@@ -288,17 +288,28 @@
                                         <td>
                                             <input type="hidden" name="item_con_id[]" class="autocomplete-value">
                                             <select class="inventory-select" data-kind="con"></select>
-                                            <input type="number" name="item_con[]" value="0" step="0.01" readonly>
+                                            <div class="mini-input-row">
+                                                <span style="font-size: 10px; color: #888;">Price:</span>
+                                                <input type="number" name="item_con[]" value="0" step="0.01" readonly style="width: 80px;">
+                                            </div>
                                         </td>
                                         <td>
                                             <input type="hidden" name="item_drug_id[]" class="autocomplete-value">
                                             <select class="inventory-select" data-kind="drug"></select>
-                                            <input type="number" name="item_drug[]" value="0" step="0.01" readonly>
+                                            <div class="mini-input-row">
+                                                <input type="number" name="item_drug_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
+                                                <span style="font-size: 10px; color: #888;">x</span>
+                                                <input type="number" name="item_drug[]" value="0" step="0.01" readonly style="width: 80px;">
+                                            </div>
                                         </td>
                                         <td>
                                             <input type="hidden" name="item_lab_id[]" class="autocomplete-value">
                                             <select class="inventory-select" data-kind="lab"></select>
-                                            <input type="number" name="item_lab[]" value="0" step="0.01" readonly>
+                                            <div class="mini-input-row">
+                                                <input type="number" name="item_lab_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
+                                                <span style="font-size: 10px; color: #888;">x</span>
+                                                <input type="number" name="item_lab[]" value="0" step="0.01" readonly style="width: 80px;">
+                                            </div>
                                         </td>
                                         <td><input type="number" name="item_amount[]" class="create-row-amount" value="0" step="0.01" readonly></td>
                                         <td><button type="button" class="remove-item">×</button></td>
@@ -400,7 +411,9 @@
                                                 <div class="mini-input-row">
                                                     <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
                                                     <select class="inventory-select" data-kind="drug"></select>
-                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
                                                     <button type="button" class="add-mini-input" data-type="drug">+</button>
                                                 </div>
                                                 <input type="hidden" name="item_drug[]" value="0" class="row-total-drug">
@@ -411,7 +424,9 @@
                                                 <div class="mini-input-row">
                                                     <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
                                                     <select class="inventory-select" data-kind="lab"></select>
-                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
                                                     <button type="button" class="add-mini-input" data-type="lab">+</button>
                                                 </div>
                                                 <input type="hidden" name="item_lab[]" value="0" class="row-total-lab">
@@ -477,7 +492,9 @@
                                                 <div class="mini-input-row">
                                                     <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
                                                     <select class="inventory-select" data-kind="drug"></select>
-                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
                                                     <button type="button" class="add-mini-input" data-type="drug">+</button>
                                                 </div>
                                                 <input type="hidden" name="ind_drug[]" value="0" class="ind-row-total-drug">
@@ -488,7 +505,9 @@
                                                 <div class="mini-input-row">
                                                     <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
                                                     <select class="inventory-select" data-kind="lab"></select>
-                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
                                                     <button type="button" class="add-mini-input" data-type="lab">+</button>
                                                 </div>
                                                 <input type="hidden" name="ind_lab[]" value="0" class="ind-row-total-lab">
@@ -555,7 +574,9 @@
                                                 <div class="mini-input-row">
                                                     <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
                                                     <select class="inventory-select" data-kind="drug"></select>
-                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
                                                     <button type="button" class="add-mini-input" data-type="drug">+</button>
                                                 </div>
                                                 <input type="hidden" name="item_drug[]" value="0" class="cash-row-total-drug">
@@ -566,7 +587,9 @@
                                                 <div class="mini-input-row">
                                                     <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
                                                     <select class="inventory-select" data-kind="lab"></select>
-                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
                                                     <button type="button" class="add-mini-input" data-type="lab">+</button>
                                                 </div>
                                                 <input type="hidden" name="item_lab[]" value="0" class="cash-row-total-lab">
@@ -732,15 +755,23 @@
             if (valueInput) valueInput.value = e.target.value;
 
             if (kind === 'con') {
-                const priceInput = td.querySelector('[name=\"item_con[]\"], [name=\"ind_con[]\"]');
+                const priceInput = td.querySelector('[name="item_con[]"], [name="ind_con[]"]');
                 if (priceInput) priceInput.value = price.toFixed(2);
             } else if (kind === 'drug') {
-                const priceInput = td.querySelector('.mini-drug');
-                if (priceInput) priceInput.value = price.toFixed(2);
+                const row = e.target.closest('.mini-input-row') || td;
+                const priceInput = row.querySelector('.mini-drug') || td.querySelector('[name="item_drug[]"]');
+                const qtyInput = row.querySelector('.mini-qty') || td.querySelector('[name="item_drug_qty[]"]');
+                const qty = parseFloat(qtyInput ? qtyInput.value : '1') || 1;
+                if (priceInput) priceInput.value = (price * qty).toFixed(2);
+                priceInput.dataset.unitPrice = price; // Store unit price
                 updateMiniTotals(tr, tr.classList.contains('individual-row') ? 'ind' : (tr.classList.contains('cash-row') ? 'cash' : ''));
             } else if (kind === 'lab') {
-                const priceInput = td.querySelector('.mini-lab');
-                if (priceInput) priceInput.value = price.toFixed(2);
+                const row = e.target.closest('.mini-input-row') || td;
+                const priceInput = row.querySelector('.mini-lab') || td.querySelector('[name="item_lab[]"]');
+                const qtyInput = row.querySelector('.mini-qty') || td.querySelector('[name="item_lab_qty[]"]');
+                const qty = parseFloat(qtyInput ? qtyInput.value : '1') || 1;
+                if (priceInput) priceInput.value = (price * qty).toFixed(2);
+                priceInput.dataset.unitPrice = price; // Store unit price
                 updateMiniTotals(tr, tr.classList.contains('individual-row') ? 'ind' : (tr.classList.contains('cash-row') ? 'cash' : ''));
             }
             updateCalculations(tr);
@@ -795,7 +826,9 @@
                 newRow.innerHTML = `
                     <input type="hidden" name="mini_${type}_id[]" class="autocomplete-value">
                     <select class="inventory-select" data-kind="${type}"></select>
-                    <input type="number" class="mini-${type}" value="0" step="0.01" readonly>
+                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                    <span style="font-size: 10px; color: #888;">x</span>
+                    <input type="number" class="mini-${type}" value="0" step="0.01" readonly style="width: 80px;">
                     <button type="button" class="remove-mini-input">×</button>
                 `;
                 container.insertBefore(newRow, container.querySelector('input[type="hidden"]'));
@@ -837,8 +870,20 @@
 
         // Handle mini-input changes
             document.addEventListener('input', function(e) {
-                if (e.target.classList.contains('mini-drug') || e.target.classList.contains('mini-lab')) {
+                if (e.target.classList.contains('mini-drug') || e.target.classList.contains('mini-lab') || e.target.classList.contains('mini-qty') || e.target.classList.contains('qty-input')) {
                     const row = e.target.closest('tr');
+                    
+                    // If it's a qty change, update the row amount
+                    if (e.target.classList.contains('mini-qty') || e.target.classList.contains('qty-input')) {
+                        const miniRow = e.target.closest('.mini-input-row') || e.target.closest('td');
+                        const priceInput = miniRow.querySelector('.mini-drug') || miniRow.querySelector('.mini-lab') || miniRow.querySelector('[name="item_drug[]"]') || miniRow.querySelector('[name="item_lab[]"]');
+                        if (priceInput && priceInput.dataset.unitPrice) {
+                            const unitPrice = parseFloat(priceInput.dataset.unitPrice);
+                            const qty = parseFloat(e.target.value) || 0;
+                            priceInput.value = (unitPrice * qty).toFixed(2);
+                        }
+                    }
+
                     const prefix = row.classList.contains('individual-row') ? 'ind' : (row.classList.contains('cash-row') ? 'cash' : '');
                     
                     if (row.classList.contains('individual-row')) {
@@ -853,6 +898,8 @@
                         updateMiniTotals(row);
                         updateRowAmount(row);
                         updateTotal();
+                    } else if (row.classList.contains('create-row')) {
+                        updateCreateTotal();
                     }
                 }
             });
@@ -1031,46 +1078,53 @@
                                     bill.items.forEach(item => {
                                         const row = document.createElement('tr');
                                         row.classList.add('cash-row');
-                                        row.innerHTML = `
-                                            <td><input type="date" name="item_date[]" value="${item.date}" required></td>
-                                            <td>
-                                                <div class="autocomplete-container">
-                                                    <input type="hidden" name="item_patient_id[]" value="${item.patient_id || ''}" class="autocomplete-value">
-                                                    <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
-                                                    <div class="autocomplete-suggestion"></div>
-                                                </div>
-                                            </td>
-                                            <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
-                                            <td>
-                                                <input type="hidden" name="item_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
-                                                <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
-                                                <input type="number" name="item_con[]" value="${item.con || 0}" step="0.01" readonly>
-                                            </td>
-                                            <td>
-                                                <div class="mini-input-container">
-                                                    <div class="mini-input-row">
-                                                        <input type="hidden" name="mini_drug_id[]" value="${item.drug_id || ''}" class="autocomplete-value">
-                                                        <select class="inventory-select" data-kind="drug" data-selected="${item.drug_id || ''}"></select>
-                                                        <input type="number" class="mini-drug" value="${item.drug || 0}" step="0.01" readonly>
-                                                        <button type="button" class="add-mini-input" data-type="drug">+</button>
-                                                    </div>
-                                                    <input type="hidden" name="item_drug[]" value="${item.drug || 0}" class="cash-row-total-drug">
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="mini-input-container">
-                                                    <div class="mini-input-row">
-                                                        <input type="hidden" name="mini_lab_id[]" value="${item.lab_id || ''}" class="autocomplete-value">
-                                                        <select class="inventory-select" data-kind="lab" data-selected="${item.lab_id || ''}"></select>
-                                                        <input type="number" class="mini-lab" value="${item.lab || 0}" step="0.01" readonly>
-                                                        <button type="button" class="add-mini-input" data-type="lab">+</button>
-                                                    </div>
-                                                    <input type="hidden" name="item_lab[]" value="${item.lab || 0}" class="cash-row-total-lab">
-                                                </div>
-                                            </td>
-                                            <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="cash-row-amount" readonly></td>
-                                            <td><button type="button" class="remove-item">×</button></td>
-                                        `;
+            newRow.innerHTML = `
+                <td><input type="date" name="item_date[]" value="${item.date}" required></td>
+                <td>
+                    <div class="autocomplete-container">
+                        <input type="hidden" name="item_patient_id[]" value="${item.patient_id || ''}" class="autocomplete-value">
+                        <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                        <div class="autocomplete-suggestion"></div>
+                    </div>
+                </td>
+                <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="item_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
+                    <div class="mini-input-row">
+                        <span style="font-size: 10px; color: #888;">Price:</span>
+                        <input type="number" name="item_con[]" value="${item.con || 0}" step="0.01" readonly style="width: 80px;">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" value="${item.drug_id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug" data-selected="${item.drug_id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${item.drug_qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="${item.drug || 0}" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="drug">+</button>
+                        </div>
+                        <input type="hidden" name="item_drug[]" value="${item.drug || 0}" class="cash-row-total-drug">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" value="${item.lab_id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab" data-selected="${item.lab_id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${item.lab_qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="${item.lab || 0}" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="lab">+</button>
+                        </div>
+                        <input type="hidden" name="item_lab[]" value="${item.lab || 0}" class="cash-row-total-lab">
+                    </div>
+                </td>
+                <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="cash-row-amount" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
                                         const patientInput = row.querySelector('[data-source="patients"]');
                                         const patientValueInput = row.querySelector('[name="item_patient_id[]"]');
                                         const patientMatch = autocompleteData.patients.find(p => p.value === item.patient_id);
@@ -1117,46 +1171,53 @@
                                     bill.items.forEach(item => {
                                         const row = document.createElement('tr');
                                         row.classList.add('invoice-row');
-                                        row.innerHTML = `
-                                            <td><input type="date" name="item_date[]" value="${item.date}" required></td>
-                                            <td>
-                                                <div class="autocomplete-container">
-                                                    <input type="hidden" name="item_patient_id[]" value="${item.patient_id || ''}" class="autocomplete-value">
-                                                    <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
-                                                    <div class="autocomplete-suggestion"></div>
-                                                </div>
-                                            </td>
-                                            <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
-                                            <td>
-                                                <input type="hidden" name="item_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
-                                                <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
-                                                <input type="number" name="item_con[]" value="${item.con || 0}" step="0.01" readonly>
-                                            </td>
-                                            <td>
-                                                <div class="mini-input-container">
-                                                    <div class="mini-input-row">
-                                                        <input type="hidden" name="mini_drug_id[]" value="${item.drug_id || ''}" class="autocomplete-value">
-                                                        <select class="inventory-select" data-kind="drug" data-selected="${item.drug_id || ''}"></select>
-                                                        <input type="number" class="mini-drug" value="${item.drug || 0}" step="0.01" readonly>
-                                                        <button type="button" class="add-mini-input" data-type="drug">+</button>
-                                                    </div>
-                                                    <input type="hidden" name="item_drug[]" value="${item.drug || 0}" class="row-total-drug">
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="mini-input-container">
-                                                    <div class="mini-input-row">
-                                                        <input type="hidden" name="mini_lab_id[]" value="${item.lab_id || ''}" class="autocomplete-value">
-                                                        <select class="inventory-select" data-kind="lab" data-selected="${item.lab_id || ''}"></select>
-                                                        <input type="number" class="mini-lab" value="${item.lab || 0}" step="0.01" readonly>
-                                                        <button type="button" class="add-mini-input" data-type="lab">+</button>
-                                                    </div>
-                                                    <input type="hidden" name="item_lab[]" value="${item.lab || 0}" class="row-total-lab">
-                                                </div>
-                                            </td>
-                                            <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="row-amount" readonly></td>
-                                            <td><button type="button" class="remove-item">×</button></td>
-                                        `;
+            newRow.innerHTML = `
+                <td><input type="date" name="item_date[]" value="${item.date}" required></td>
+                <td>
+                    <div class="autocomplete-container">
+                        <input type="hidden" name="item_patient_id[]" value="${item.patient_id || ''}" class="autocomplete-value">
+                        <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                        <div class="autocomplete-suggestion"></div>
+                    </div>
+                </td>
+                <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="item_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
+                    <div class="mini-input-row">
+                        <span style="font-size: 10px; color: #888;">Price:</span>
+                        <input type="number" name="item_con[]" value="${item.con || 0}" step="0.01" readonly style="width: 80px;">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" value="${item.drug_id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug" data-selected="${item.drug_id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${item.drug_qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="${item.drug || 0}" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="drug">+</button>
+                        </div>
+                        <input type="hidden" name="item_drug[]" value="${item.drug || 0}" class="row-total-drug">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" value="${item.lab_id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab" data-selected="${item.lab_id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${item.lab_qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="${item.lab || 0}" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="lab">+</button>
+                        </div>
+                        <input type="hidden" name="item_lab[]" value="${item.lab || 0}" class="row-total-lab">
+                    </div>
+                </td>
+                <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="row-amount" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
                                         const patientInput = row.querySelector('[data-source="patients"]');
                                         const patientValueInput = row.querySelector('[name="item_patient_id[]"]');
                                         const patientMatch = autocompleteData.patients.find(p => p.value === item.patient_id);
@@ -1202,39 +1263,46 @@
                                 bill.items.forEach(item => {
                                     const row = document.createElement('tr');
                                     row.classList.add('individual-row');
-                                    row.innerHTML = `
-                                        <td><input type="date" name="ind_date[]" value="${item.date}" required></td>
-                                        <td><input type="text" name="ind_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
-                                        <td>
-                                            <input type="hidden" name="ind_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
-                                            <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
-                                            <input type="number" name="ind_con[]" value="${item.con || 0}" step="0.01" readonly>
-                                        </td>
-                                        <td>
-                                            <div class="mini-input-container">
-                                                <div class="mini-input-row">
-                                                    <input type="hidden" name="mini_drug_id[]" value="${item.drug_id || ''}" class="autocomplete-value">
-                                                    <select class="inventory-select" data-kind="drug" data-selected="${item.drug_id || ''}"></select>
-                                                    <input type="number" class="mini-drug" value="${item.drug || 0}" step="0.01" readonly>
-                                                    <button type="button" class="add-mini-input" data-type="drug">+</button>
-                                                </div>
-                                                <input type="hidden" name="ind_drug[]" value="${item.drug || 0}" class="ind-row-total-drug">
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="mini-input-container">
-                                                <div class="mini-input-row">
-                                                    <input type="hidden" name="mini_lab_id[]" value="${item.lab_id || ''}" class="autocomplete-value">
-                                                    <select class="inventory-select" data-kind="lab" data-selected="${item.lab_id || ''}"></select>
-                                                    <input type="number" class="mini-lab" value="${item.lab || 0}" step="0.01" readonly>
-                                                    <button type="button" class="add-mini-input" data-type="lab">+</button>
-                                                </div>
-                                                <input type="hidden" name="ind_lab[]" value="${item.lab || 0}" class="ind-row-total-lab">
-                                            </div>
-                                        </td>
-                                        <td><input type="number" name="ind_amount[]" class="ind-row-amount" value="${item.amount || 0}" step="0.01" readonly></td>
-                                        <td><button type="button" class="remove-item">×</button></td>
-                                    `;
+            newRow.innerHTML = `
+                <td><input type="date" name="ind_date[]" value="${item.date}" required></td>
+                <td><input type="text" name="ind_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="ind_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
+                    <div class="mini-input-row">
+                        <span style="font-size: 10px; color: #888;">Price:</span>
+                        <input type="number" name="ind_con[]" value="${item.con || 0}" step="0.01" readonly style="width: 80px;">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" value="${item.drug_id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug" data-selected="${item.drug_id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${item.drug_qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="${item.drug || 0}" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="drug">+</button>
+                        </div>
+                        <input type="hidden" name="ind_drug[]" value="${item.drug || 0}" class="ind-row-total-drug">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" value="${item.lab_id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab" data-selected="${item.lab_id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${item.lab_qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="${item.lab || 0}" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="lab">+</button>
+                        </div>
+                        <input type="hidden" name="ind_lab[]" value="${item.lab || 0}" class="ind-row-total-lab">
+                    </div>
+                </td>
+                <td><input type="number" name="ind_amount[]" class="ind-row-amount" value="${item.amount || 0}" step="0.01" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
                                     body.appendChild(row);
                                 });
                             } else {
@@ -1318,7 +1386,9 @@
                         <div class="mini-input-row">
                             <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="drug"></select>
-                            <input type="number" class="mini-drug" value="0" step="0.01" readonly>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
                             <button type="button" class="add-mini-input" data-type="drug">+</button>
                         </div>
                         <input type="hidden" name="item_drug[]" value="0" class="row-total-drug">
@@ -1329,7 +1399,9 @@
                         <div class="mini-input-row">
                             <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="lab"></select>
-                            <input type="number" class="mini-lab" value="0" step="0.01" readonly>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
                             <button type="button" class="add-mini-input" data-type="lab">+</button>
                         </div>
                         <input type="hidden" name="item_lab[]" value="0" class="row-total-lab">
@@ -1395,7 +1467,9 @@
                         <div class="mini-input-row">
                             <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="drug"></select>
-                            <input type="number" class="mini-drug" value="0" step="0.01" readonly>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
                             <button type="button" class="add-mini-input" data-type="drug">+</button>
                         </div>
                         <input type="hidden" name="ind_drug[]" value="0" class="ind-row-total-drug">
@@ -1406,7 +1480,9 @@
                         <div class="mini-input-row">
                             <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
                             <select class="inventory-select" data-kind="lab"></select>
-                            <input type="number" class="mini-lab" value="0" step="0.01" readonly>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
                             <button type="button" class="add-mini-input" data-type="lab">+</button>
                         </div>
                         <input type="hidden" name="ind_lab[]" value="0" class="ind-row-total-lab">

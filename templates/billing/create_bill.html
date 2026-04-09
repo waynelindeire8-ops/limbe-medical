@@ -156,13 +156,28 @@
             const itemRow = document.createElement('div');
             itemRow.className = 'invoice-item';
             itemRow.innerHTML = `
-                <div class="item-row">
-                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" value="${name}" required>
-                    <input type="number" name="costs[]" class="form-control cost-input" placeholder="Cost (MWK)" step="0.01" min="0" value="${cost}" oninput="updateTotal()" ${fromInventory ? 'readonly' : ''} required>
+                <div class="item-row" style="display: flex; gap: 10px; align-items: center; width: 100%;">
+                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" value="${name}" required style="flex-grow: 1;">
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="number" name="qtys[]" class="form-control qty-input" placeholder="Qty" value="1" min="1" step="1" style="width: 70px;" oninput="updateItemTotal(this)">
+                        <span style="color: #888;">x</span>
+                        <input type="number" name="unit_costs[]" class="form-control unit-cost-input" placeholder="Price" step="0.01" min="0" value="${cost}" oninput="updateItemTotal(this)" ${fromInventory ? 'readonly' : ''} required style="width: 120px;">
+                        <span style="color: #888;">=</span>
+                        <input type="number" name="costs[]" class="form-control cost-input" placeholder="Total" step="0.01" min="0" value="${cost}" readonly style="width: 140px; background-color: #f8f9fa;">
+                    </div>
                 </div>
-                <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
+                <button type="button" class="remove-btn" onclick="removeItem(this)" style="margin-left: 10px;"><i class="fas fa-trash"></i></button>
             `;
             itemList.appendChild(itemRow);
+            updateTotal();
+        }
+
+        function updateItemTotal(input) {
+            const row = input.closest('.item-row');
+            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+            const unitCost = parseFloat(row.querySelector('.unit-cost-input').value) || 0;
+            const costInput = row.querySelector('.cost-input');
+            costInput.value = (qty * unitCost).toFixed(2);
             updateTotal();
         }
 

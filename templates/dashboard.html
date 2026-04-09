@@ -105,13 +105,13 @@
                                     {% endif %}
                                 </div>
                                 <p style="font-size: 12px; color: #666; margin-top: 4px;">
-                                    <i class="far fa-clock"></i> {{ item.arrival_time }} &bull; 
-                                    <span style="font-weight: 600; color: {% if item.status == 'Calling' %}#4361ee{% elif item.status == 'In Consultation' %}#28a745{% else %}#666{% endif %};">{{ item.status }}</span>
+                                    <i class="far fa-clock"></i> {{ item.arrival_time }}
+                                    {% if item.date_added %}
+                                    <span style="font-size: 11px; color: #888; font-weight: 500;">({{ item.date_added }})</span>
+                                    {% endif %}
+                                    &bull; <span style="font-weight: 600; color: {% if item.status == 'Calling' %}#4361ee{% elif item.status == 'In Consultation' %}#28a745{% else %}#666{% endif %};">{{ item.status }}</span>
                                     {% if item.priority != 'Routine' %}
                                     &bull; <span style="color: #dc3545; font-weight: bold;">{{ item.priority }}</span>
-                                    {% endif %}
-                                    {% if item.date_added %}
-                                    &bull; <span style="font-size: 10px; color: #888;">Added: {{ item.date_added }}</span>
                                     {% endif %}
                                 </p>
                             </div>
