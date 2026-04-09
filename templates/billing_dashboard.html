@@ -688,14 +688,20 @@
         // Populate inventory selects with options
         function populateInventorySelects(scope=document, filterProvider = null) {
             let filteredInventory = autocompleteData.inventory;
-            if (filterProvider && filterProvider !== 'Cash') {
-                filteredInventory = autocompleteData.inventory.filter(item => 
-                    item.schemes && item.schemes[filterProvider]
-                );
-            } else if (filterProvider === 'Cash') {
-                // If provider is Cash, show all items
-                filteredInventory = autocompleteData.inventory;
+            
+            const masm = "Medical Aid Society of Malawi (MASM)";
+            const precious = "Precious Medical International";
+
+            // If it's MASM or Precious, filter by that provider.
+            // Otherwise (including 'Cash' or no provider), filter by 'Cash'.
+            let targetFilter = filterProvider || 'Cash';
+            if (targetFilter !== masm && targetFilter !== precious) {
+                targetFilter = 'Cash';
             }
+            
+            filteredInventory = autocompleteData.inventory.filter(item => 
+                item.schemes && item.schemes[targetFilter]
+            );
 
             const opts = ['<option value=\"\"></option>'].concat(
                 filteredInventory.map(i => {
@@ -793,7 +799,19 @@
                     <button type="button" class="remove-mini-input">×</button>
                 `;
                 container.insertBefore(newRow, container.querySelector('input[type="hidden"]'));
-                populateInventorySelects(newRow, currentProvider);
+                
+                // Get provider from tab context
+                const tab = e.target.closest('.tab-content');
+                let provider = null;
+                if (tab) {
+                    const providerInput = tab.querySelector('.autocomplete-input[data-source="providers"]');
+                    if (providerInput) {
+                        provider = providerInput.value;
+                    } else if (tab.id === 'cash') {
+                        provider = 'Cash';
+                    }
+                }
+                populateInventorySelects(newRow, provider);
             }
             if (e.target.classList.contains('remove-mini-input')) {
                 const container = e.target.closest('.mini-input-container');
@@ -1322,7 +1340,11 @@
             `;
             body.appendChild(newRow);
             setupAutocomplete(newRow);
-            populateInventorySelects(newRow);
+            
+            // Get current provider from Bulk Invoice tab
+            const providerInput = document.querySelector('#invoice .autocomplete-input[data-source="providers"]');
+            const provider = providerInput ? providerInput.value : null;
+            populateInventorySelects(newRow, provider);
         });
 
         document.getElementById('invoice').addEventListener('input', function(e) {

@@ -85,8 +85,10 @@
                             {% for item in bill.items %}
                             <div class="invoice-item">
                                 <div class="item-row">
-                                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" value="{{ item.description }}" required>
-                                    <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" value="{{ item.cost }}" required>
+                                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" 
+                                           value="{% if item.description %}{{ item.description }}{% elif item.name %}{{ item.name }}{% else %}{{ 'Service' }}{% endif %}" required>
+                                    <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" 
+                                           value="{{ item.cost or item.amount or 0 }}" required>
                                 </div>
                                 <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
                             </div>
