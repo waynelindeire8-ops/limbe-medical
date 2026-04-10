@@ -1608,6 +1608,8 @@ def get_billing_draft(tab):
 
 @app.route('/billing/delete/<bill_id>')
 def delete_bill(bill_id):
+    if hms.delete_bill(bill_id):
+        flash('Bill deleted successfully!', 'success')
         notify('Bill deleted', bill_id, 'admin')
     else:
         flash('Error deleting bill!', 'error')
