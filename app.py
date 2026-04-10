@@ -1209,7 +1209,15 @@ def handle_invoice():
         id_nos = request.form.getlist('item_id_no[]')
         cons = request.form.getlist('item_con[]')
         drugs = request.form.getlist('item_drug[]')
+        drug_ids_grouped = request.form.getlist('item_drug_ids[]')
+        drug_qtys_grouped = request.form.getlist('item_drug_qtys[]')
+        drug_prices_grouped = request.form.getlist('item_drug_prices[]')
+        
         labs = request.form.getlist('item_lab[]')
+        lab_ids_grouped = request.form.getlist('item_lab_ids[]')
+        lab_qtys_grouped = request.form.getlist('item_lab_qtys[]')
+        lab_prices_grouped = request.form.getlist('item_lab_prices[]')
+        
         amounts = request.form.getlist('item_amount[]')
 
         invoice_items = []
@@ -1221,13 +1229,41 @@ def handle_invoice():
             item_amount = float(amounts[i])
             total_invoice_amount += item_amount
             
+            # Reconstruct mini drugs
+            row_drugs = []
+            if i < len(drug_ids_grouped) and drug_ids_grouped[i]:
+                ids = drug_ids_grouped[i].split(',')
+                qtys = drug_qtys_grouped[i].split(',')
+                prices = drug_prices_grouped[i].split(',')
+                for j in range(len(ids)):
+                    row_drugs.append({
+                        'id': ids[j],
+                        'qty': float(qtys[j]),
+                        'price': float(prices[j])
+                    })
+
+            # Reconstruct mini labs
+            row_labs = []
+            if i < len(lab_ids_grouped) and lab_ids_grouped[i]:
+                ids = lab_ids_grouped[i].split(',')
+                qtys = lab_qtys_grouped[i].split(',')
+                prices = lab_prices_grouped[i].split(',')
+                for j in range(len(ids)):
+                    row_labs.append({
+                        'id': ids[j],
+                        'qty': float(qtys[j]),
+                        'price': float(prices[j])
+                    })
+
             invoice_items.append({
                 'date': dates[i],
                 'patient_id': patient_ids[i],
                 'id_no': id_nos[i],
                 'con': float(cons[i]),
                 'drug': float(drugs[i]),
+                'drugs': row_drugs,
                 'lab': float(labs[i]),
+                'labs': row_labs,
                 'amount': item_amount
             })
 
@@ -1268,7 +1304,15 @@ def handle_individual_invoice():
         id_nos = request.form.getlist('ind_id_no[]')
         cons = request.form.getlist('ind_con[]')
         drugs = request.form.getlist('ind_drug[]')
+        drug_ids_grouped = request.form.getlist('ind_drug_ids[]')
+        drug_qtys_grouped = request.form.getlist('ind_drug_qtys[]')
+        drug_prices_grouped = request.form.getlist('ind_drug_prices[]')
+        
         labs = request.form.getlist('ind_lab[]')
+        lab_ids_grouped = request.form.getlist('ind_lab_ids[]')
+        lab_qtys_grouped = request.form.getlist('ind_lab_qtys[]')
+        lab_prices_grouped = request.form.getlist('ind_lab_prices[]')
+        
         amounts = request.form.getlist('ind_amount[]')
 
         invoice_items = []
@@ -1281,12 +1325,40 @@ def handle_individual_invoice():
             amt = float(amounts[i])
             total_amount += amt
             
+            # Reconstruct mini drugs
+            row_drugs = []
+            if i < len(drug_ids_grouped) and drug_ids_grouped[i]:
+                ids = drug_ids_grouped[i].split(',')
+                qtys = drug_qtys_grouped[i].split(',')
+                prices = drug_prices_grouped[i].split(',')
+                for j in range(len(ids)):
+                    row_drugs.append({
+                        'id': ids[j],
+                        'qty': float(qtys[j]),
+                        'price': float(prices[j])
+                    })
+
+            # Reconstruct mini labs
+            row_labs = []
+            if i < len(lab_ids_grouped) and lab_ids_grouped[i]:
+                ids = lab_ids_grouped[i].split(',')
+                qtys = lab_qtys_grouped[i].split(',')
+                prices = lab_prices_grouped[i].split(',')
+                for j in range(len(ids)):
+                    row_labs.append({
+                        'id': ids[j],
+                        'qty': float(qtys[j]),
+                        'price': float(prices[j])
+                    })
+
             item = {
                 'date': dates[i],
                 'id_no': id_nos[i],
                 'con': float(cons[i]),
                 'drug': float(drugs[i]),
+                'drugs': row_drugs,
                 'lab': float(labs[i]),
+                'labs': row_labs,
                 'amount': amt
             }
             invoice_items.append(item)
@@ -1331,7 +1403,15 @@ def update_individual_invoice(bill_id):
         id_nos = request.form.getlist('ind_id_no[]')
         cons = request.form.getlist('ind_con[]')
         drugs = request.form.getlist('ind_drug[]')
+        drug_ids_grouped = request.form.getlist('ind_drug_ids[]')
+        drug_qtys_grouped = request.form.getlist('ind_drug_qtys[]')
+        drug_prices_grouped = request.form.getlist('ind_drug_prices[]')
+        
         labs = request.form.getlist('ind_lab[]')
+        lab_ids_grouped = request.form.getlist('ind_lab_ids[]')
+        lab_qtys_grouped = request.form.getlist('ind_lab_qtys[]')
+        lab_prices_grouped = request.form.getlist('ind_lab_prices[]')
+        
         amounts = request.form.getlist('ind_amount[]')
 
         invoice_items = []
@@ -1344,12 +1424,40 @@ def update_individual_invoice(bill_id):
             amt = float(amounts[i])
             total_amount += amt
             
+            # Reconstruct mini drugs
+            row_drugs = []
+            if i < len(drug_ids_grouped) and drug_ids_grouped[i]:
+                ids = drug_ids_grouped[i].split(',')
+                qtys = drug_qtys_grouped[i].split(',')
+                prices = drug_prices_grouped[i].split(',')
+                for j in range(len(ids)):
+                    row_drugs.append({
+                        'id': ids[j],
+                        'qty': float(qtys[j]),
+                        'price': float(prices[j])
+                    })
+
+            # Reconstruct mini labs
+            row_labs = []
+            if i < len(lab_ids_grouped) and lab_ids_grouped[i]:
+                ids = lab_ids_grouped[i].split(',')
+                qtys = lab_qtys_grouped[i].split(',')
+                prices = lab_prices_grouped[i].split(',')
+                for j in range(len(ids)):
+                    row_labs.append({
+                        'id': ids[j],
+                        'qty': float(qtys[j]),
+                        'price': float(prices[j])
+                    })
+
             item = {
                 'date': dates[i],
                 'id_no': id_nos[i],
                 'con': float(cons[i]),
                 'drug': float(drugs[i]),
+                'drugs': row_drugs,
                 'lab': float(labs[i]),
+                'labs': row_labs,
                 'amount': amt
             }
             invoice_items.append(item)
@@ -1395,7 +1503,15 @@ def update_invoice(bill_id):
         id_nos = request.form.getlist('item_id_no[]')
         cons = request.form.getlist('item_con[]')
         drugs = request.form.getlist('item_drug[]')
+        drug_ids_grouped = request.form.getlist('item_drug_ids[]')
+        drug_qtys_grouped = request.form.getlist('item_drug_qtys[]')
+        drug_prices_grouped = request.form.getlist('item_drug_prices[]')
+        
         labs = request.form.getlist('item_lab[]')
+        lab_ids_grouped = request.form.getlist('item_lab_ids[]')
+        lab_qtys_grouped = request.form.getlist('item_lab_qtys[]')
+        lab_prices_grouped = request.form.getlist('item_lab_prices[]')
+        
         amounts = request.form.getlist('item_amount[]')
 
         invoice_items = []
@@ -1407,13 +1523,41 @@ def update_invoice(bill_id):
             item_amount = float(amounts[i])
             total_invoice_amount += item_amount
             
+            # Reconstruct mini drugs
+            row_drugs = []
+            if i < len(drug_ids_grouped) and drug_ids_grouped[i]:
+                ids = drug_ids_grouped[i].split(',')
+                qtys = drug_qtys_grouped[i].split(',')
+                prices = drug_prices_grouped[i].split(',')
+                for j in range(len(ids)):
+                    row_drugs.append({
+                        'id': ids[j],
+                        'qty': float(qtys[j]),
+                        'price': float(prices[j])
+                    })
+
+            # Reconstruct mini labs
+            row_labs = []
+            if i < len(lab_ids_grouped) and lab_ids_grouped[i]:
+                ids = lab_ids_grouped[i].split(',')
+                qtys = lab_qtys_grouped[i].split(',')
+                prices = lab_prices_grouped[i].split(',')
+                for j in range(len(ids)):
+                    row_labs.append({
+                        'id': ids[j],
+                        'qty': float(qtys[j]),
+                        'price': float(prices[j])
+                    })
+
             invoice_items.append({
                 'date': dates[i],
                 'patient_id': patient_ids[i],
                 'id_no': id_nos[i],
                 'con': float(cons[i]),
                 'drug': float(drugs[i]),
+                'drugs': row_drugs,
                 'lab': float(labs[i]),
+                'labs': row_labs,
                 'amount': item_amount
             })
 
@@ -1434,10 +1578,36 @@ def update_invoice(bill_id):
         flash(f'Error updating invoice: {e}', 'error')
     return redirect(url_for('billing_dashboard'))
 
+@app.route('/api/billing/autosave', methods=['POST'])
+def billing_autosave():
+    try:
+        data = request.json
+        # Store drafts in a simple file or in hms
+        if not hasattr(hms, 'billing_drafts'):
+            hms.billing_drafts = {}
+        
+        user_id = session.get('user_id', 'default')
+        tab = data.get('tab', 'general')
+        hms.billing_drafts[f"{user_id}_{tab}"] = {
+            'data': data.get('form_data'),
+            'timestamp': datetime.datetime.now().isoformat()
+        }
+        # We don't necessarily need to hms.save_data() for every autosave 
+        # to avoid disk I/O overhead, but we could.
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/billing/draft/<tab>')
+def get_billing_draft(tab):
+    user_id = session.get('user_id', 'default')
+    draft = getattr(hms, 'billing_drafts', {}).get(f"{user_id}_{tab}")
+    if draft:
+        return jsonify(draft)
+    return jsonify({'error': 'No draft found'}), 404
+
 @app.route('/billing/delete/<bill_id>')
 def delete_bill(bill_id):
-    if hms.delete_bill(bill_id):
-        flash('Bill deleted successfully!', 'success')
         notify('Bill deleted', bill_id, 'admin')
     else:
         flash('Error deleting bill!', 'error')
@@ -2358,7 +2528,7 @@ def inventory():
         inventory_items = hms.search_inventory(search_term)
     else:
         inventory_items = hms.inventory
-    return render_template('inventory.html', inventory=inventory_items, active_page='inventory', search_term=search_term)
+    return render_template('inventory.html', inventory=inventory_items, active_page='inventory', search_term=search_term, providers=PROVIDERS)
 
 @app.route('/inventory/add', methods=['GET', 'POST'])
 def add_inventory_item():

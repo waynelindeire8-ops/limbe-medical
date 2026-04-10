@@ -75,7 +75,16 @@
             {% endwith %}
             <div class="header-actions">
                 <h2>Inventory</h2>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 10px; background: #f0f2f5; padding: 5px 15px; border-radius: 8px; border: 1px solid #ddd;">
+                        <label for="provider-sort" style="font-weight: 600; font-size: 14px; color: #444; white-space: nowrap;"><i class="fas fa-sort-amount-down"></i> Sort by Scheme:</label>
+                        <select id="provider-sort" style="padding: 8px; border: 1px solid #ccc; border-radius: 6px; outline: none; min-width: 200px; background: white;">
+                            <option value="">-- No Sorting --</option>
+                            {% for p in providers %}
+                            <option value="{{ p }}">{{ p }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <form action="{{ url_for('inventory') }}" method="get" class="search-form" style="display: flex; align-items: center; gap: 10px;">
                         <input type="text" name="search" placeholder="Search inventory..." value="{{ search_term if search_term else '' }}" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px; outline: none; width: 250px;">
                         <button type="submit" style="background-color: #4361ee; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;"><i class="fas fa-search"></i></button>
@@ -84,41 +93,43 @@
                         {% endif %}
                     </form>
                     <a href="{{ url_for('add_inventory_item') }}" class="btn-add"><i class="fas fa-plus"></i> Add Item</a>
-                    <a href="{{ url_for('inventory_import') }}" class="btn-add" style="background-color: #f72585;"><i class="fas fa-file-upload"></i> Import Medicines and Services</a>
+                    <a href="{{ url_for('inventory_import') }}" class="btn-add" style="background-color: #f72585;"><i class="fas fa-file-upload"></i> Import</a>
                     <form action="{{ url_for('inventory_bulk_price_update') }}" method="post" style="display: flex; align-items: center; gap: 5px; border-left: 1px solid #ddd; padding-left: 10px;" onsubmit="return confirm('Are you sure you want to update ALL inventory prices by this percentage?')">
-                        <input type="number" name="percentage" step="0.01" placeholder="Price Change %" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 130px;" required>
-                        <button type="submit" class="btn-add" style="background-color: #4cc9f0; border: none; cursor: pointer; white-space: nowrap;"><i class="fas fa-percent"></i> Bulk Update</button>
+                        <input type="number" name="percentage" step="0.01" placeholder="Price %" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100px;" required title="Enter percentage to change all prices (e.g. 10 for 10% increase, -5 for 5% decrease)">
+                        <button type="submit" class="btn-add" style="background-color: #4cc9f0; border: none; cursor: pointer; white-space: nowrap;"><i class="fas fa-percent"></i> Update</button>
                     </form>
                 </div>
             </div>
 
             <div class="table-container">
-                <table>
+                <table id="inventory-table">
                     <thead>
                         <tr>
                             <th>Name</th>
                             <th>Category</th>
-                            <th>Quantity</th>
+                            <th>Qty</th>
                             <th>Unit Price</th>
                             <th>Billing Codes</th>
-                            <th>Expiry Date</th>
+                            <th>Expiry</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="inventory-body">
                         {% for item in inventory %}
-                        <tr>
-                            <td>{{ item.name }}</td>
+                        <tr class="inventory-row" data-name="{{ item.name|lower }}" data-codes='{{ item.billing_codes|tojson if item.billing_codes else "{}" }}'>
+                            <td class="item-name">{{ item.name }}</td>
                             <td>{{ item.category }}</td>
                             <td>{{ item.quantity }}</td>
-                            <td>{{ item.unit_price }}</td>
-                            <td>
+                            <td>MWK{{ "{:,.2f}".format(item.unit_price) }}</td>
+                            <td class="billing-codes-cell">
                                 {% if item.billing_codes %}
-                                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 12px;">
+                                    <div class="codes-list" style="font-size: 11px;">
                                     {% for provider, code in item.billing_codes.items() %}
-                                        <li><strong>{{ provider }}:</strong> {{ code }}</li>
+                                        <div class="code-item" data-provider="{{ provider }}" data-code="{{ code }}">
+                                            <strong>{{ provider }}:</strong> {{ code }}
+                                        </div>
                                     {% endfor %}
-                                    </ul>
+                                    </div>
                                 {% else %}
                                     <span style="color: #999;">None</span>
                                 {% endif %}
@@ -131,7 +142,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="6" style="text-align: center; color: #888; padding: 20px;">No inventory items found. Add your first item using the "Add Item" button above.</td>
+                            <td colspan="7" style="text-align: center; color: #888; padding: 20px;">No inventory items found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -139,5 +150,54 @@
             </div>
         </main>
     </div>
+
+    <script>
+        document.getElementById('provider-sort').addEventListener('change', function() {
+            const provider = this.value;
+            const tbody = document.getElementById('inventory-body');
+            const rows = Array.from(tbody.querySelectorAll('.inventory-row'));
+            
+            // Highlight relevant code in the cell
+            document.querySelectorAll('.code-item').forEach(el => {
+                el.style.backgroundColor = 'transparent';
+                el.style.fontWeight = 'normal';
+                el.style.padding = '0';
+            });
+
+            if (provider) {
+                document.querySelectorAll(`.code-item[data-provider="${provider}"]`).forEach(el => {
+                    el.style.backgroundColor = '#fff3cd';
+                    el.style.fontWeight = 'bold';
+                    el.style.padding = '2px 4px';
+                    el.style.borderRadius = '4px';
+                });
+            }
+
+            rows.sort((a, b) => {
+                const codesA = JSON.parse(a.dataset.codes || '{}');
+                const codesB = JSON.parse(b.dataset.codes || '{}');
+                
+                const codeA = provider ? (codesA[provider] || "") : "";
+                const codeB = provider ? (codesB[provider] || "") : "";
+
+                if (codeA && codeB) {
+                    const numA = parseInt(codeA);
+                    const numB = parseInt(codeB);
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        if (numA !== numB) return numA - numB;
+                    }
+                    return codeA.localeCompare(codeB);
+                }
+                
+                if (codeA && !codeB) return -1;
+                if (!codeA && codeB) return 1;
+                
+                // Fallback to name
+                return a.dataset.name.localeCompare(b.dataset.name);
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        });
+    </script>
 </body>
 </html>
