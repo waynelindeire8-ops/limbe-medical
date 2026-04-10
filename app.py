@@ -622,7 +622,7 @@ def edit_patient(patient_id):
                 flash('Patient not found!', 'error')
                 return redirect(url_for('patients'))
 
-            new_id = request.form.get('patient_id', '').strip()
+            new_id = (request.form.get('patient_id', '') or patient_id).strip()
             
             # Prepare update data
             update_data = {
