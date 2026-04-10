@@ -92,7 +92,8 @@ def seed_users():
         ('cashier', 'cash123', 'cashier'),
         ('nurse', 'nurse123', 'nurse'),
         ('lab', 'lab123', 'lab_assistant'),
-        ('doctor', 'doc123', 'doctor')
+        ('doctor', 'doc123', 'doctor'),
+        ('locum', 'locum123', 'doctor')
     ]
     # Check if users exist, if not create them
     # We need to temporarily mock an admin actor for the first user creation if strict checks are in place
