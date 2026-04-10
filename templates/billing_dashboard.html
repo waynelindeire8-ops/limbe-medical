@@ -294,21 +294,29 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <input type="hidden" name="item_drug_id[]" class="autocomplete-value">
-                                            <select class="inventory-select" data-kind="drug"></select>
-                                            <div class="mini-input-row">
-                                                <input type="number" name="item_drug_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
-                                                <span style="font-size: 10px; color: #888;">x</span>
-                                                <input type="number" name="item_drug[]" value="0" step="0.01" readonly style="width: 80px;">
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="drug"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="drug">+</button>
+                                                </div>
+                                                <input type="hidden" name="item_drug[]" value="0" class="row-total-drug">
                                             </div>
                                         </td>
                                         <td>
-                                            <input type="hidden" name="item_lab_id[]" class="autocomplete-value">
-                                            <select class="inventory-select" data-kind="lab"></select>
-                                            <div class="mini-input-row">
-                                                <input type="number" name="item_lab_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
-                                                <span style="font-size: 10px; color: #888;">x</span>
-                                                <input type="number" name="item_lab[]" value="0" step="0.01" readonly style="width: 80px;">
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="lab"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="lab">+</button>
+                                                </div>
+                                                <input type="hidden" name="item_lab[]" value="0" class="row-total-lab">
                                             </div>
                                         </td>
                                         <td><input type="number" name="item_amount[]" class="create-row-amount" value="0" step="0.01" readonly></td>
@@ -701,7 +709,11 @@
 
         // Helper to update calculations based on row type
         function updateCalculations(row) {
+            const prefix = row.classList.contains('individual-row') ? 'ind' : (row.classList.contains('cash-row') ? 'cash' : '');
+            updateMiniTotals(row, prefix);
+
             if (row.classList.contains('create-row')) {
+                updateCreateRowAmount(row);
                 updateCreateTotal();
             } else if (row.classList.contains('invoice-row')) {
                 updateRowAmount(row);
@@ -854,17 +866,27 @@
                     <input type="number" class="mini-${type}" value="0" step="0.01" readonly style="width: 80px;">
                     <button type="button" class="remove-mini-input">×</button>
                 `;
-                container.insertBefore(newRow, container.querySelector(':scope > input[type="hidden"]'));
+                
+                const targetInput = container.querySelector(':scope > input[type="hidden"]');
+                if (targetInput) {
+                    container.insertBefore(newRow, targetInput);
+                } else {
+                    container.appendChild(newRow);
+                }
                 
                 // Get provider from tab context
                 const tab = e.target.closest('.tab-content');
                 let provider = null;
                 if (tab) {
-                    if (tab.id === 'individual') {
+                    if (tab.id === 'individual' || tab.id === 'create') {
                         const patientInput = tab.querySelector('.autocomplete-input[data-source="patients"]');
-                        const patientId = patientInput.previousElementSibling.value;
-                        const patientMatch = autocompleteData.patients.find(p => p.value === patientId);
-                        provider = patientMatch ? (patientMatch.scheme || 'Cash') : 'Cash';
+                        if (patientInput && patientInput.previousElementSibling) {
+                            const patientId = patientInput.previousElementSibling.value;
+                            const patientMatch = autocompleteData.patients.find(p => p.value === patientId);
+                            provider = patientMatch ? (patientMatch.scheme || 'Cash') : 'Cash';
+                        } else {
+                            provider = 'Cash';
+                        }
                     } else {
                         const providerInput = tab.querySelector('.autocomplete-input[data-source="providers"]');
                         if (providerInput) {
@@ -875,26 +897,14 @@
                     }
                 }
                 populateInventorySelects(newRow, provider);
+                
+                // Update totals for the row
+                updateCalculations(e.target.closest('tr'));
             }
             if (e.target.classList.contains('remove-mini-input')) {
-                const container = e.target.closest('.mini-input-container');
                 const row = e.target.closest('tr');
-                const prefix = row.classList.contains('individual-row') ? 'ind' : (row.classList.contains('cash-row') ? 'cash' : '');
                 e.target.closest('.mini-input-row').remove();
-                
-                if (row.classList.contains('individual-row')) {
-                    updateMiniTotals(row, 'ind');
-                    updateIndividualRowAmount(row);
-                    updateIndividualTotal();
-                } else if (row.classList.contains('cash-row')) {
-                    updateMiniTotals(row, 'cash');
-                    updateCashRowAmount(row);
-                    updateCashTotal();
-                } else {
-                    updateMiniTotals(row);
-                    updateRowAmount(row);
-                    updateTotal();
-                }
+                updateCalculations(row);
             }
         });
 
@@ -915,22 +925,7 @@
                     }
 
                     const prefix = row.classList.contains('individual-row') ? 'ind' : (row.classList.contains('cash-row') ? 'cash' : '');
-                    
-                    if (row.classList.contains('individual-row')) {
-                        updateMiniTotals(row, 'ind');
-                        updateIndividualRowAmount(row);
-                        updateIndividualTotal();
-                    } else if (row.classList.contains('cash-row')) {
-                        updateMiniTotals(row, 'cash');
-                        updateCashRowAmount(row);
-                        updateCashTotal();
-                    } else if (row.classList.contains('invoice-row')) {
-                        updateMiniTotals(row);
-                        updateRowAmount(row);
-                        updateTotal();
-                    } else if (row.classList.contains('create-row')) {
-                        updateCreateTotal();
-                    }
+                    updateCalculations(row);
                 }
             });
 
@@ -1681,7 +1676,6 @@
             document.getElementById('cash-total').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
 
-        // Create Bill Logic
         document.getElementById('add-create-item').addEventListener('click', function() {
             const tbody = document.getElementById('create-items-body');
             const newRow = document.createElement('tr');
@@ -1698,21 +1692,29 @@
                     </div>
                 </td>
                 <td>
-                    <input type="hidden" name="item_drug_id[]" class="autocomplete-value">
-                    <select class="inventory-select" data-kind="drug"></select>
-                    <div class="mini-input-row">
-                        <input type="number" name="item_drug_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
-                        <span style="font-size: 10px; color: #888;">x</span>
-                        <input type="number" name="item_drug[]" value="0" step="0.01" readonly style="width: 80px;">
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="drug">+</button>
+                        </div>
+                        <input type="hidden" name="item_drug[]" value="0" class="row-total-drug">
                     </div>
                 </td>
                 <td>
-                    <input type="hidden" name="item_lab_id[]" class="autocomplete-value">
-                    <select class="inventory-select" data-kind="lab"></select>
-                    <div class="mini-input-row">
-                        <input type="number" name="item_lab_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
-                        <span style="font-size: 10px; color: #888;">x</span>
-                        <input type="number" name="item_lab[]" value="0" step="0.01" readonly style="width: 80px;">
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="lab">+</button>
+                        </div>
+                        <input type="hidden" name="item_lab[]" value="0" class="row-total-lab">
                     </div>
                 </td>
                 <td><input type="number" name="item_amount[]" class="create-row-amount" value="0" step="0.01" readonly></td>
