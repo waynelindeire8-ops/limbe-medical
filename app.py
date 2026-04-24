@@ -593,7 +593,8 @@ def add_patient():
                 email=request.form.get('email',''),
                 address=request.form.get('address',''),
                 emergency_contact=request.form.get('emergency_contact',''),
-                medical_history="",
+                blood_group=request.form.get('blood_group',''),
+                medical_history=request.form.get('medical_history',''),
                 created_date=datetime.datetime.now().strftime("%Y-%m-%d"),
                 scheme_provider=request.form.get('scheme_provider',''),
                 scheme_type=request.form.get('scheme_type','')
@@ -636,11 +637,14 @@ def edit_patient(patient_id):
                 'email': request.form.get('email',''),
                 'address': request.form.get('address',''),
                 'emergency_contact': request.form.get('emergency_contact',''),
+                'blood_group': request.form.get('blood_group',''),
+                'medical_history': request.form.get('medical_history',''),
                 'scheme_provider': request.form.get('scheme_provider',''),
                 'scheme_type': request.form.get('scheme_type','')
             }
             
             # Filter out None values to avoid overwriting with empty
+            # Actually, we want to allow empty strings, just not None
             update_data = {k: v for k, v in update_data.items() if v is not None}
             
             success = hms.update_patient(patient_id, **update_data)

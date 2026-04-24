@@ -364,6 +364,53 @@ class HospitalManagementSystem:
         patient = self.get_patient(patient_id)
         if not patient:
             return False
+            
+        new_id = kwargs.get('patient_id')
+        if new_id and new_id != patient_id:
+            # Check if new ID is already taken
+            if self.get_patient(new_id):
+                return False
+                
+            # Update ID in all related records
+            for a in self.appointments:
+                if a.patient_id == patient_id: a.patient_id = new_id
+            for m in self.medical_records:
+                if m.patient_id == patient_id: m.patient_id = new_id
+            for p in self.prescriptions:
+                if p.patient_id == patient_id: p.patient_id = new_id
+            for b in self.bills:
+                if b.patient_id == patient_id: b.patient_id = new_id
+            for lr in self.lab_results:
+                if lr.patient_id == patient_id: lr.patient_id = new_id
+            for q in self.queue:
+                if q.patient_id == patient_id: q.patient_id = new_id
+                
+            # Update dictionaries
+            if patient_id in self.patient_files:
+                self.patient_files[new_id] = self.patient_files.pop(patient_id)
+                # Update paths in file entries
+                for entry in self.patient_files[new_id]:
+                    if 'path' in entry:
+                        # Use replace with care, ensuring we only replace the directory part
+                        old_prefix = f"attachments{os.sep}{patient_id}"
+                        new_prefix = f"attachments{os.sep}{new_id}"
+                        entry['path'] = entry['path'].replace(old_prefix, new_prefix)
+                        # Also handle forward slashes just in case
+                        entry['path'] = entry['path'].replace(f"attachments/{patient_id}", f"attachments/{new_id}")
+
+            if patient_id in self.patient_scheme:
+                self.patient_scheme[new_id] = self.patient_scheme.pop(patient_id)
+
+            # Rename attachments directory if it exists
+            base_dir = os.path.dirname(os.path.abspath(self.data_file))
+            old_dir = os.path.join(base_dir, 'attachments', patient_id)
+            new_dir_path = os.path.join(base_dir, 'attachments', new_id)
+            if os.path.exists(old_dir):
+                try:
+                    os.rename(old_dir, new_dir_path)
+                except Exception as e:
+                    print(f"[WARN] Failed to rename attachments directory: {e}")
+
         for key, value in kwargs.items():
             if hasattr(patient, key):
                 setattr(patient, key, value)

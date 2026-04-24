@@ -16,6 +16,7 @@ class Patient:
     email: str = ""
     address: str = ""
     emergency_contact: str = ""
+    blood_group: str = ""
     medical_history: str = ""
     created_date: str = ""
     scheme_provider: str = ""

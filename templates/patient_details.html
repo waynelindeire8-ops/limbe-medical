@@ -151,6 +151,10 @@
                             <span>{{ patient.gender }}</span>
                         </div>
                         <div class="info-item">
+                            <label>Blood Group</label>
+                            <span>{{ patient.blood_group or 'Not Specified' }}</span>
+                        </div>
+                        <div class="info-item">
                             <label>Phone</label>
                             <span>{{ patient.phone }}</span>
                         </div>
@@ -173,6 +177,10 @@
                         <div class="info-item" style="grid-column: span 2;">
                             <label>Address</label>
                             <span>{{ patient.address }}</span>
+                        </div>
+                        <div class="info-item" style="grid-column: span 2;">
+                            <label>Medical History</label>
+                            <span>{{ patient.medical_history or 'No medical history recorded.' }}</span>
                         </div>
                     </div>
                 </div>
