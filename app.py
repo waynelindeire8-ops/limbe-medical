@@ -110,6 +110,13 @@ def seed_users():
 
 seed_users()
 
+def paginate_list(items, page, per_page=20):
+    total = len(items)
+    total_pages = (total + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    end = start + per_page
+    return items[start:end], total_pages
+
 @app.before_request
 def require_login():
     allowed_routes = ['login', 'register', 'static']
@@ -573,11 +580,22 @@ def serve_file():
 @app.route('/patients')
 def patients():
     search_term = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    
     if search_term:
-        patients = hms.search_patients(search_term)
+        all_patients = hms.search_patients(search_term)
     else:
-        patients = hms.patients
-    return render_template('patients.html', patients=patients, active_page='patients', search_term=search_term)
+        all_patients = hms.patients
+        
+    patients_slice, total_pages = paginate_list(all_patients, page)
+    
+    return render_template('patients.html', 
+                           patients=patients_slice, 
+                           active_page='patients', 
+                           search_term=search_term,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=len(all_patients))
 
 @app.route('/add_patient', methods=['GET', 'POST'])
 def add_patient():
@@ -1054,23 +1072,38 @@ def general_reports():
 @app.route('/view_schedule')
 def view_schedule():
     search_term = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    
     if search_term:
-        appointments = hms.search_appointments(search_term)
+        all_appointments = hms.search_appointments(search_term)
     else:
-        appointments = hms.appointments
-    return render_template('view_schedule.html', appointments=appointments, active_page='schedule', search_term=search_term)
+        all_appointments = hms.appointments
+        
+    # Sort by date descending
+    all_appointments = sorted(all_appointments, key=lambda x: (getattr(x, 'appointment_date', '') or ''), reverse=True)
+    
+    appointments_slice, total_pages = paginate_list(all_appointments, page)
+    
+    return render_template('view_schedule.html', 
+                           appointments=appointments_slice, 
+                           active_page='schedule', 
+                           search_term=search_term,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=len(all_appointments))
 
 @app.route('/billing')
 def billing_dashboard():
     # Filter for search if needed
     search_term = request.args.get('search', '').lower().strip()
+    page = request.args.get('page', 1, type=int)
     search_parts = search_term.split()
     
     # Sort bills by timestamp descending (newest first), falling back to date if timestamp missing
-    all_bills = sorted(hms.bills, key=lambda x: (x.created_at or x.created_date or ''), reverse=True)
+    all_bills = sorted(hms.bills, key=lambda x: (getattr(x, 'created_at', '') or getattr(x, 'created_date', '') or ''), reverse=True)
     
     # Resolve patient names for display
-    display_bills = []
+    filtered_bills = []
     for bill in all_bills:
         patient = hms.get_patient(bill.patient_id)
         p_name = f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
@@ -1078,13 +1111,9 @@ def billing_dashboard():
         # Search filter
         p_first = patient.first_name.lower() if patient else ""
         p_last = patient.last_name.lower() if patient else ""
-        p_full = f"{p_first} {p_last}"
-        p_reverse = f"{p_last} {p_first}"
         
         bill_text = (
             bill.bill_id.lower() + " " +
-            p_full + " " +
-            p_reverse + " " +
             p_first + " " +
             p_last + " " +
             bill.status.lower()
@@ -1093,7 +1122,7 @@ def billing_dashboard():
         if search_term and not all(part in bill_text for part in search_parts):
             continue
             
-        display_bills.append({
+        filtered_bills.append({
             'bill_id': bill.bill_id,
             'date': bill.created_date,
             'patient_name': p_name,
@@ -1102,13 +1131,15 @@ def billing_dashboard():
             'services': bill.services
         })
 
+    bills_slice, total_pages = paginate_list(filtered_bills, page)
+
     # Calculate stats
     total_revenue = sum(b.amount for b in hms.bills if b.status.lower() == 'paid')
     pending_amount = sum(b.amount for b in hms.bills if b.status.lower() == 'pending')
     total_bills = len(hms.bills)
     
     return render_template('billing_dashboard.html', 
-                           bills=display_bills, 
+                           bills=bills_slice, 
                            patients=hms.patients,
                            inventory=hms.inventory,
                            total_revenue=total_revenue,
@@ -1116,7 +1147,11 @@ def billing_dashboard():
                            total_bills=total_bills,
                            today_date=datetime.datetime.now().strftime("%Y-%m-%d"),
                            active_page='billing',
-                           hms_providers=PROVIDERS)
+                           hms_providers=PROVIDERS,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=len(filtered_bills),
+                           search_term=search_term)
 
 @app.route('/billing/create', methods=['GET', 'POST'])
 def create_bill():
@@ -1895,8 +1930,10 @@ def billing_reports():
 @app.route('/prescriptions')
 def prescriptions():
     search_term = request.args.get('search', '').lower().strip()
+    page = request.args.get('page', 1, type=int)
     search_parts = search_term.split()
     all_rx = sorted(hms.prescriptions, key=lambda x: (x.date or ''), reverse=True)
+    
     def map_display(rx):
         patient = hms.get_patient(rx.patient_id)
         doctor = hms.get_doctor(rx.doctor_id)
@@ -1917,9 +1954,13 @@ def prescriptions():
             'medication': rx.medication,
             'status': rx.status
         }
-    display_list = [map_display(rx) for rx in all_rx]
+    
+    filtered_list = []
     if search_term:
-        display_list = [d for d in display_list if all(part in (
+        # We still need to map all for search unfortunately, unless we optimize search
+        # But let's at least paginate the result
+        full_list = [map_display(rx) for rx in all_rx]
+        filtered_list = [d for d in full_list if all(part in (
             d['prescription_id'].lower() + " " +
             d['patient_name'].lower() + " " +
             d['patient_reverse'].lower() + " " +
@@ -1928,7 +1969,23 @@ def prescriptions():
             d['doctor_reverse'].lower() + " " +
             d['medication'].lower()
         ) for part in search_parts)]
-    return render_template('prescriptions.html', prescriptions=display_list, active_page='prescriptions', search_term=search_term)
+    else:
+        # If no search, we only need to map the slice! This is a big optimization.
+        filtered_list = all_rx # Just a list of objects for now
+    
+    display_slice, total_pages = paginate_list(filtered_list, page)
+    
+    # If it wasn't searched, it's still raw objects, so map them now
+    if not search_term:
+        display_slice = [map_display(rx) for rx in display_slice]
+        
+    return render_template('prescriptions.html', 
+                           prescriptions=display_slice, 
+                           active_page='prescriptions', 
+                           search_term=search_term,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=len(filtered_list))
 
 @app.route('/prescriptions/add', methods=['GET', 'POST'])
 def add_prescription():
@@ -2017,39 +2074,40 @@ def print_prescription(prescription_id):
 @app.route('/medical_records')
 def medical_records():
     search_term = request.args.get('search', '').lower().strip()
+    page = request.args.get('page', 1, type=int)
     search_parts = search_term.split()
     all_records = sorted(hms.medical_records, key=lambda x: (x.date or ''), reverse=True)
     
-    display_list = []
+    # Pre-filter for search to avoid O(N^2) if possible
+    # But we need patient/doctor names for search, so we still need some lookup
+    # Let's at least optimize the search a bit
+    
+    filtered_records = []
     for record in all_records:
         patient = hms.get_patient(record.patient_id)
         doctor = hms.get_doctor(record.doctor_id)
+        
         p_first = patient.first_name.lower() if patient else ""
         p_last = patient.last_name.lower() if patient else ""
-        p_full = f"{p_first} {p_last}"
-        p_reverse = f"{p_last} {p_first}"
-        
-        d_first = doctor.first_name.lower() if doctor else ""
         d_last = doctor.last_name.lower() if doctor else ""
-        d_full = f"{d_first} {d_last}"
-        d_reverse = f"{d_last} {d_first}"
-        d_name_short = f"dr. {d_last}" if d_last else ""
         
         record_text = (
             record.record_id.lower() + " " +
-            p_full + " " +
-            p_reverse + " " +
             p_first + " " +
             p_last + " " +
-            d_full + " " +
-            d_reverse + " " +
-            d_name_short + " " +
+            d_last + " " +
             record.diagnosis.lower()
         )
         
         if search_term and not all(part in record_text for part in search_parts):
             continue
+        
+        filtered_records.append((record, patient, doctor))
 
+    records_slice_info, total_pages = paginate_list(filtered_records, page)
+    
+    display_list = []
+    for record, patient, doctor in records_slice_info:
         display_list.append({
             'record_id': record.record_id,
             'date': record.date,
@@ -2059,7 +2117,13 @@ def medical_records():
             'consult_reason': record.consult_reason
         })
             
-    return render_template('medical_records.html', records=display_list, active_page='medical_records', search_term=search_term)
+    return render_template('medical_records.html', 
+                           records=display_list, 
+                           active_page='medical_records', 
+                           search_term=search_term,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=len(filtered_records))
 
 @app.route('/medical_records/add', methods=['GET', 'POST'])
 def add_medical_record():
@@ -2341,8 +2405,31 @@ def delete_medical_record(record_id):
 
 @app.route('/lab_results')
 def lab_results():
-    results = hms.lab_results
-    return render_template('lab_results.html', lab_results=results, active_page='lab_results', hms=hms)
+    search_term = request.args.get('search', '').lower().strip()
+    page = request.args.get('page', 1, type=int)
+    
+    all_results = sorted(hms.lab_results, key=lambda x: (getattr(x, 'test_date', '') or ''), reverse=True)
+    
+    if search_term:
+        search_parts = search_term.split()
+        filtered_results = [r for r in all_results if all(part in (
+            (getattr(r, 'result_id', '') or '').lower() + " " +
+            (getattr(r, 'test_name', '') or '').lower() + " " +
+            (getattr(r, 'patient_id', '') or '').lower()
+        ) for part in search_parts)]
+    else:
+        filtered_results = all_results
+        
+    results_slice, total_pages = paginate_list(filtered_results, page)
+    
+    return render_template('lab_results.html', 
+                           lab_results=results_slice, 
+                           active_page='lab_results', 
+                           hms=hms,
+                           search_term=search_term,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=len(filtered_results))
 
 @app.route('/lab_results/add', methods=['GET', 'POST'])
 def add_lab_result():
@@ -2531,11 +2618,23 @@ def disable_user_2fa(username):
 @app.route('/inventory')
 def inventory():
     search_term = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    
     if search_term:
-        inventory_items = hms.search_inventory(search_term)
+        all_items = hms.search_inventory(search_term)
     else:
-        inventory_items = hms.inventory
-    return render_template('inventory.html', inventory=inventory_items, active_page='inventory', search_term=search_term, providers=PROVIDERS)
+        all_items = hms.inventory
+        
+    items_slice, total_pages = paginate_list(all_items, page)
+    
+    return render_template('inventory.html', 
+                           inventory=items_slice, 
+                           active_page='inventory', 
+                           search_term=search_term, 
+                           providers=PROVIDERS,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=len(all_items))
 
 @app.route('/inventory/add', methods=['GET', 'POST'])
 def add_inventory_item():

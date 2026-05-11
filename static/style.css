@@ -80,11 +80,46 @@ body {
     color: var(--primary-color);
 }
 
-/* Main Content */
-.main-content {
-    flex: 1;
-    padding: 30px;
-    overflow-y: auto;
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+    padding: 10px;
+}
+
+.pagination-btn {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text-dark);
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.pagination-btn:hover {
+    background-color: #f0f0f0;
+    border-color: #ccc;
+}
+
+.pagination-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.pagination-btn.disabled {
+    color: #ccc;
+    pointer-events: none;
+    background-color: #f9f9f9;
+}
+
+.pagination-info {
+    font-size: 14px;
+    color: var(--text-light);
 }
 
 /* Header */

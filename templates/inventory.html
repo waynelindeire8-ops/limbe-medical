@@ -148,6 +148,22 @@
                     </tbody>
                 </table>
             </div>
+
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                <a href="{{ url_for('inventory', page=page-1, search=search_term) }}" class="pagination-btn {{ 'disabled' if page == 1 else '' }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </a>
+                
+                <div class="pagination-info">
+                    Page {{ page }} of {{ total_pages }} (Total: {{ total_count }})
+                </div>
+
+                <a href="{{ url_for('inventory', page=page+1, search=search_term) }}" class="pagination-btn {{ 'disabled' if page == total_pages else '' }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                </a>
+            </div>
+            {% endif %}
         </main>
     </div>
 
