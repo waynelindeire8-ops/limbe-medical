@@ -128,7 +128,7 @@ def inject_user():
     username = session.get('username')
     role = session.get('role')
     unread = 0
-    for m in hms.messages:
+    for m in hms.messages[:500]:
         if not m.is_read and (m.recipient_id == username or m.recipient_id == role or m.recipient_id == 'all'):
             unread += 1
     return dict(current_user=username, current_role=role, unread_messages_count=unread, hms=hms)
@@ -253,14 +253,14 @@ def dashboard():
             print(f"[ERROR] Sorting recent_appointments failed: {e}")
             recent_appointments = hms.appointments[-5:] if hms.appointments else []
         
-        # Get active queue
+        # Get active queue - limit to 50 for performance
         active_queue = [q for q in hms.queue if getattr(q, 'status', '') != 'Completed']
         sorted_queue = []
         try:
-            sorted_queue = sorted(active_queue, key=lambda x: (getattr(x, 'check_in_time', '') or ''))
+            sorted_queue = sorted(active_queue, key=lambda x: (getattr(x, 'check_in_time', '') or ''))[:50]
         except Exception as e:
             print(f"[ERROR] Sorting queue failed: {e}")
-            sorted_queue = active_queue
+            sorted_queue = active_queue[:50]
             
         # Charts
         days = 90

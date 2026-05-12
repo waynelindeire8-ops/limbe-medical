@@ -142,10 +142,6 @@ class HospitalManagementSystem:
 
         if not os.path.exists(self.data_file):
             print(f"[ERROR] Data file '{self.data_file}' not found and no remote data available.")
-            # We do NOT create a fresh file automatically anymore per user request.
-            # But we might need empty structures to avoid crashes if the app continues running.
-            # Ideally, we should probably raise an error or exit, but for safety in a running app,
-            # we'll just leave lists empty (initialized in __init__) and let the user know.
             return
 
         try:
