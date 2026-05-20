@@ -74,7 +74,7 @@ class HospitalManagementSystem:
         self.load_data()
         
         # If DB is empty, migrate from JSON
-        if self.db.count('patients') == 0 and os.path.exists(self.data_file):
+        if self.db.count('patients') == 0:
             self._migrate_json_to_db()
 
     @property
@@ -141,30 +141,70 @@ class HospitalManagementSystem:
 
     def _migrate_json_to_db(self):
         """Migrate data from legacy JSON to SQLite"""
-        print("Migrating legacy JSON data to SQLite...")
-        try:
-            with open(self.data_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            # Use _apply_loaded_data to parse JSON correctly
-            self._apply_loaded_data(data)
-            
-            # Save everything to DB
-            for p in self.patients: self.db.save('patients', p, 'patient_id')
-            for d in self.doctors: self.db.save('doctors', d, 'doctor_id')
-            for a in self.appointments: self.db.save('appointments', a, 'appointment_id')
-            for m in self.medical_records: self.db.save('medical_records', m, 'record_id')
-            for pr in self.prescriptions: self.db.save('prescriptions', pr, 'prescription_id')
-            for b in self.bills: self.db.save('bills', b, 'bill_id')
-            for i in self.inventory: self.db.save('inventory', i, 'item_id')
-            for u in self.users: self.db.save('users', u, 'user_id')
-            for msg in self.messages: self.db.save('messages', msg, 'message_id')
-            for q in self.queue: self.db.save('queue', q, 'queue_id')
-            for lr in self.lab_results: self.db.save('lab_results', lr, 'result_id')
-            
+        print("Checking for legacy data to migrate...")
+        
+        migrated_any = False
+        
+        # 1. Try single JSON file
+        if os.path.exists(self.data_file):
+            print(f"Migrating from single JSON file: {self.data_file}")
+            try:
+                with open(self.data_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                self._apply_loaded_data(data)
+                self._save_caches_to_db()
+                migrated_any = True
+            except Exception as e:
+                print(f"Migration from single JSON failed: {e}")
+
+        # 2. Try separate JSON files (Legacy structure)
+        if not migrated_any:
+            legacy_dirs = ['data', 'sample_data']
+            for d in legacy_dirs:
+                if os.path.exists(d) and any(f.endswith('.json') for f in os.listdir(d)):
+                    print(f"Migrating from separate JSON files in directory: {d}")
+                    try:
+                        legacy_data = {}
+                        files = {
+                            'patients': 'patients.json',
+                            'doctors': 'doctors.json',
+                            'appointments': 'appointments.json',
+                            'medical_records': 'medical_records.json',
+                            'bills': 'bills.json',
+                            'inventory': 'inventory.json'
+                        }
+                        for key, filename in files.items():
+                            p = os.path.join(d, filename)
+                            if os.path.exists(p):
+                                with open(p, 'r', encoding='utf-8') as f:
+                                    legacy_data[key] = json.load(f)
+                        
+                        if legacy_data:
+                            self._apply_loaded_data(legacy_data)
+                            self._save_caches_to_db()
+                            migrated_any = True
+                            break
+                    except Exception as e:
+                        print(f"Migration from separate JSON files in {d} failed: {e}")
+
+        if migrated_any:
             print("Migration completed successfully.")
-        except Exception as e:
-            print(f"Migration failed: {e}")
+        else:
+            print("No legacy data found to migrate.")
+
+    def _save_caches_to_db(self):
+        """Save populated caches to database during migration"""
+        for p in self._patients_cache: self.db.save('patients', p, 'patient_id')
+        for d in self._doctors_cache: self.db.save('doctors', d, 'doctor_id')
+        for a in self._appointments_cache: self.db.save('appointments', a, 'appointment_id')
+        for m in self._medical_records_cache: self.db.save('medical_records', m, 'record_id')
+        for pr in self._prescriptions_cache: self.db.save('prescriptions', pr, 'prescription_id')
+        for b in self._bills_cache: self.db.save('bills', b, 'bill_id')
+        for i in self._inventory_cache: self.db.save('inventory', i, 'item_id')
+        for u in self._users_cache: self.db.save('users', u, 'user_id')
+        for msg in self._messages_cache: self.db.save('messages', msg, 'message_id')
+        for q in self._queue_cache: self.db.save('queue', q, 'queue_id')
+        for lr in self._lab_results_cache: self.db.save('lab_results', lr, 'result_id')
 
 
     # ---------- Utility ----------
