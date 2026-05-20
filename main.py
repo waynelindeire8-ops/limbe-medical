@@ -33,6 +33,9 @@ from typing import List, Dict, Optional, Any
 from models import Patient, Doctor, Appointment, MedicalRecord, Prescription, Bill, InventoryItem, User, Message, QueueItem, LabResult
 
 
+from database.db_manager import DatabaseManager
+
+
 # ==============================
 # 🏥 HOSPITAL MANAGEMENT SYSTEM
 # ==============================
@@ -40,24 +43,12 @@ from models import Patient, Doctor, Appointment, MedicalRecord, Prescription, Bi
 class HospitalManagementSystem:
     """Core class for managing hospital data and operations."""
 
-    def __init__(self, data_file: str = "hospital_data.json"):
+    def __init__(self, data_file: str = "hospital_data.json", db_file: str = "hospital_data.db"):
         self.data_file = data_file
+        self.db_file = db_file
+        self.db = DatabaseManager(db_file=db_file)
 
-        self.patients: List[Patient] = []
-        self.doctors: List[Doctor] = []
-        self.appointments: List[Appointment] = []
-        self.medical_records: List[MedicalRecord] = []
-        self.prescriptions: List[Prescription] = []
-        self.bills: List[Bill] = []
-        self.inventory: List[InventoryItem] = []
-        self.users: List[User] = []
-        self.messages: List[Message] = []
-        self.queue: List[QueueItem] = []
-        self.lab_results: List[LabResult] = []
-        self.activity: List[Dict[str, Any]] = []
-        self.patient_files: Dict[str, List[Dict[str, Any]]] = {}
-        self.patient_scheme: Dict[str, Dict[str, Any]] = {}
-
+        # Cache settings for fast access, other data stays in DB
         self.settings: Dict[str, Any] = {
             'theme': 'Light',
             'notifications': True,
@@ -67,21 +58,114 @@ class HospitalManagementSystem:
             'server_url': None,
             'supabase_project_id': os.environ.get('SUPABASE_PROJECT_ID', 'qiudxdvssvkbpoovwpbr'),
             'supabase_url': os.environ.get('SUPABASE_URL', 'https://qiudxdvssvkbpoovwpbr.supabase.co'),
-            # We use the service role key for API key fallback to ensure permissions, as the publishable key was causing issues.
-            'supabase_api_key': os.environ.get('SUPABASE_API_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpdWR4ZHZzc3ZrYnBvb3Z3cGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTUyOTQ2NywiZXhwIjoyMDgxMTA1NDY3fQ.WoHT4S5Or9sjs4TpB9gpq4ys5F9MlTNiToZA8dOfUPw'),
-            'supabase_service_role': os.environ.get('SUPABASE_SERVICE_ROLE', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpdWR4ZHZzc3ZrYnBvb3Z3cGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTUyOTQ2NywiZXhwIjoyMDgxMTA1NDY3fQ.WoHT4S5Or9sjs4TpB9gpq4ys5F9MlTNiToZA8dOfUPw'),
+            'supabase_api_key': os.environ.get('SUPABASE_API_KEY', ''),
+            'supabase_service_role': os.environ.get('SUPABASE_SERVICE_ROLE', ''),
         }
 
-        onedrive_path = self._route_data_file_to_onedrive(os.path.basename(self.data_file))
-        if onedrive_path:
-            if os.path.exists(self.data_file) and not os.path.exists(onedrive_path):
-                try:
-                    shutil.copy2(self.data_file, onedrive_path)
-                except Exception:
-                    pass
-            self.data_file = onedrive_path
+        # The following are kept for backward compatibility but should be migrated to DB queries
+        self._patients_cache: List[Patient] = []
+        self._doctors_cache: List[Doctor] = []
+        
+        self.activity: List[Dict[str, Any]] = []
+        self.patient_files: Dict[str, List[Dict[str, Any]]] = {}
+        self.patient_scheme: Dict[str, Dict[str, Any]] = {}
+        self.departments: List[str] = []
 
         self.load_data()
+        
+        # If DB is empty, migrate from JSON
+        if self.db.count('patients') == 0 and os.path.exists(self.data_file):
+            self._migrate_json_to_db()
+
+    @property
+    def patients(self) -> List[Patient]:
+        return self.db.get_all(Patient, 'patients', limit=1000)
+
+    def get_patients_paginated(self, page: int = 1, per_page: int = 20) -> List[Patient]:
+        return self.db.get_all(Patient, 'patients', limit=per_page, offset=(page-1)*per_page)
+
+    def get_patients_count(self) -> int:
+        return self.db.count('patients')
+
+    @property
+    def doctors(self) -> List[Doctor]:
+        return self.db.get_all(Doctor, 'doctors', limit=1000)
+
+    @property
+    def appointments(self) -> List[Appointment]:
+        return self.db.get_all(Appointment, 'appointments', limit=1000)
+
+    @property
+    def medical_records(self) -> List[MedicalRecord]:
+        return self.db.get_all(MedicalRecord, 'medical_records', limit=1000)
+
+    @property
+    def prescriptions(self) -> List[Prescription]:
+        return self.db.get_all(Prescription, 'prescriptions', limit=1000)
+
+    @property
+    def bills(self) -> List[Bill]:
+        return self.db.get_all(Bill, 'bills', limit=1000)
+
+    @property
+    def inventory(self) -> List[InventoryItem]:
+        return self.db.get_all(InventoryItem, 'inventory', limit=1000)
+
+    @property
+    def users(self) -> List[User]:
+        return self.db.get_all(User, 'users', limit=1000)
+
+    @property
+    def messages(self) -> List[Message]:
+        return self.db.get_all(Message, 'messages', limit=1000)
+
+    @property
+    def queue(self) -> List[QueueItem]:
+        return self.db.get_all(QueueItem, 'queue', limit=1000)
+
+    @queue.setter
+    def queue(self, value: List[QueueItem]):
+        # This is for the clear_all and similar operations
+        # For scalability, we should ideally not replace the whole list
+        # but for now we support it by clearing and re-adding
+        conn = self.db.get_connection()
+        conn.execute("DELETE FROM queue")
+        conn.commit()
+        conn.close()
+        for item in value:
+            self.db.save('queue', item, 'queue_id')
+
+    @property
+    def lab_results(self) -> List[LabResult]:
+        return self.db.get_all(LabResult, 'lab_results', limit=1000)
+
+    def _migrate_json_to_db(self):
+        """Migrate data from legacy JSON to SQLite"""
+        print("Migrating legacy JSON data to SQLite...")
+        try:
+            with open(self.data_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Use _apply_loaded_data to parse JSON correctly
+            self._apply_loaded_data(data)
+            
+            # Save everything to DB
+            for p in self.patients: self.db.save('patients', p, 'patient_id')
+            for d in self.doctors: self.db.save('doctors', d, 'doctor_id')
+            for a in self.appointments: self.db.save('appointments', a, 'appointment_id')
+            for m in self.medical_records: self.db.save('medical_records', m, 'record_id')
+            for pr in self.prescriptions: self.db.save('prescriptions', pr, 'prescription_id')
+            for b in self.bills: self.db.save('bills', b, 'bill_id')
+            for i in self.inventory: self.db.save('inventory', i, 'item_id')
+            for u in self.users: self.db.save('users', u, 'user_id')
+            for msg in self.messages: self.db.save('messages', msg, 'message_id')
+            for q in self.queue: self.db.save('queue', q, 'queue_id')
+            for lr in self.lab_results: self.db.save('lab_results', lr, 'result_id')
+            
+            print("Migration completed successfully.")
+        except Exception as e:
+            print(f"Migration failed: {e}")
+
 
     # ---------- Utility ----------
     @staticmethod
@@ -91,67 +175,58 @@ class HospitalManagementSystem:
 
     # ---------- Persistence ----------
     def save_data(self) -> None:
-        """Save all data to a single JSON file."""
+        """Save non-relational data to JSON and sync relational data if needed."""
         try:
+            # Relational data is already saved to SQLite in real-time.
+            # Here we only save metadata and settings.
             data = {
-                'patients': [asdict(p) for p in self.patients],
-                'doctors': [asdict(d) for d in self.doctors],
-                'appointments': [asdict(a) for a in self.appointments],
-                'medical_records': [asdict(m) for m in self.medical_records],
-                'prescriptions': [asdict(p) for p in self.prescriptions],
-                'bills': [asdict(b) for b in self.bills],
-                'inventory': [asdict(i) for i in self.inventory],
-                'users': [asdict(u) for u in self.users],
-                'messages': [asdict(m) for m in self.messages],
-                'queue': [asdict(q) for q in self.queue],
-                'lab_results': [asdict(lr) for lr in self.lab_results],
                 'settings': self.settings,
                 'activity': self.activity,
                 'patient_files': self.patient_files,
-                'patient_scheme': self.patient_scheme
+                'patient_scheme': self.patient_scheme,
+                'departments': self.departments
             }
-            srv = self.settings.get('server_url')
-            if srv:
-                try:
-                    self._post_remote_json('/api/save', data, srv)
-                except Exception as e:
-                    print(f"[WARN] Remote save failed: {e}")
-            try:
-                from supabase_data_manager import supabase_connected, put_supabase_json
-                if supabase_connected():
-                    put_supabase_json(data)
-            except Exception as e:
-                print(f"[WARN] Supabase save failed: {e}")
-
+            
+            # For backward compatibility and small backups, we could still include everything,
+            # but it's better to move away from it for scalability.
+            # We'll only save the metadata to the primary data_file.
+            
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
+                
+            # Sync with Supabase if enabled
+            if self.db.use_supabase:
+                try:
+                    from supabase_data_manager import put_supabase_json
+                    put_supabase_json(data)
+                except Exception as e:
+                    print(f"[WARN] Supabase sync failed: {e}")
+                    
         except Exception as e:
             print(f"[ERROR] Failed to save data: {e}")
-            pass
 
     def load_data(self) -> None:
-        """Load all data from the JSON file."""
-        try:
-            from supabase_data_manager import get_supabase_json
-            data = get_supabase_json()
-            if data:
-                self._apply_loaded_data(data)
-                return
-        except Exception as e:
-            print(f"[WARN] Supabase load failed: {e}")
-
+        """Load metadata from JSON file."""
         if not os.path.exists(self.data_file):
-            print(f"[ERROR] Data file '{self.data_file}' not found and no remote data available.")
             return
 
         try:
             with open(self.data_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            self._apply_loaded_data(data)
+            self._apply_metadata(data)
         except Exception as e:
             print(f"[ERROR] Failed to load data from {self.data_file}: {e}")
 
+    def _apply_metadata(self, data: Dict[str, Any]) -> None:
+        """Apply metadata from loaded JSON"""
+        self.settings.update(data.get('settings', {}))
+        self.activity = data.get('activity', [])
+        self.patient_files = data.get('patient_files', {})
+        self.patient_scheme = data.get('patient_scheme', {})
+        self.departments = data.get('departments', [])
+
     def _apply_loaded_data(self, data: Dict[str, Any]) -> None:
+        """Legacy method for migration - applies all data to temporary properties"""
         from dataclasses import fields as _dc_fields
 
         def _filter(cls, obj: Dict[str, Any]) -> Dict[str, Any]:
@@ -191,22 +266,21 @@ class HospitalManagementSystem:
             new_record['details'] = details
             return _filter(MedicalRecord, new_record)
 
-        self.patients = [Patient(**_filter(Patient, p)) for p in data.get('patients', [])]
-        self.doctors = [Doctor(**_filter(Doctor, d)) for d in data.get('doctors', [])]
-        self.appointments = [Appointment(**_normalize_appointment(a)) for a in data.get('appointments', [])]
-        self.medical_records = [MedicalRecord(**_normalize_record(m)) for m in data.get('medical_records', [])]
-        self.prescriptions = [Prescription(**_filter(Prescription, p)) for p in data.get('prescriptions', [])]
-        self.bills = [Bill(**_normalize_bill(b)) for b in data.get('bills', [])]
-        self.inventory = [InventoryItem(**_filter(InventoryItem, i)) for i in data.get('inventory', [])]
-        self.users = [User(**_filter(User, u)) for u in data.get('users', [])]
-        self.messages = [Message(**_filter(Message, m)) for m in data.get('messages', [])]
-        self.queue = [QueueItem(**_filter(QueueItem, q)) for q in data.get('queue', [])]
-        self.lab_results = [LabResult(**_filter(LabResult, lr)) for lr in data.get('lab_results', [])]
-        self.departments = data.get('departments', [])
-        self.settings = data.get('settings', self.settings)
-        self.activity = data.get('activity', [])
-        self.patient_files = data.get('patient_files', {})
-        self.patient_scheme = data.get('patient_scheme', {})
+        # Temporary lists for migration
+        self._patients_cache = [Patient(**_filter(Patient, p)) for p in data.get('patients', [])]
+        self._doctors_cache = [Doctor(**_filter(Doctor, d)) for d in data.get('doctors', [])]
+        self._appointments_cache = [Appointment(**_normalize_appointment(a)) for a in data.get('appointments', [])]
+        self._medical_records_cache = [MedicalRecord(**_normalize_record(m)) for m in data.get('medical_records', [])]
+        self._prescriptions_cache = [Prescription(**_filter(Prescription, p)) for p in data.get('prescriptions', [])]
+        self._bills_cache = [Bill(**_normalize_bill(b)) for b in data.get('bills', [])]
+        self._inventory_cache = [InventoryItem(**_filter(InventoryItem, i)) for i in data.get('inventory', [])]
+        self._users_cache = [User(**_filter(User, u)) for u in data.get('users', [])]
+        self._messages_cache = [Message(**_filter(Message, m)) for m in data.get('messages', [])]
+        self._queue_cache = [QueueItem(**_filter(QueueItem, q)) for q in data.get('queue', [])]
+        self._lab_results_cache = [LabResult(**_filter(LabResult, lr)) for lr in data.get('lab_results', [])]
+        
+        self._apply_metadata(data)
+
 
     def add_patient_files(self, patient_id: str, file_paths: List[str], source_appointment_id: Optional[str] = None, source_record_id: Optional[str] = None) -> int:
         added = 0
@@ -323,17 +397,17 @@ class HospitalManagementSystem:
 
     # ---------- Patients ----------
     def add_patient(self, patient: Patient) -> bool:
-        self.patients.append(patient)
-        self.save_data()
-        try:
-            name = f"{getattr(patient,'first_name','')} {getattr(patient,'last_name','')}".strip()
-            self.add_activity(None, 'add', 'patient', patient.patient_id, name)
-        except Exception:
-            pass
-        return True
+        if self.db.save('patients', patient, 'patient_id'):
+            try:
+                name = f"{getattr(patient,'first_name','')} {getattr(patient,'last_name','')}".strip()
+                self.add_activity(None, 'add', 'patient', patient.patient_id, name)
+            except Exception:
+                pass
+            return True
+        return False
 
     def get_patient(self, patient_id: str) -> Optional[Patient]:
-        return next((p for p in self.patients if p.patient_id == patient_id), None)
+        return self.db.get_by_id(Patient, 'patients', patient_id, 'patient_id')
 
     def get_patient_by_id(self, patient_id: str) -> Optional[Patient]:
         return self.get_patient(patient_id)
@@ -343,18 +417,7 @@ class HospitalManagementSystem:
         if not search_term:
             return self.patients
             
-        search_parts = search_term.split()
-        
-        results = []
-        for p in self.patients:
-            full_name = f"{p.first_name} {p.last_name}".lower()
-            reverse_name = f"{p.last_name} {p.first_name}".lower()
-            patient_id = p.patient_id.lower()
-            
-            # Check if all parts of search term are in the full name or ID
-            if all(part in full_name or part in reverse_name or part in patient_id for part in search_parts):
-                results.append(p)
-        return results
+        return self.db.search(Patient, 'patients', search_term, ['first_name', 'last_name', 'patient_id'])
 
     def update_patient(self, patient_id: str, **kwargs) -> bool:
         patient = self.get_patient(patient_id)
@@ -367,102 +430,76 @@ class HospitalManagementSystem:
             if self.get_patient(new_id):
                 return False
                 
-            # Update ID in all related records
-            for a in self.appointments:
-                if a.patient_id == patient_id: a.patient_id = new_id
-            for m in self.medical_records:
-                if m.patient_id == patient_id: m.patient_id = new_id
-            for p in self.prescriptions:
-                if p.patient_id == patient_id: p.patient_id = new_id
-            for b in self.bills:
-                if b.patient_id == patient_id: b.patient_id = new_id
-            for lr in self.lab_results:
-                if lr.patient_id == patient_id: lr.patient_id = new_id
-            for q in self.queue:
-                if q.patient_id == patient_id: q.patient_id = new_id
-                
+            # Update ID in all related records (this is a bit heavy for SQL but necessary if IDs change)
+            # Better to use a non-changing internal ID, but project uses patient_id as PK.
+            conn = self.db.get_connection()
+            try:
+                conn.execute("UPDATE appointments SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
+                conn.execute("UPDATE medical_records SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
+                conn.execute("UPDATE prescriptions SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
+                conn.execute("UPDATE bills SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
+                conn.execute("UPDATE lab_results SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
+                conn.execute("UPDATE queue SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
+                conn.commit()
+            except Exception as e:
+                print(f"Error updating related IDs: {e}")
+                conn.rollback()
+            finally:
+                conn.close()
+
             # Update dictionaries
             if patient_id in self.patient_files:
                 self.patient_files[new_id] = self.patient_files.pop(patient_id)
-                # Update paths in file entries
-                for entry in self.patient_files[new_id]:
-                    if 'path' in entry:
-                        # Use replace with care, ensuring we only replace the directory part
-                        old_prefix = f"attachments{os.sep}{patient_id}"
-                        new_prefix = f"attachments{os.sep}{new_id}"
-                        entry['path'] = entry['path'].replace(old_prefix, new_prefix)
-                        # Also handle forward slashes just in case
-                        entry['path'] = entry['path'].replace(f"attachments/{patient_id}", f"attachments/{new_id}")
-
             if patient_id in self.patient_scheme:
                 self.patient_scheme[new_id] = self.patient_scheme.pop(patient_id)
-
-            # Rename attachments directory if it exists
-            base_dir = os.path.dirname(os.path.abspath(self.data_file))
-            old_dir = os.path.join(base_dir, 'attachments', patient_id)
-            new_dir_path = os.path.join(base_dir, 'attachments', new_id)
-            if os.path.exists(old_dir):
-                try:
-                    os.rename(old_dir, new_dir_path)
-                except Exception as e:
-                    print(f"[WARN] Failed to rename attachments directory: {e}")
 
         for key, value in kwargs.items():
             if hasattr(patient, key):
                 setattr(patient, key, value)
-        self.save_data()
-        return True
+        
+        return self.db.save('patients', patient, 'patient_id')
 
     def delete_patient(self, patient_id: str) -> bool:
-        for i, p in enumerate(self.patients):
-            if p.patient_id == patient_id:
-                del self.patients[i]
-                self.save_data()
-                try:
-                    self.add_activity(None, 'delete', 'patient', patient_id, '')
-                except Exception:
-                    pass
-                return True
+        if self.db.delete('patients', patient_id, 'patient_id'):
+            try:
+                self.add_activity(None, 'delete', 'patient', patient_id, '')
+            except Exception:
+                pass
+            return True
         return False
 
     # ---------- Doctors ----------
     def add_doctor(self, doctor: Doctor) -> bool:
-        self.doctors.append(doctor)
-        self.save_data()
-        try:
-            name = f"{getattr(doctor,'first_name','')} {getattr(doctor,'last_name','')}".strip()
-            self.add_activity(None, 'add', 'doctor', doctor.doctor_id, name)
-        except Exception:
-            pass
-        return True
+        if self.db.save('doctors', doctor, 'doctor_id'):
+            try:
+                name = f"{getattr(doctor,'first_name','')} {getattr(doctor,'last_name','')}".strip()
+                self.add_activity(None, 'add', 'doctor', doctor.doctor_id, name)
+            except Exception:
+                pass
+            return True
+        return False
 
     def get_doctor(self, doctor_id: str) -> Optional[Doctor]:
-        return next((d for d in self.doctors if d.doctor_id == doctor_id), None)
+        return self.db.get_by_id(Doctor, 'doctors', doctor_id, 'doctor_id')
 
     def get_doctor_by_id(self, doctor_id: str) -> Optional[Doctor]:
         return self.get_doctor(doctor_id)
 
     def get_available_doctors(self) -> List[Doctor]:
-        return [d for d in self.doctors if d.status.lower() == "available"]
+        # This could be optimized with a custom query in DatabaseManager
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM doctors WHERE LOWER(status) = 'available'")
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(Doctor, row) for row in rows]
 
     def search_doctors(self, search_term: str) -> List[Doctor]:
         search_term = search_term.lower().strip()
         if not search_term:
             return self.doctors
             
-        search_parts = search_term.split()
-        
-        results = []
-        for d in self.doctors:
-            full_name = f"{d.first_name} {d.last_name}".lower()
-            reverse_name = f"{d.last_name} {d.first_name}".lower()
-            doctor_id = d.doctor_id.lower()
-            specialty = d.specialty.lower()
-            
-            # Check if all parts of search term are in the full name, ID, or specialty
-            if all(part in full_name or part in reverse_name or part in doctor_id or part in specialty for part in search_parts):
-                results.append(d)
-        return results
+        return self.db.search(Doctor, 'doctors', search_term, ['first_name', 'last_name', 'doctor_id', 'specialty'])
 
     def update_doctor(self, doctor_id: str, **kwargs) -> bool:
         doctor = self.get_doctor(doctor_id)
@@ -471,77 +508,57 @@ class HospitalManagementSystem:
         for key, value in kwargs.items():
             if hasattr(doctor, key):
                 setattr(doctor, key, value)
-        self.save_data()
-        return True
+        return self.db.save('doctors', doctor, 'doctor_id')
 
     def delete_doctor(self, doctor_id: str) -> bool:
-        for i, d in enumerate(self.doctors):
-            if d.doctor_id == doctor_id:
-                del self.doctors[i]
-                self.save_data()
-                try:
-                    self.add_activity(None, 'delete', 'doctor', doctor_id, '')
-                except Exception:
-                    pass
-                return True
+        if self.db.delete('doctors', doctor_id, 'doctor_id'):
+            try:
+                self.add_activity(None, 'delete', 'doctor', doctor_id, '')
+            except Exception:
+                pass
+            return True
         return False
 
     # ---------- Appointments ----------
     def schedule_appointment(self, appointment: Appointment) -> bool:
-        self.appointments.append(appointment)
-        self.save_data()
-        try:
-            self.add_activity(None, 'schedule', 'appointment', appointment.appointment_id, f"{appointment.patient_id} -> {appointment.doctor_id} on {appointment.appointment_date} {appointment.appointment_time}")
-        except Exception:
-            pass
-        return True
+        if self.db.save('appointments', appointment, 'appointment_id'):
+            try:
+                self.add_activity(None, 'schedule', 'appointment', appointment.appointment_id, f"{appointment.patient_id} -> {appointment.doctor_id} on {appointment.appointment_date} {appointment.appointment_time}")
+            except Exception:
+                pass
+            return True
+        return False
 
     def search_appointments(self, search_term: str) -> List[Appointment]:
         search_term = search_term.lower().strip()
         if not search_term:
             return self.appointments
             
-        search_parts = search_term.split()
-        
-        # Get patient and doctor names for filtering
-        matching_appointments = []
-        for a in self.appointments:
-            patient = self.get_patient(a.patient_id)
-            doctor = self.get_doctor(a.doctor_id)
-            
-            p_name = f"{patient.first_name} {patient.last_name}".lower() if patient else ""
-            p_reverse = f"{patient.last_name} {patient.first_name}".lower() if patient else ""
-            d_name = f"{doctor.first_name} {doctor.last_name}".lower() if doctor else ""
-            d_reverse = f"{doctor.last_name} {doctor.first_name}".lower() if doctor else ""
-            
-            combined_text = (
-                a.appointment_id.lower() + " " +
-                a.patient_id.lower() + " " +
-                a.doctor_id.lower() + " " +
-                a.appointment_date.lower() + " " +
-                a.status.lower() + " " +
-                p_name + " " +
-                p_reverse + " " +
-                d_name + " " +
-                d_reverse
-            )
-            
-            if all(part in combined_text for part in search_parts):
-                matching_appointments.append(a)
-        
-        return matching_appointments
+        # For scalability, we search by IDs or date.
+        # Searching by joined patient/doctor names would require a more complex query.
+        return self.db.search(Appointment, 'appointments', search_term, ['appointment_id', 'patient_id', 'doctor_id', 'appointment_date', 'status'])
 
     def get_patient_appointments(self, patient_id: str) -> List[Appointment]:
-        return [a for a in self.appointments if a.patient_id == patient_id]
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM appointments WHERE patient_id = ?", (patient_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(Appointment, row) for row in rows]
 
     def get_doctor_appointments(self, doctor_id: str, date: str) -> List[Appointment]:
-        return [a for a in self.appointments if a.doctor_id == doctor_id and a.appointment_date == date]
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM appointments WHERE doctor_id = ? AND appointment_date = ?", (doctor_id, date))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(Appointment, row) for row in rows]
 
     def update_appointment_status(self, appointment_id: str, status: str) -> bool:
-        for a in self.appointments:
-            if a.appointment_id == appointment_id:
-                a.status = status
-                self.save_data()
+        appointment = self.get_appointment(appointment_id)
+        if appointment:
+            appointment.status = status
+            if self.db.save('appointments', appointment, 'appointment_id'):
                 try:
                     self.add_activity(None, 'update_status', 'appointment', appointment_id, status)
                 except Exception:
@@ -550,7 +567,7 @@ class HospitalManagementSystem:
         return False
 
     def get_appointment(self, appointment_id: str) -> Optional[Appointment]:
-        return next((a for a in self.appointments if a.appointment_id == appointment_id), None)
+        return self.db.get_by_id(Appointment, 'appointments', appointment_id, 'appointment_id')
 
     def update_appointment(self, appointment_id: str, **kwargs) -> bool:
         appointment = self.get_appointment(appointment_id)
@@ -559,156 +576,149 @@ class HospitalManagementSystem:
         for key, value in kwargs.items():
             if hasattr(appointment, key):
                 setattr(appointment, key, value)
-        self.save_data()
-        return True
+        return self.db.save('appointments', appointment, 'appointment_id')
 
     def delete_appointment(self, appointment_id: str) -> bool:
-        for i, a in enumerate(self.appointments):
-            if a.appointment_id == appointment_id:
-                del self.appointments[i]
-                self.save_data()
-                try:
-                    self.add_activity(None, 'delete', 'appointment', appointment_id, '')
-                except Exception:
-                    pass
-                return True
+        if self.db.delete('appointments', appointment_id, 'appointment_id'):
+            try:
+                self.add_activity(None, 'delete', 'appointment', appointment_id, '')
+            except Exception:
+                pass
+            return True
         return False
 
     # ---------- Medical Records ----------
     def add_medical_record(self, record: MedicalRecord) -> bool:
-        self.medical_records.append(record)
-        self.save_data()
-        try:
-            self.add_activity(None, 'add', 'medical_record', record.record_id, record.patient_id)
-        except Exception:
-            pass
-        return True
+        if self.db.save('medical_records', record, 'record_id'):
+            try:
+                self.add_activity(None, 'add', 'medical_record', record.record_id, record.patient_id)
+            except Exception:
+                pass
+            return True
+        return False
 
     def get_patient_medical_records(self, patient_id: str) -> List[MedicalRecord]:
-        return [r for r in self.medical_records if r.patient_id == patient_id]
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM medical_records WHERE patient_id = ?", (patient_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(MedicalRecord, row) for row in rows]
 
     def get_medical_record(self, record_id: str) -> Optional[MedicalRecord]:
-        return next((r for r in self.medical_records if r.record_id == record_id), None)
+        return self.db.get_by_id(MedicalRecord, 'medical_records', record_id, 'record_id')
 
     def update_medical_record(self, record: MedicalRecord) -> bool:
-        for i, r in enumerate(self.medical_records):
-            if r.record_id == record.record_id:
-                self.medical_records[i] = record
-                self.save_data()
-                try:
-                    self.add_activity(None, 'update', 'medical_record', record.record_id, record.patient_id)
-                except Exception:
-                    pass
-                return True
+        if self.db.save('medical_records', record, 'record_id'):
+            try:
+                self.add_activity(None, 'update', 'medical_record', record.record_id, record.patient_id)
+            except Exception:
+                pass
+            return True
         return False
 
     # ---------- Prescriptions ----------
     def add_prescription(self, prescription: Prescription) -> bool:
-        self.prescriptions.append(prescription)
-        self.save_data()
-        try:
-            self.add_activity(None, 'add', 'prescription', prescription.prescription_id, prescription.patient_id)
-        except Exception:
-            pass
-        return True
+        if self.db.save('prescriptions', prescription, 'prescription_id'):
+            try:
+                self.add_activity(None, 'add', 'prescription', prescription.prescription_id, prescription.patient_id)
+            except Exception:
+                pass
+            return True
+        return False
 
     def get_patient_prescriptions(self, patient_id: str) -> List[Prescription]:
-        return [p for p in self.prescriptions if p.patient_id == patient_id]
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM prescriptions WHERE patient_id = ?", (patient_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(Prescription, row) for row in rows]
 
     def get_prescription(self, prescription_id: str) -> Optional[Prescription]:
-        return next((p for p in self.prescriptions if p.prescription_id == prescription_id), None)
+        return self.db.get_by_id(Prescription, 'prescriptions', prescription_id, 'prescription_id')
 
     def update_prescription(self, prescription: Prescription) -> bool:
-        for i, p in enumerate(self.prescriptions):
-            if p.prescription_id == prescription.prescription_id:
-                self.prescriptions[i] = prescription
-                self.save_data()
-                try:
-                    self.add_activity(None, 'update', 'prescription', prescription.prescription_id, prescription.patient_id)
-                except Exception:
-                    pass
-                return True
+        if self.db.save('prescriptions', prescription, 'prescription_id'):
+            try:
+                self.add_activity(None, 'update', 'prescription', prescription.prescription_id, prescription.patient_id)
+            except Exception:
+                pass
+            return True
         return False
 
     def delete_prescription(self, prescription_id: str) -> bool:
-        for i, p in enumerate(self.prescriptions):
-            if p.prescription_id == prescription_id:
-                del self.prescriptions[i]
-                self.save_data()
-                try:
-                    self.add_activity(None, 'delete', 'prescription', prescription_id, '')
-                except Exception:
-                    pass
-                return True
+        if self.db.delete('prescriptions', prescription_id, 'prescription_id'):
+            try:
+                self.add_activity(None, 'delete', 'prescription', prescription_id, '')
+            except Exception:
+                pass
+            return True
         return False
 
     def delete_medical_record(self, record_id: str) -> bool:
-        for i, r in enumerate(self.medical_records):
-            if r.record_id == record_id:
-                del self.medical_records[i]
-                self.save_data()
-                try:
-                    self.add_activity(None, 'delete', 'medical_record', record_id, '')
-                except Exception:
-                    pass
-                return True
+        if self.db.delete('medical_records', record_id, 'record_id'):
+            try:
+                self.add_activity(None, 'delete', 'medical_record', record_id, '')
+            except Exception:
+                pass
+            return True
         return False
 
     # ---------- Lab Results ----------
     def add_lab_result(self, result: LabResult) -> bool:
-        self.lab_results.append(result)
-        self.save_data()
-        try:
-            self.add_activity(None, 'add', 'lab_result', result.result_id, result.patient_id)
-        except Exception:
-            pass
-        return True
+        if self.db.save('lab_results', result, 'result_id'):
+            try:
+                self.add_activity(None, 'add', 'lab_result', result.result_id, result.patient_id)
+            except Exception:
+                pass
+            return True
+        return False
 
     def get_lab_result(self, result_id: str) -> Optional[LabResult]:
-        return next((r for r in self.lab_results if r.result_id == result_id), None)
+        return self.db.get_by_id(LabResult, 'lab_results', result_id, 'result_id')
 
     def update_lab_result(self, result: LabResult) -> bool:
-        for i, r in enumerate(self.lab_results):
-            if r.result_id == result.result_id:
-                self.lab_results[i] = result
-                self.save_data()
-                try:
-                    self.add_activity(None, 'update', 'lab_result', result.result_id, result.patient_id)
-                except Exception:
-                    pass
-                return True
+        if self.db.save('lab_results', result, 'result_id'):
+            try:
+                self.add_activity(None, 'update', 'lab_result', result.result_id, result.patient_id)
+            except Exception:
+                pass
+            return True
         return False
 
     def delete_lab_result(self, result_id: str) -> bool:
-        for i, r in enumerate(self.lab_results):
-            if r.result_id == result_id:
-                del self.lab_results[i]
-                self.save_data()
-                try:
-                    self.add_activity(None, 'delete', 'lab_result', result_id, '')
-                except Exception:
-                    pass
-                return True
+        if self.db.delete('lab_results', result_id, 'result_id'):
+            try:
+                self.add_activity(None, 'delete', 'lab_result', result_id, '')
+            except Exception:
+                pass
+            return True
         return False
 
     # ---------- Billing ----------
     def create_bill(self, bill: Bill) -> bool:
-        self.bills.append(bill)
-        self.save_data()
-        try:
-            self.add_activity(None, 'create', 'bill', bill.bill_id, bill.patient_id)
-        except Exception:
-            pass
-        return True
+        if self.db.save('bills', bill, 'bill_id'):
+            try:
+                self.add_activity(None, 'create', 'bill', bill.bill_id, bill.patient_id)
+            except Exception:
+                pass
+            return True
+        return False
 
     def get_patient_bills(self, patient_id: str) -> List[Bill]:
-        return [b for b in self.bills if b.patient_id == patient_id]
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM bills WHERE patient_id = ?", (patient_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(Bill, row) for row in rows]
 
     def update_bill_status(self, bill_id: str, status: str) -> bool:
-        for b in self.bills:
-            if b.bill_id == bill_id:
-                b.status = status
-                self.save_data()
+        bill = self.get_bill(bill_id)
+        if bill:
+            bill.status = status
+            if self.db.save('bills', bill, 'bill_id'):
                 try:
                     self.add_activity(None, 'update_status', 'bill', bill_id, status)
                 except Exception:
@@ -717,70 +727,48 @@ class HospitalManagementSystem:
         return False
 
     def get_bill(self, bill_id: str) -> Optional[Bill]:
-        return next((b for b in self.bills if b.bill_id == bill_id), None)
+        return self.db.get_by_id(Bill, 'bills', bill_id, 'bill_id')
 
     def update_bill(self, bill: Bill) -> bool:
-        for i, b in enumerate(self.bills):
-            if b.bill_id == bill.bill_id:
-                self.bills[i] = bill
-                self.save_data()
-                try:
-                    self.add_activity(None, 'update', 'bill', bill.bill_id, bill.patient_id)
-                except Exception:
-                    pass
-                return True
+        if self.db.save('bills', bill, 'bill_id'):
+            try:
+                self.add_activity(None, 'update', 'bill', bill.bill_id, bill.patient_id)
+            except Exception:
+                pass
+            return True
         return False
 
     def delete_bill(self, bill_id: str) -> bool:
-        for i, b in enumerate(self.bills):
-            if b.bill_id == bill_id:
-                del self.bills[i]
-                self.save_data()
-                try:
-                    self.add_activity(None, 'delete', 'bill', bill_id, '')
-                except Exception:
-                    pass
-                return True
+        if self.db.delete('bills', bill_id, 'bill_id'):
+            try:
+                self.add_activity(None, 'delete', 'bill', bill_id, '')
+            except Exception:
+                pass
+            return True
         return False
-
-
 
     def search_inventory(self, search_term: str) -> List[InventoryItem]:
         search_term = search_term.lower().strip()
         if not search_term:
             return self.inventory
 
-        search_parts = search_term.split()
-
-        results = []
-        for item in self.inventory:
-            billing_text = " ".join([f"{p} {c}" for p, c in (item.billing_codes or {}).items()]).lower()
-            item_text = (
-                item.name.lower() + " " +
-                (item.category or '').lower() + " " +
-                item.item_id.lower() + " " +
-                billing_text
-            )
-
-            if all(part in item_text for part in search_parts):
-                results.append(item)
-        return results
+        return self.db.search(InventoryItem, 'inventory', search_term, ['name', 'category', 'item_id'])
 
     # ---------- Inventory ----------
     def add_inventory_item(self, item: InventoryItem) -> bool:
-        self.inventory.append(item)
-        self.save_data()
-        try:
-            self.add_activity(None, 'add', 'inventory', item.item_id, item.name)
-        except Exception:
-            pass
-        return True
+        if self.db.save('inventory', item, 'item_id'):
+            try:
+                self.add_activity(None, 'add', 'inventory', item.item_id, item.name)
+            except Exception:
+                pass
+            return True
+        return False
 
     def update_inventory_quantity(self, item_id: str, quantity: int) -> bool:
-        for i in self.inventory:
-            if i.item_id == item_id:
-                i.quantity = quantity
-                self.save_data()
+        item = self.get_inventory_item(item_id)
+        if item:
+            item.quantity = quantity
+            if self.db.save('inventory', item, 'item_id'):
                 try:
                     self.add_activity(None, 'update_qty', 'inventory', item_id, str(quantity))
                 except Exception:
@@ -789,45 +777,46 @@ class HospitalManagementSystem:
         return False
 
     def get_low_stock_items(self) -> List[InventoryItem]:
-        return [i for i in self.inventory if i.quantity <= i.min_quantity]
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM inventory WHERE quantity <= min_quantity")
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(InventoryItem, row) for row in rows]
 
     def get_inventory_item(self, item_id: str) -> Optional[InventoryItem]:
-        return next((i for i in self.inventory if i.item_id == item_id), None)
+        return self.db.get_by_id(InventoryItem, 'inventory', item_id, 'item_id')
 
     def update_inventory_item(self, item: InventoryItem) -> bool:
-        for idx, existing in enumerate(self.inventory):
-            if existing.item_id == item.item_id:
-                self.inventory[idx] = item
-                self.save_data()
-                try:
-                    self.add_activity(None, 'update', 'inventory', item.item_id, item.name)
-                except Exception:
-                    pass
-                return True
+        if self.db.save('inventory', item, 'item_id'):
+            try:
+                self.add_activity(None, 'update', 'inventory', item.item_id, item.name)
+            except Exception:
+                pass
+            return True
         return False
 
     def delete_inventory_item(self, item_id: str) -> bool:
-        for idx, existing in enumerate(self.inventory):
-            if existing.item_id == item_id:
-                del self.inventory[idx]
-                self.save_data()
-                try:
-                    self.add_activity(None, 'delete', 'inventory', item_id, '')
-                except Exception:
-                    pass
-                return True
+        if self.db.delete('inventory', item_id, 'item_id'):
+            try:
+                self.add_activity(None, 'delete', 'inventory', item_id, '')
+            except Exception:
+                pass
+            return True
         return False
 
     # ---------- Queue Management ----------
     def add_to_queue(self, queue_item: QueueItem) -> None:
         """Add a patient to the queue."""
-        self.queue.append(queue_item)
-        self.save_data()
+        self.db.save('queue', queue_item, 'queue_id')
 
     def estimate_wait_time(self, department: str) -> str:
         """Estimate the wait time for a patient based on the number of waiting patients in a department."""
-        # Simple estimation: 15 mins per waiting patient
-        waiting_count = len([q for q in self.queue if q.department == department and q.status == 'Waiting'])
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM queue WHERE department = ? AND status = 'Waiting'", (department,))
+        waiting_count = cursor.fetchone()[0]
+        conn.close()
         wait_mins = waiting_count * 15
         if wait_mins == 0:
             return "5 mins"
@@ -835,57 +824,199 @@ class HospitalManagementSystem:
 
     def call_patient(self, queue_id: str) -> bool:
         """Mark a patient as being called."""
-        for item in self.queue:
-            if item.queue_id == queue_id:
-                item.status = "Calling"
-                item.last_called_time = datetime.datetime.now().strftime("%H:%M:%S")
-                self.save_data()
-                return True
+        item = self.db.get_by_id(QueueItem, 'queue', queue_id, 'queue_id')
+        if item:
+            item.status = "Calling"
+            item.last_called_time = datetime.datetime.now().strftime("%H:%M:%S")
+            return self.db.save('queue', item, 'queue_id')
         return False
 
     def transfer_patient(self, queue_id: str, new_dept: str, new_doctor_id: str) -> bool:
         """Transfer a patient to a different department or doctor."""
-        for item in self.queue:
-            if item.queue_id == queue_id:
-                item.department = new_dept
-                item.assigned_doctor_id = new_doctor_id
-                # Reset estimated wait for the new department
-                item.estimated_wait = self.estimate_wait_time(new_dept)
-                self.save_data()
-                return True
+        item = self.db.get_by_id(QueueItem, 'queue', queue_id, 'queue_id')
+        if item:
+            item.department = new_dept
+            item.assigned_doctor_id = new_doctor_id
+            item.estimated_wait = self.estimate_wait_time(new_dept)
+            return self.db.save('queue', item, 'queue_id')
         return False
 
     def requeue_patient(self, queue_id: str) -> bool:
         """Re-queue a patient who might have been missed or needs a follow-up."""
-        for item in self.queue:
-            if item.queue_id == queue_id:
-                item.status = "Waiting"
-                item.requeued_count = getattr(item, 'requeued_count', 0) + 1
-                self.save_data()
-                return True
+        item = self.db.get_by_id(QueueItem, 'queue', queue_id, 'queue_id')
+        if item:
+            item.status = "Waiting"
+            item.requeued_count = getattr(item, 'requeued_count', 0) + 1
+            return self.db.save('queue', item, 'queue_id')
         return False
 
     def update_queue_status(self, queue_id: str, status: str) -> bool:
         """Update the status of a queue item."""
-        for item in self.queue:
-            if item.queue_id == queue_id:
-                item.status = status
-                self.save_data()
-                return True
+        item = self.db.get_by_id(QueueItem, 'queue', queue_id, 'queue_id')
+        if item:
+            item.status = status
+            return self.db.save('queue', item, 'queue_id')
         return False
 
     def remove_from_queue(self, queue_id: str) -> bool:
         """Remove a patient from the queue."""
-        initial_len = len(self.queue)
-        self.queue = [item for item in self.queue if item.queue_id != queue_id]
-        if len(self.queue) < initial_len:
-            self.save_data()
-            return True
-        return False
+        return self.db.delete('queue', queue_id, 'queue_id')
 
-    def get_queue(self) -> List[QueueItem]:
-        """Get the current queue."""
-        return self.queue
+    def get_unread_count(self, user_id: str, role: str) -> int:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) FROM messages 
+            WHERE is_read = 0 AND (recipient_id = ? OR recipient_id = ? OR recipient_id = 'all')
+        """, (user_id, role))
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get summary statistics using database aggregation"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        stats = {}
+        
+        cursor.execute("SELECT COUNT(*) FROM patients")
+        stats['total_patients'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM appointments")
+        stats['total_appointments'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT SUM(amount) FROM bills WHERE status = 'Paid'")
+        stats['total_revenue'] = cursor.fetchone()[0] or 0.0
+        
+        cursor.execute("SELECT status, COUNT(*) FROM appointments GROUP BY status")
+        stats['appointment_statuses'] = dict(cursor.fetchall())
+        
+        conn.close()
+        return stats
+
+    def get_dashboard_stats(self, days: int = 90) -> Dict[str, Any]:
+        """Get dashboard statistics using database aggregation"""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        stats = {}
+        
+        # Registration counts per day
+        cursor.execute("""
+            SELECT created_date, COUNT(*) FROM patients 
+            WHERE created_date >= date('now', ?)
+            GROUP BY created_date
+        """, (f"-{days} days",))
+        stats['registration_map'] = dict(cursor.fetchall())
+        
+        # Appointment counts per day
+        cursor.execute("""
+            SELECT appointment_date, COUNT(*) FROM appointments 
+            WHERE appointment_date >= date('now', ?)
+            GROUP BY appointment_date
+        """, (f"-{days} days",))
+        stats['appointment_map'] = dict(cursor.fetchall())
+        
+        # Todays counts
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        cursor.execute("SELECT COUNT(*) FROM appointments WHERE appointment_date = ?", (today,))
+        stats['todays_appointments'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM appointments WHERE status = 'Scheduled'")
+        stats['pending_appointments'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM appointments WHERE status = 'Completed'")
+        stats['completed_appointments'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM doctors WHERE LOWER(status) = 'available'")
+        stats['active_doctors'] = cursor.fetchone()[0]
+        
+        conn.close()
+        return stats
+
+    def get_recent_appointments(self, limit: int = 5) -> List[Appointment]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM appointments ORDER BY appointment_date DESC, appointment_time DESC LIMIT ?", (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(Appointment, row) for row in rows]
+
+    def get_active_queue(self, limit: int = 50) -> List[QueueItem]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM queue WHERE status != 'Completed' ORDER BY check_in_time ASC LIMIT ?", (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(QueueItem, row) for row in rows]
+
+    def get_recent_notifications(self, user_id: str, role: str, limit: int = 5) -> List[Message]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM messages 
+            WHERE sender_id = 'system' AND (recipient_id = ? OR recipient_id = ? OR recipient_id = 'all')
+            ORDER BY timestamp DESC LIMIT ?
+        """, (user_id, role, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(Message, row) for row in rows]
+
+    def get_messages_for_user(self, user_id: str, role: str, limit: int = 100) -> List[Message]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM messages 
+            WHERE recipient_id = ? OR recipient_id = ? OR recipient_id = 'all' OR sender_id = ?
+            ORDER BY timestamp DESC LIMIT ?
+        """, (user_id, role, user_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(Message, row) for row in rows]
+
+    def get_lab_records(self, limit: int = 100) -> List[MedicalRecord]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM medical_records 
+            WHERE LOWER(consult_reason) LIKE '%lab%' OR LOWER(consult_reason) LIKE '%blood%' OR LOWER(consult_reason) LIKE '%test%'
+               OR LOWER(diagnosis) LIKE '%lab%' OR LOWER(diagnosis) LIKE '%blood%' OR LOWER(diagnosis) LIKE '%test%'
+               OR LOWER(notes) LIKE '%lab%' OR LOWER(notes) LIKE '%blood%' OR LOWER(notes) LIKE '%test%'
+            LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [self.db._row_to_obj(MedicalRecord, row) for row in rows]
+
+    def get_report_stats(self) -> Dict[str, Any]:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        stats = {}
+        cursor.execute("SELECT COUNT(*) FROM patients")
+        stats['total_patients'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM doctors")
+        stats['total_doctors'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM appointments")
+        stats['total_appointments'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT SUM(amount) FROM bills")
+        stats['revenue'] = cursor.fetchone()[0] or 0.0
+        
+        cursor.execute("SELECT specialty, COUNT(*) FROM doctors GROUP BY specialty")
+        stats['department_counts'] = dict(cursor.fetchall())
+        
+        cursor.execute("SELECT gender, COUNT(*) FROM patients GROUP BY gender")
+        stats['gender_counts'] = dict(cursor.fetchall())
+        
+        cursor.execute("SELECT status, COUNT(*) FROM appointments GROUP BY status")
+        stats['status_counts'] = dict(cursor.fetchall())
+        
+        conn.close()
+        return stats
 
     def update_settings(self, **kwargs) -> None:
         self.settings.update(kwargs)
@@ -915,15 +1046,26 @@ class HospitalManagementSystem:
         return {'salt': salt, 'hash': h}
 
     def register_user(self, username: str, password: str, role: str = 'user', actor_role: Optional[str] = None) -> bool:
-        if any(u.username.lower() == username.lower() for u in self.users):
-            return False
+        # Check if username exists using SQL
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+        exists = cursor.fetchone()[0] > 0
+        
         r = (role or 'user').strip().lower()
         admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
         if r in admin_roles:
             actor_is_admin = (actor_role or '').strip().lower() in admin_roles
-            existing_admin = any((u.role or '').strip().lower() in admin_roles for u in self.users)
+            cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(role) IN ('admin', 'admin doctor', 'admin_doctor')")
+            existing_admin = cursor.fetchone()[0] > 0
             if not actor_is_admin and existing_admin:
+                conn.close()
                 return False
+        conn.close()
+        
+        if exists:
+            return False
+            
         creds = self._hash_password(password)
         user = User(
             user_id=self.generate_id('USR'),
@@ -935,18 +1077,28 @@ class HospitalManagementSystem:
             is_verified=False,
             otp_enabled=False
         )
-        self.users.append(user)
-        self.save_data()
-        return True
+        if self.db.save('users', user, 'user_id'):
+            return True
+        return False
 
     def authenticate(self, username: str, password: str) -> Optional[User]:
-        user = next((u for u in self.users if u.username.lower() == username.lower()), None)
-        if not user:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
             return None
+            
+        user = self.db._row_to_obj(User, row)
         creds = self._hash_password(password, user.password_salt)
-        if creds['hash'] == user.password_hash:
+        if creds['hash'] == user.password_hash and user.is_active:
             return user
         return None
+
+    def add_message(self, message: Message) -> bool:
+        return self.db.save('messages', message, 'message_id')
 
     def add_activity(self, actor: Optional[str], action: str, entity: str, entity_id: str, summary: str) -> None:
         entry = {
@@ -962,65 +1114,118 @@ class HospitalManagementSystem:
         self.activity.append(entry)
         if len(self.activity) > 500:
             self.activity = self.activity[-500:]
+        # Activity is still in JSON for now as it's not a core relational model
         self.save_data()
 
     def update_user_role(self, target_username: str, new_role: str, actor_username: str) -> bool:
         admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
-        actor = next((u for u in self.users if u.username.lower() == actor_username.lower()), None)
-        if not actor or (actor.role or '').strip().lower() not in admin_roles:
+        actor = self.authenticate(actor_username, "") # authenticate is used here but it needs password.
+        # Let's use a simpler check for role
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE LOWER(username) = LOWER(?)", (actor_username,))
+        row = cursor.fetchone()
+        if not row or row[0].lower() not in admin_roles:
+            conn.close()
             return False
-        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
-        if not user:
+            
+        cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (target_username,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
             return False
+            
+        user = self.db._row_to_obj(User, row)
         old_role = (user.role or '').strip().lower()
         user.role = (new_role or '').strip().lower()
-        self.save_data()
-        try:
-            self.add_activity(actor_username, 'update_role', 'user', user.user_id, f"{user.username}: {old_role} -> {user.role}")
-        except Exception:
-            pass
-        return True
+        
+        if self.db.save('users', user, 'user_id'):
+            conn.close()
+            try:
+                self.add_activity(actor_username, 'update_role', 'user', user.user_id, f"{user.username}: {old_role} -> {user.role}")
+            except Exception:
+                pass
+            return True
+        conn.close()
+        return False
 
     def toggle_user_status(self, target_username: str, active: bool, actor_username: str) -> bool:
         admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
-        actor = next((u for u in self.users if u.username.lower() == actor_username.lower()), None)
-        if not actor or (actor.role or '').strip().lower() not in admin_roles:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE LOWER(username) = LOWER(?)", (actor_username,))
+        row = cursor.fetchone()
+        if not row or row[0].lower() not in admin_roles:
+            conn.close()
             return False
-        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
-        if not user:
+            
+        cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (target_username,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
             return False
+            
+        user = self.db._row_to_obj(User, row)
         user.is_active = active
-        self.save_data()
-        self.add_activity(actor_username, 'toggle_status', 'user', user.user_id, f"{user.username}: {'Active' if active else 'Inactive'}")
-        return True
+        if self.db.save('users', user, 'user_id'):
+            conn.close()
+            self.add_activity(actor_username, 'toggle_status', 'user', user.user_id, f"{user.username}: {'Active' if active else 'Inactive'}")
+            return True
+        conn.close()
+        return False
 
     def toggle_user_verification(self, target_username: str, verified: bool, actor_username: str) -> bool:
         admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
-        actor = next((u for u in self.users if u.username.lower() == actor_username.lower()), None)
-        if not actor or (actor.role or '').strip().lower() not in admin_roles:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE LOWER(username) = LOWER(?)", (actor_username,))
+        row = cursor.fetchone()
+        if not row or row[0].lower() not in admin_roles:
+            conn.close()
             return False
-        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
-        if not user:
+            
+        cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (target_username,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
             return False
+            
+        user = self.db._row_to_obj(User, row)
         user.is_verified = verified
-        self.save_data()
-        self.add_activity(actor_username, 'toggle_verification', 'user', user.user_id, f"{user.username}: {'Verified' if verified else 'Unverified'}")
-        return True
+        if self.db.save('users', user, 'user_id'):
+            conn.close()
+            self.add_activity(actor_username, 'toggle_verification', 'user', user.user_id, f"{user.username}: {'Verified' if verified else 'Unverified'}")
+            return True
+        conn.close()
+        return False
 
     def toggle_user_2fa(self, target_username: str, enabled: bool, actor_username: str) -> bool:
         admin_roles = {'admin', 'admin doctor', 'admin_doctor'}
-        actor = next((u for u in self.users if u.username.lower() == actor_username.lower()), None)
-        if not actor or (actor.role or '').strip().lower() not in admin_roles:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM users WHERE LOWER(username) = LOWER(?)", (actor_username,))
+        row = cursor.fetchone()
+        if not row or row[0].lower() not in admin_roles:
+            conn.close()
             return False
-        user = next((u for u in self.users if u.username.lower() == target_username.lower()), None)
-        if not user:
+            
+        cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (target_username,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
             return False
+            
+        user = self.db._row_to_obj(User, row)
         user.otp_enabled = enabled
         if not enabled:
             user.otp_secret = None
-        self.save_data()
-        self.add_activity(actor_username, 'toggle_2fa', 'user', user.user_id, f"{user.username}: {'2FA Enabled' if enabled else '2FA Disabled'}")
-        return True
+            
+        if self.db.save('users', user, 'user_id'):
+            conn.close()
+            self.add_activity(actor_username, 'toggle_2fa', 'user', user.user_id, f"{user.username}: {'2FA Enabled' if enabled else '2FA Disabled'}")
+            return True
+        conn.close()
+        return False
 
     def _resolve_onedrive_base(self) -> Optional[str]:
         for env_key in ["OneDrive", "OneDriveCommercial", "OneDriveConsumer"]:
@@ -1078,14 +1283,14 @@ class HospitalHTTPHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/load'):
             data = {
-                'patients': [asdict(p) for p in self.hms.patients],
+                'patients': [asdict(p) for p in self.hms.patients[:100]], # Limit for API
                 'doctors': [asdict(d) for d in self.hms.doctors],
-                'appointments': [asdict(a) for a in self.hms.appointments],
-                'medical_records': [asdict(m) for m in self.hms.medical_records],
-                'prescriptions': [asdict(p) for p in self.hms.prescriptions],
-                'bills': [asdict(b) for b in self.hms.bills],
-                'inventory': [asdict(i) for i in self.hms.inventory],
-                'users': [asdict(u) for u in self.hms.users],
+                'appointments': [asdict(a) for a in self.hms.appointments[:100]],
+                'medical_records': [asdict(m) for m in self.hms.medical_records[:100]],
+                'prescriptions': [asdict(p) for p in self.hms.prescriptions[:100]],
+                'bills': [asdict(b) for b in self.hms.bills[:100]],
+                'inventory': [asdict(i) for i in self.hms.inventory[:100]],
+                'users': [asdict(u) for u in self.hms.users[:100]],
                 'settings': self.hms.settings,
                 'activity': self.hms.activity
             }

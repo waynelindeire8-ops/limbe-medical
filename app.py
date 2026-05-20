@@ -128,25 +128,16 @@ def inject_user():
     username = session.get('username')
     role = session.get('role')
     unread = 0
-    for m in hms.messages[:500]:
-        if not m.is_read and (m.recipient_id == username or m.recipient_id == role or m.recipient_id == 'all'):
-            unread += 1
+    if username:
+        unread = hms.get_unread_count(username, role)
     return dict(current_user=username, current_role=role, unread_messages_count=unread, hms=hms)
 
 @app.route('/analytics')
 def analytics():
-    # Calculate stats
-    total_patients = len(hms.patients)
-    total_appointments = len(hms.appointments)
-    total_revenue = sum(float(b.amount) for b in hms.bills if b.status == 'Paid')
+    # Use optimized database aggregation
+    stats = hms.get_stats()
     
-    # Appointments by Status
-    status_counts = {'Scheduled': 0, 'Completed': 0, 'Cancelled': 0}
-    for a in hms.appointments:
-        if a.status in status_counts:
-            status_counts[a.status] += 1
-            
-    # Revenue by Month (Last 6 months)
+    # Revenue by Month (Last 6 months) - This part still needs some Python logic for month keys
     revenue_data = {}
     today = datetime.date.today()
     for i in range(5, -1, -1):
@@ -154,35 +145,46 @@ def analytics():
         month_key = month_date.strftime("%B")
         revenue_data[month_key] = 0
         
-    for bill in hms.bills:
-        if bill.status == 'Paid':
-            try:
-                bill_date = datetime.datetime.strptime(bill.created_date, "%Y-%m-%d").date()
-                if (today - bill_date).days <= 180:
-                    month_key = bill_date.strftime("%B")
-                    if month_key in revenue_data:
-                        revenue_data[month_key] += float(bill.amount)
-            except:
-                pass
+    # We can still optimize this with a custom SQL query if needed
+    conn = hms.db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT created_date, SUM(amount) FROM bills 
+        WHERE status = 'Paid' AND created_date >= date('now', '-180 days')
+        GROUP BY created_date
+    """)
+    for row in cursor.fetchall():
+        try:
+            bill_date = datetime.datetime.strptime(row[0], "%Y-%m-%d").date()
+            month_key = bill_date.strftime("%B")
+            if month_key in revenue_data:
+                revenue_data[month_key] += float(row[1])
+        except:
+            pass
+    conn.close()
 
-    # Top Doctors by Appointments
-    doctor_counts = {}
-    for a in hms.appointments:
-        if a.doctor_id in doctor_counts:
-            doctor_counts[a.doctor_id] += 1
-        else:
-            doctor_counts[a.doctor_id] = 1
-            
+    # Top Doctors by Appointments - Optimized with SQL
     top_doctors = []
-    for doc_id, count in sorted(doctor_counts.items(), key=lambda x: x[1], reverse=True)[:5]:
-        doc = hms.get_doctor(doc_id)
-        if doc:
-            top_doctors.append({'name': f"Dr. {doc.last_name}", 'count': count})
+    conn = hms.db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT d.last_name, COUNT(a.appointment_id) as count 
+        FROM doctors d
+        LEFT JOIN appointments a ON d.doctor_id = a.doctor_id
+        GROUP BY d.doctor_id
+        ORDER BY count DESC
+        LIMIT 5
+    """)
+    for row in cursor.fetchall():
+        top_doctors.append({'name': f"Dr. {row[0]}", 'count': row[1]})
+    conn.close()
+
+    status_counts = stats['appointment_statuses']
 
     return render_template('analytics.html', 
-                           total_patients=total_patients,
-                           total_appointments=total_appointments,
-                           total_revenue=total_revenue,
+                           total_patients=stats['total_patients'],
+                           total_appointments=stats['total_appointments'],
+                           total_revenue=stats['total_revenue'],
                            status_labels=list(status_counts.keys()),
                            status_data=list(status_counts.values()),
                            revenue_labels=list(revenue_data.keys()),
@@ -228,77 +230,33 @@ def logout():
 @app.route('/')
 def dashboard():
     try:
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        
-        # Calculate stats
-        total_patients = len(hms.patients)
-        todays_appointments = len([a for a in hms.appointments if getattr(a, 'appointment_date', '') == today])
-        pending_appointments = len([a for a in hms.appointments if getattr(a, 'status', '') == 'Scheduled'])
-        completed_appointments = len([a for a in hms.appointments if getattr(a, 'status', '') == 'Completed'])
-        
-        active_doctors = 0
-        try:
-            active_doctors = len(hms.get_available_doctors())
-        except Exception as e:
-            print(f"[ERROR] get_available_doctors failed: {e}")
-            active_doctors = len([d for d in hms.doctors if getattr(d, 'status', '').lower() == "available"])
-        
-        # Get recent appointments with safety
-        recent_appointments = []
-        try:
-            recent_appointments = sorted(hms.appointments, 
-                                        key=lambda x: (getattr(x, 'appointment_date', '') or '') + ' ' + (getattr(x, 'appointment_time', '') or ''), 
-                                        reverse=True)[:5]
-        except Exception as e:
-            print(f"[ERROR] Sorting recent_appointments failed: {e}")
-            recent_appointments = hms.appointments[-5:] if hms.appointments else []
-        
-        # Get active queue - limit to 50 for performance
-        active_queue = [q for q in hms.queue if getattr(q, 'status', '') != 'Completed']
-        sorted_queue = []
-        try:
-            sorted_queue = sorted(active_queue, key=lambda x: (getattr(x, 'check_in_time', '') or ''))[:50]
-        except Exception as e:
-            print(f"[ERROR] Sorting queue failed: {e}")
-            sorted_queue = active_queue[:50]
-            
-        # Charts
         days = 90
+        stats = hms.get_dashboard_stats(days)
+        total_patients = hms.get_patients_count()
+        
+        # Charts
         base = datetime.date.today()
         chart_labels = [(base - datetime.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days-1, -1, -1)]
-        reg_map = {}
-        for p in hms.patients:
-            d = (getattr(p,'created_date','') or '')
-            if d:
-                reg_map[d] = reg_map.get(d,0) + 1
-        appt_map = {}
-        for a in hms.appointments:
-            d = getattr(a,'appointment_date','') or ''
-            if d:
-                appt_map[d] = appt_map.get(d,0) + 1
-        chart_patient_reg = [reg_map.get(d,0) for d in chart_labels]
-        chart_appointments = [appt_map.get(d,0) for d in chart_labels]
         
-        # Get last 5 system notifications for the current user
+        reg_map = stats['registration_map']
+        appt_map = stats['appointment_map']
+        
+        chart_patient_reg = [reg_map.get(d, 0) for d in chart_labels]
+        chart_appointments = [appt_map.get(d, 0) for d in chart_labels]
+        
+        # Get notifications
         username = session.get('username')
         role = session.get('role')
-        system_notifications = []
-        try:
-            system_notifications = [m for m in hms.messages 
-                                if getattr(m, 'sender_id', '') == 'system' and 
-                                (getattr(m, 'recipient_id', '') == username or getattr(m, 'recipient_id', '') == role or getattr(m, 'recipient_id', '') == 'all')]
-            system_notifications = sorted(system_notifications, key=lambda x: (getattr(x, 'timestamp', '') or ''), reverse=True)[:5]
-        except Exception as e:
-            print(f"[ERROR] Getting system_notifications failed: {e}")
+        system_notifications = hms.get_recent_notifications(username, role)
 
         return render_template('dashboard.html', 
                             total_patients=total_patients,
-                            active_doctors=active_doctors,
-                            todays_appointments=todays_appointments,
-                            pending_appointments=pending_appointments,
-                            completed_appointments=completed_appointments,
-                            recent_appointments=recent_appointments,
-                            queue=sorted_queue,
+                            active_doctors=stats['active_doctors'],
+                            todays_appointments=stats['todays_appointments'],
+                            pending_appointments=stats['pending_appointments'],
+                            completed_appointments=stats['completed_appointments'],
+                            recent_appointments=hms.get_recent_appointments(),
+                            queue=hms.get_active_queue(),
                             chart_labels=chart_labels,
                             chart_patient_reg=chart_patient_reg,
                             chart_appointments=chart_appointments,
@@ -314,8 +272,8 @@ def dashboard():
 def add_to_queue(patient_id):
     patient = hms.get_patient(patient_id)
     if patient:
-        # Check if already in queue
-        if not any(q.patient_id == patient_id and q.status != 'Completed' for q in hms.queue):
+        # Check if already in queue (only block if they are currently waiting or being seen)
+        if not any(q.patient_id == patient_id and (q.status or "").strip() not in ['Completed', 'No-show', 'Cancelled'] for q in hms.queue):
             new_item = QueueItem(
                 queue_id=hms.generate_id('Q'),
                 patient_id=patient.patient_id,
@@ -338,7 +296,7 @@ def add_to_queue(patient_id):
             flash(f'{patient.first_name} added to queue.', 'success')
             notify('Queue update', f"{patient.first_name} {patient.last_name} added to queue", 'receptionist')
         else:
-            flash('Patient is already in the queue.', 'warning')
+            flash('Patient is already in the active queue.', 'warning')
     return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/queue/update/<queue_id>/<status>')
@@ -375,6 +333,11 @@ def queue_checkin():
         weight = request.form.get('weight') or ''
         p = hms.get_patient(pid)
         if p:
+            # Check if already in queue (only block if they are currently waiting or being seen)
+            if any(q.patient_id == pid and (q.status or "").strip() not in ['Completed', 'No-show', 'Cancelled'] for q in hms.queue):
+                flash('Patient is already in the active queue.', 'warning')
+                return redirect(url_for('queue_dashboard'))
+
             new_item = QueueItem(
                 queue_id=hms.generate_id('Q'),
                 patient_id=p.patient_id,
@@ -581,13 +544,17 @@ def serve_file():
 def patients():
     search_term = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)
+    per_page = 20
     
     if search_term:
-        all_patients = hms.search_patients(search_term)
+        # Search is still slightly limited but more scalable than loading all
+        all_results = hms.search_patients(search_term)
+        total_count = len(all_results)
+        patients_slice, total_pages = paginate_list(all_results, page, per_page)
     else:
-        all_patients = hms.patients
-        
-    patients_slice, total_pages = paginate_list(all_patients, page)
+        total_count = hms.get_patients_count()
+        patients_slice = hms.get_patients_paginated(page, per_page)
+        total_pages = math.ceil(total_count / per_page)
     
     return render_template('patients.html', 
                            patients=patients_slice, 
@@ -595,7 +562,7 @@ def patients():
                            search_term=search_term,
                            page=page,
                            total_pages=total_pages,
-                           total_count=len(all_patients))
+                           total_count=total_count)
 
 @app.route('/add_patient', methods=['GET', 'POST'])
 def add_patient():
@@ -693,11 +660,33 @@ def delete_patient(patient_id):
 @app.route('/doctors')
 def doctors():
     search_term = request.args.get('search', '').lower()
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
     if search_term:
-        doctors_list = hms.search_doctors(search_term)
+        all_results = hms.search_doctors(search_term)
+        total_count = len(all_results)
+        doctors_slice, total_pages = paginate_list(all_results, page, per_page)
     else:
-        doctors_list = hms.doctors
-    return render_template('doctors.html', doctors=doctors_list, active_page='doctors', search_term=search_term)
+        # Scalable query
+        conn = hms.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM doctors")
+        total_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT * FROM doctors LIMIT ? OFFSET ?", (per_page, (page-1)*per_page))
+        rows = cursor.fetchall()
+        doctors_slice = [hms.db._row_to_obj(Doctor, row) for row in rows]
+        conn.close()
+        total_pages = math.ceil(total_count / per_page)
+        
+    return render_template('doctors.html', 
+                           doctors=doctors_slice, 
+                           active_page='doctors',
+                           search_term=search_term,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=total_count)
 
 @app.route('/add_doctor', methods=['GET', 'POST'])
 def add_doctor():
@@ -908,25 +897,12 @@ def messages():
     current_username = session.get('username')
     current_role = session.get('role')
     
-    # Filter messages where current user is recipient or sender
-    user_messages = []
-    for msg in hms.messages:
-        # Check if message is for this user (by username or role)
-        is_recipient = (msg.recipient_id == current_username) or \
-                      (msg.recipient_id == current_role) or \
-                      (msg.recipient_id == 'all')
-                      
-        is_sender = (msg.sender_id == current_username)
-        
-        if is_recipient or is_sender:
-            user_messages.append(msg)
-            
-    # Sort by timestamp (newest first)
-    sorted_messages = sorted(user_messages, key=lambda x: (x.timestamp or ''), reverse=True)
+    # Use optimized database query
+    user_messages = hms.get_messages_for_user(current_username, current_role)
     
     # Format for display
     display_messages = []
-    for msg in sorted_messages:
+    for msg in user_messages:
         display_messages.append({
             'id': msg.message_id,
             'sender': msg.sender_name,
@@ -943,22 +919,24 @@ def messages():
     if display_messages:
         display_messages[0]['active'] = True
     
-    for msg in hms.messages:
-        is_recipient = (msg.recipient_id == current_username) or (msg.recipient_id == current_role) or (msg.recipient_id == 'all')
-        if is_recipient and not msg.is_read:
-            msg.is_read = True
-    hms.save_data()
+    # Mark as read using SQL for scalability
+    conn = hms.db.get_connection()
+    conn.execute("""
+        UPDATE messages SET is_read = 1 
+        WHERE is_read = 0 AND (recipient_id = ? OR recipient_id = ? OR recipient_id = 'all')
+    """, (current_username, current_role))
+    conn.commit()
+    conn.close()
         
-    # Get list of potential recipients (all users)
+    # Get list of potential recipients
     recipients = []
-    # Add roles as recipients
     roles = ['admin', 'doctor', 'nurse', 'receptionist', 'cashier', 'lab_assistant']
     for r in roles:
         if r != current_role:
             recipients.append({'id': r, 'name': f"All {r.title()}s", 'type': 'role'})
             
-    # Add individual users
-    for user in hms.users:
+    # Add individual users (limited to 50 for performance)
+    for user in hms.db.get_all(User, 'users', limit=50):
         if user.username != current_username:
             recipients.append({'id': user.username, 'name': user.username, 'type': 'user'})
 
@@ -987,8 +965,7 @@ def send_message():
             is_read=False,
             is_archived=False
         )
-        hms.messages.append(new_msg)
-        hms.save_data()
+        hms.add_message(new_msg) # I should add this method to HMS
         flash('Message sent successfully!', 'success')
     else:
         flash('Message cannot be empty.', 'error')
@@ -997,42 +974,25 @@ def send_message():
 
 @app.route('/view_lab_results')
 def view_lab_results():
-    # Filter for lab results
-    lab_records = []
-    for record in hms.medical_records:
-        # Check if "Lab" is mentioned in reason, diagnosis, or notes
-        # OR if it has a 'Lab Results' section in details (if we had structured data)
-        text_content = (record.consult_reason + record.diagnosis + record.notes).lower()
-        if 'lab' in text_content or 'blood' in text_content or 'test' in text_content:
-             lab_records.append(record)
-             
+    # Use optimized database query
+    lab_records = hms.get_lab_records()
     return render_template('view_lab_results.html', medical_records=lab_records, active_page='lab_results')
 
 @app.route('/general_reports')
 def general_reports():
-    total_patients = len(hms.patients)
-    total_doctors = len(hms.doctors)
-    total_appointments = len(hms.appointments)
+    # Use optimized database aggregation
+    stats = hms.get_report_stats()
     
-    # Calculate revenue from bills if available, otherwise estimate
-    revenue = 0
-    if hasattr(hms, 'bills') and hms.bills:
-         revenue = sum(bill.amount for bill in hms.bills)
-    else:
-         # Mock revenue based on completed appointments
-         revenue = sum(150 for a in hms.appointments if a.status == 'Completed')
-
-    # Department counts for the table
-    department_counts = {}
-    for doctor in hms.doctors:
-        spec = getattr(doctor, 'specialty', getattr(doctor, 'specialization', 'General'))
-        if not spec:
-            spec = 'General'
-        department_counts[spec] = department_counts.get(spec, 0) + 1
+    total_patients = stats['total_patients']
+    total_doctors = stats['total_doctors']
+    total_appointments = stats['total_appointments']
+    revenue = stats['revenue']
+    department_counts = stats['department_counts']
 
     # Demographics
-    male_patients = sum(1 for p in hms.patients if p.gender.lower() == 'male')
-    female_patients = sum(1 for p in hms.patients if p.gender.lower() == 'female')
+    gender_counts = stats['gender_counts']
+    male_patients = gender_counts.get('Male', 0) + gender_counts.get('male', 0)
+    female_patients = gender_counts.get('Female', 0) + gender_counts.get('female', 0)
     
     if total_patients > 0:
         male_pct = int((male_patients / total_patients) * 100)
@@ -1042,9 +1002,10 @@ def general_reports():
         female_pct = 0
 
     # Appointment Status
-    completed_appt = sum(1 for a in hms.appointments if a.status.lower() == 'completed')
-    cancelled_appt = sum(1 for a in hms.appointments if a.status.lower() == 'cancelled')
-    no_show_appt = sum(1 for a in hms.appointments if a.status.lower() == 'no-show')
+    status_counts = stats['status_counts']
+    completed_appt = status_counts.get('Completed', 0)
+    cancelled_appt = status_counts.get('Cancelled', 0)
+    no_show_appt = status_counts.get('No-show', 0)
     
     if total_appointments > 0:
         completed_pct = int((completed_appt / total_appointments) * 100)
@@ -1073,24 +1034,33 @@ def general_reports():
 def view_schedule():
     search_term = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)
+    per_page = 20
     
     if search_term:
-        all_appointments = hms.search_appointments(search_term)
+        all_results = hms.search_appointments(search_term)
+        total_count = len(all_results)
+        appointments_slice, total_pages = paginate_list(all_results, page, per_page)
     else:
-        all_appointments = hms.appointments
+        # Scale by querying only what we need
+        conn = hms.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM appointments")
+        total_count = cursor.fetchone()[0]
         
-    # Sort by date descending
-    all_appointments = sorted(all_appointments, key=lambda x: (getattr(x, 'appointment_date', '') or ''), reverse=True)
-    
-    appointments_slice, total_pages = paginate_list(all_appointments, page)
-    
+        cursor.execute("SELECT * FROM appointments ORDER BY appointment_date DESC, appointment_time DESC LIMIT ? OFFSET ?", 
+                      (per_page, (page-1)*per_page))
+        rows = cursor.fetchall()
+        appointments_slice = [hms.db._row_to_obj(Appointment, row) for row in rows]
+        conn.close()
+        total_pages = math.ceil(total_count / per_page)
+        
     return render_template('view_schedule.html', 
                            appointments=appointments_slice, 
                            active_page='schedule', 
                            search_term=search_term,
                            page=page,
                            total_pages=total_pages,
-                           total_count=len(all_appointments))
+                           total_count=total_count)
 
 @app.route('/billing')
 def billing_dashboard():
@@ -2619,13 +2589,24 @@ def disable_user_2fa(username):
 def inventory():
     search_term = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)
+    per_page = 20
     
     if search_term:
-        all_items = hms.search_inventory(search_term)
+        all_results = hms.search_inventory(search_term)
+        total_count = len(all_results)
+        items_slice, total_pages = paginate_list(all_results, page, per_page)
     else:
-        all_items = hms.inventory
+        # Scalable query
+        conn = hms.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM inventory")
+        total_count = cursor.fetchone()[0]
         
-    items_slice, total_pages = paginate_list(all_items, page)
+        cursor.execute("SELECT * FROM inventory LIMIT ? OFFSET ?", (per_page, (page-1)*per_page))
+        rows = cursor.fetchall()
+        items_slice = [hms.db._row_to_obj(InventoryItem, row) for row in rows]
+        conn.close()
+        total_pages = math.ceil(total_count / per_page)
     
     return render_template('inventory.html', 
                            inventory=items_slice, 
@@ -2634,7 +2615,7 @@ def inventory():
                            providers=PROVIDERS,
                            page=page,
                            total_pages=total_pages,
-                           total_count=len(all_items))
+                           total_count=total_count)
 
 @app.route('/inventory/add', methods=['GET', 'POST'])
 def add_inventory_item():
