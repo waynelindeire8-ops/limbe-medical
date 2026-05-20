@@ -81,10 +81,10 @@
     </style>
 </head>
 <body>
-    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+    <div class="container" >
         {% include 'sidebar.html' %}
         
-        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+        <main class="main-content" >
             <div style="margin-bottom: 20px;">
                 <a href="{{ url_for('medical_records') }}" style="color: #4361ee; text-decoration: none;"><i class="fas fa-arrow-left"></i> Back to Medical Records</a>
             </div>
@@ -169,3 +169,4 @@
     </div>
 </body>
 </html>
+

@@ -128,10 +128,10 @@
     </style>
 </head>
 <body>
-    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+    <div class="container" >
         {% include 'sidebar.html' %}
         
-        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+        <main class="main-content" >
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2>Messages</h2>
                 <button onclick="document.getElementById('new-message-modal').style.display='flex'" class="btn-send" style="float: none;"><i class="fas fa-plus"></i> New Message</button>

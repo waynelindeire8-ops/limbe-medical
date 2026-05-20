@@ -53,10 +53,10 @@
     </style>
 </head>
 <body>
-    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+    <div class="container" >
         {% include 'sidebar.html' %}
         
-        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+        <main class="main-content" >
             <a href="{{ url_for('doctors') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Doctors</a>
             
             <div class="form-container">
@@ -111,3 +111,4 @@
     </script>
 </body>
 </html>
+

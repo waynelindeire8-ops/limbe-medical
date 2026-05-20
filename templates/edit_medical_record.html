@@ -98,10 +98,10 @@
     </style>
 </head>
 <body>
-    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+    <div class="container" >
         {% include 'sidebar.html' %}
         
-        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+        <main class="main-content" >
             <a href="{{ url_for('medical_records') }}" style="color: #4361ee; text-decoration: none; display: block; margin-bottom: 10px;"><i class="fas fa-arrow-left"></i> Back to List</a>
             
             <div class="form-container">
@@ -261,3 +261,4 @@
     </script>
 </body>
 </html>
+

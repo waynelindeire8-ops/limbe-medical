@@ -53,11 +53,11 @@
     </style>
 </head>
 <body>
-    <div class="container" style="display: flex; height: 100vh; overflow: hidden;">
+    <div class="container" >
         <!-- Sidebar -->
         {% include 'sidebar.html' %}
 
-        <main class="main-content" style="flex: 1; padding: 20px; overflow-y: auto;">
+        <main class="main-content" >
             <a href="{{ url_for('view_schedule') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Schedule</a>
             
             <div class="form-container">
@@ -114,3 +114,4 @@
     </script>
 </body>
 </html>
+
