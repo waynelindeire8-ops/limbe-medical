@@ -71,15 +71,24 @@ class HospitalManagementSystem:
         self.patient_scheme: Dict[str, Dict[str, Any]] = {}
         self.departments: List[str] = []
 
+        # Route data file to OneDrive if available
+        onedrive_path = self._route_data_file_to_onedrive(os.path.basename(self.data_file))
+        if onedrive_path:
+            if os.path.exists(self.data_file) and not os.path.exists(onedrive_path):
+                try:
+                    shutil.copy2(self.data_file, onedrive_path)
+                except Exception:
+                    pass
+            self.data_file = onedrive_path
+
         self.load_data()
         
-        # If DB is empty, migrate from JSON
-        if self.db.count('patients') == 0:
-            self._migrate_json_to_db()
+        # Check for legacy data migration
+        self._migrate_json_to_db()
 
     @property
     def patients(self) -> List[Patient]:
-        return self.db.get_all(Patient, 'patients', limit=1000)
+        return self.db.get_all(Patient, 'patients', limit=10000)
 
     def get_patients_paginated(self, page: int = 1, per_page: int = 20) -> List[Patient]:
         return self.db.get_all(Patient, 'patients', limit=per_page, offset=(page-1)*per_page)
@@ -89,39 +98,39 @@ class HospitalManagementSystem:
 
     @property
     def doctors(self) -> List[Doctor]:
-        return self.db.get_all(Doctor, 'doctors', limit=1000)
+        return self.db.get_all(Doctor, 'doctors', limit=10000)
 
     @property
     def appointments(self) -> List[Appointment]:
-        return self.db.get_all(Appointment, 'appointments', limit=1000)
+        return self.db.get_all(Appointment, 'appointments', limit=10000)
 
     @property
     def medical_records(self) -> List[MedicalRecord]:
-        return self.db.get_all(MedicalRecord, 'medical_records', limit=1000)
+        return self.db.get_all(MedicalRecord, 'medical_records', limit=10000)
 
     @property
     def prescriptions(self) -> List[Prescription]:
-        return self.db.get_all(Prescription, 'prescriptions', limit=1000)
+        return self.db.get_all(Prescription, 'prescriptions', limit=10000)
 
     @property
     def bills(self) -> List[Bill]:
-        return self.db.get_all(Bill, 'bills', limit=1000)
+        return self.db.get_all(Bill, 'bills', limit=10000)
 
     @property
     def inventory(self) -> List[InventoryItem]:
-        return self.db.get_all(InventoryItem, 'inventory', limit=1000)
+        return self.db.get_all(InventoryItem, 'inventory', limit=10000)
 
     @property
     def users(self) -> List[User]:
-        return self.db.get_all(User, 'users', limit=1000)
+        return self.db.get_all(User, 'users', limit=10000)
 
     @property
     def messages(self) -> List[Message]:
-        return self.db.get_all(Message, 'messages', limit=1000)
+        return self.db.get_all(Message, 'messages', limit=10000)
 
     @property
     def queue(self) -> List[QueueItem]:
-        return self.db.get_all(QueueItem, 'queue', limit=1000)
+        return self.db.get_all(QueueItem, 'queue', limit=10000)
 
     @queue.setter
     def queue(self, value: List[QueueItem]):
@@ -137,60 +146,68 @@ class HospitalManagementSystem:
 
     @property
     def lab_results(self) -> List[LabResult]:
-        return self.db.get_all(LabResult, 'lab_results', limit=1000)
+        return self.db.get_all(LabResult, 'lab_results', limit=10000)
 
     def _migrate_json_to_db(self):
-        """Migrate data from legacy JSON to SQLite"""
+        """Migrate data from legacy JSON sources to SQLite"""
         print("Checking for legacy data to migrate...")
         
-        migrated_any = False
-        
-        # 1. Try single JSON file
+        # We use a set to track if we've migrated anything to avoid redundant saves
+        self._patients_cache = [] # Start with fresh cache
+        migrated = False
+
+        # 1. Try single JSON file (including OneDrive)
         if os.path.exists(self.data_file):
-            print(f"Migrating from single JSON file: {self.data_file}")
+            print(f"Checking single JSON file: {self.data_file}")
             try:
                 with open(self.data_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                self._apply_loaded_data(data)
-                self._save_caches_to_db()
-                migrated_any = True
+                
+                json_patients = data.get('patients', [])
+                if json_patients:
+                    print(f"Adding {len(json_patients)} patients from {self.data_file}")
+                    self._apply_loaded_data(data, append=True)
+                    migrated = True
             except Exception as e:
                 print(f"Migration from single JSON failed: {e}")
 
-        # 2. Try separate JSON files (Legacy structure)
-        if not migrated_any:
-            legacy_dirs = ['data', 'sample_data']
-            for d in legacy_dirs:
-                if os.path.exists(d) and any(f.endswith('.json') for f in os.listdir(d)):
-                    print(f"Migrating from separate JSON files in directory: {d}")
-                    try:
-                        legacy_data = {}
-                        files = {
-                            'patients': 'patients.json',
-                            'doctors': 'doctors.json',
-                            'appointments': 'appointments.json',
-                            'medical_records': 'medical_records.json',
-                            'bills': 'bills.json',
-                            'inventory': 'inventory.json'
-                        }
-                        for key, filename in files.items():
-                            p = os.path.join(d, filename)
-                            if os.path.exists(p):
-                                with open(p, 'r', encoding='utf-8') as f:
-                                    legacy_data[key] = json.load(f)
+        # 2. Try separate JSON files (Legacy structure in data/ or sample_data/)
+        legacy_dirs = ['data', 'sample_data']
+        for d in legacy_dirs:
+            if os.path.exists(d) and any(f.endswith('.json') for f in os.listdir(d)):
+                print(f"Checking separate JSON files in directory: {d}")
+                try:
+                    patients_path = os.path.join(d, 'patients.json')
+                    if os.path.exists(patients_path):
+                        with open(patients_path, 'r', encoding='utf-8') as f:
+                            json_patients = json.load(f)
                         
-                        if legacy_data:
-                            self._apply_loaded_data(legacy_data)
-                            self._save_caches_to_db()
-                            migrated_any = True
-                            break
-                    except Exception as e:
-                        print(f"Migration from separate JSON files in {d} failed: {e}")
-
-        if migrated_any:
-            print("Migration completed successfully.")
-        else:
-            print("No legacy data found to migrate.")
+                        if json_patients:
+                            print(f"Adding {len(json_patients)} patients from {d}")
+                            legacy_data = {}
+                            files = {
+                                'patients': 'patients.json',
+                                'doctors': 'doctors.json',
+                                'appointments': 'appointments.json',
+                                'medical_records': 'medical_records.json',
+                                'bills': 'bills.json',
+                                'inventory': 'inventory.json'
+                            }
+                            for key, filename in files.items():
+                                p = os.path.join(d, filename)
+                                if os.path.exists(p):
+                                    with open(p, 'r', encoding='utf-8') as f:
+                                        legacy_data[key] = json.load(f)
+                            
+                            if legacy_data:
+                                self._apply_loaded_data(legacy_data, append=True)
+                                migrated = True
+                except Exception as e:
+                    print(f"Migration from separate JSON files in {d} failed: {e}")
+        
+        if migrated:
+            self._save_caches_to_db()
+            print(f"Migration complete. Total patients now in DB: {self.db.count('patients')}")
 
     def _save_caches_to_db(self):
         """Save populated caches to database during migration"""
@@ -265,7 +282,7 @@ class HospitalManagementSystem:
         self.patient_scheme = data.get('patient_scheme', {})
         self.departments = data.get('departments', [])
 
-    def _apply_loaded_data(self, data: Dict[str, Any]) -> None:
+    def _apply_loaded_data(self, data: Dict[str, Any], append: bool = False) -> None:
         """Legacy method for migration - applies all data to temporary properties"""
         from dataclasses import fields as _dc_fields
 
@@ -307,17 +324,42 @@ class HospitalManagementSystem:
             return _filter(MedicalRecord, new_record)
 
         # Temporary lists for migration
-        self._patients_cache = [Patient(**_filter(Patient, p)) for p in data.get('patients', [])]
-        self._doctors_cache = [Doctor(**_filter(Doctor, d)) for d in data.get('doctors', [])]
-        self._appointments_cache = [Appointment(**_normalize_appointment(a)) for a in data.get('appointments', [])]
-        self._medical_records_cache = [MedicalRecord(**_normalize_record(m)) for m in data.get('medical_records', [])]
-        self._prescriptions_cache = [Prescription(**_filter(Prescription, p)) for p in data.get('prescriptions', [])]
-        self._bills_cache = [Bill(**_normalize_bill(b)) for b in data.get('bills', [])]
-        self._inventory_cache = [InventoryItem(**_filter(InventoryItem, i)) for i in data.get('inventory', [])]
-        self._users_cache = [User(**_filter(User, u)) for u in data.get('users', [])]
-        self._messages_cache = [Message(**_filter(Message, m)) for m in data.get('messages', [])]
-        self._queue_cache = [QueueItem(**_filter(QueueItem, q)) for q in data.get('queue', [])]
-        self._lab_results_cache = [LabResult(**_filter(LabResult, lr)) for lr in data.get('lab_results', [])]
+        new_patients = [Patient(**_filter(Patient, p)) for p in data.get('patients', [])]
+        new_doctors = [Doctor(**_filter(Doctor, d)) for d in data.get('doctors', [])]
+        new_appointments = [Appointment(**_normalize_appointment(a)) for a in data.get('appointments', [])]
+        new_records = [MedicalRecord(**_normalize_record(m)) for m in data.get('medical_records', [])]
+        new_prescriptions = [Prescription(**_filter(Prescription, p)) for p in data.get('prescriptions', [])]
+        new_bills = [Bill(**_normalize_bill(b)) for b in data.get('bills', [])]
+        new_inventory = [InventoryItem(**_filter(InventoryItem, i)) for i in data.get('inventory', [])]
+        new_users = [User(**_filter(User, u)) for u in data.get('users', [])]
+        new_messages = [Message(**_filter(Message, m)) for m in data.get('messages', [])]
+        new_queue = [QueueItem(**_filter(QueueItem, q)) for q in data.get('queue', [])]
+        new_lab_results = [LabResult(**_filter(LabResult, lr)) for lr in data.get('lab_results', [])]
+
+        if append:
+            self._patients_cache.extend(new_patients)
+            self._doctors_cache.extend(new_doctors)
+            self._appointments_cache.extend(new_appointments)
+            self._medical_records_cache.extend(new_records)
+            self._prescriptions_cache.extend(new_prescriptions)
+            self._bills_cache.extend(new_bills)
+            self._inventory_cache.extend(new_inventory)
+            self._users_cache.extend(new_users)
+            self._messages_cache.extend(new_messages)
+            self._queue_cache.extend(new_queue)
+            self._lab_results_cache.extend(new_lab_results)
+        else:
+            self._patients_cache = new_patients
+            self._doctors_cache = new_doctors
+            self._appointments_cache = new_appointments
+            self._medical_records_cache = new_records
+            self._prescriptions_cache = new_prescriptions
+            self._bills_cache = new_bills
+            self._inventory_cache = new_inventory
+            self._users_cache = new_users
+            self._messages_cache = new_messages
+            self._queue_cache = new_queue
+            self._lab_results_cache = new_lab_results
         
         self._apply_metadata(data)
 
