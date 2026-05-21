@@ -1,0 +1,12 @@
+﻿Total patients in DB: 3821
+First 10 patients in DB:
+  ID: PAT-000000, Name: Patient0 Last0
+  ID: PAT-000001, Name: Patient1 Last1
+  ID: PAT-000002, Name: Patient2 Last2
+  ID: PAT-000003, Name: Patient3 Last3
+  ID: PAT-000004, Name: Patient4 Last4
+  ID: PAT-000005, Name: Patient5 Last5
+  ID: PAT-000006, Name: Patient6 Last6
+  ID: PAT-000007, Name: Patient7 Last7
+  ID: PAT-000008, Name: Patient8 Last8
+  ID: PAT-000009, Name: Patient9 Last9
