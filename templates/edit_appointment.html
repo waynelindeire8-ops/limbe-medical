@@ -68,7 +68,7 @@
                         <select id="patient_id" name="patient_id" required>
                             {% for patient in patients %}
                             <option value="{{ patient.patient_id }}" {% if patient.patient_id == appointment.patient_id %}selected{% endif %}>
-                                {{ patient.first_name }} {{ patient.last_name }} ({{ patient.patient_id }})
+                                {{ patient.last_name }}, {{ patient.first_name }} ({{ patient.patient_id }})
                             </option>
                             {% endfor %}
                         </select>
@@ -124,7 +124,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                     <div>
                         <label style="font-size: 12px; color: #666; display: block;">Name</label>
-                        <div style="font-weight: 500;">{{ current_patient.first_name }} {{ current_patient.last_name }}</div>
+                        <div style="font-weight: 500;">{{ current_patient.last_name }}, {{ current_patient.first_name }}</div>
                     </div>
                     <div>
                         <label style="font-size: 12px; color: #666; display: block;">ID</label>

@@ -278,7 +278,7 @@ def add_to_queue(patient_id):
             new_item = QueueItem(
                 queue_id=hms.generate_id('Q'),
                 patient_id=patient.patient_id,
-                patient_name=f"{patient.first_name} {patient.last_name}",
+                patient_name=f"{patient.last_name}, {patient.first_name}",
                 doctor_id="Unassigned",
                 status="Waiting",
                 priority="Routine",
@@ -295,7 +295,7 @@ def add_to_queue(patient_id):
             )
             hms.add_to_queue(new_item)
             flash(f'{patient.first_name} added to queue.', 'success')
-            notify('Queue update', f"{patient.first_name} {patient.last_name} added to queue", 'receptionist')
+            notify('Queue update', f"{patient.last_name}, {patient.first_name} added to queue", 'receptionist')
         else:
             flash('Patient is already in the active queue.', 'warning')
     return redirect(request.referrer or url_for('dashboard'))
@@ -342,7 +342,7 @@ def queue_checkin():
             new_item = QueueItem(
                 queue_id=hms.generate_id('Q'),
                 patient_id=p.patient_id,
-                patient_name=f"{p.first_name} {p.last_name}",
+                patient_name=f"{p.last_name}, {p.first_name}",
                 doctor_id=doc_id,
                 status="Waiting",
                 priority=urgency,
@@ -587,8 +587,8 @@ def add_patient():
             )
             hms.add_patient(new_patient)
             flash('Patient added successfully!', 'success')
-            notify('Patient added', f"{new_patient.first_name} {new_patient.last_name} ({new_patient.patient_id})", 'admin')
-            notify('Patient added', f"{new_patient.first_name} {new_patient.last_name}", 'receptionist')
+            notify('Patient added', f"{new_patient.last_name}, {new_patient.first_name} ({new_patient.patient_id})", 'admin')
+            notify('Patient added', f"{new_patient.last_name}, {new_patient.first_name}", 'receptionist')
             return redirect(url_for('patients'))
         except Exception as e:
             flash(f'Error adding patient: {e}', 'error')
@@ -1077,7 +1077,7 @@ def billing_dashboard():
     filtered_bills = []
     for bill in all_bills:
         patient = hms.get_patient(bill.patient_id)
-        p_name = f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
+        p_name = f"{patient.last_name}, {patient.first_name}" if patient else "Unknown"
         
         # Search filter
         p_first = patient.first_name.lower() if patient else ""
@@ -1706,7 +1706,7 @@ def print_invoice(bill_id):
             for item in bill.items:
                 p = hms.get_patient(item['patient_id'])
                 item_copy = dict(item)
-                item_copy['patient_name'] = f"{p.first_name} {p.last_name}" if p else "Unknown"
+                item_copy['patient_name'] = f"{p.last_name}, {p.first_name}" if p else "Unknown"
                 item_copy['scheme_type'] = getattr(p, 'scheme_type', '-') if p else "-"
                 resolved_items.append(item_copy)
             
@@ -1809,7 +1809,7 @@ def export_invoice_csv(bill_id):
         
         for item in bill.items:
             p = hms.get_patient(item['patient_id'])
-            p_name = f"{p.first_name} {p.last_name}" if p else "Unknown"
+            p_name = f"{p.last_name}, {p.first_name}" if p else "Unknown"
             s_type = getattr(p, 'scheme_type', '-') if p else "-"
             writer.writerow([
                 bill.bill_id,
@@ -1828,7 +1828,7 @@ def export_invoice_csv(bill_id):
     else:
         # Individual Invoice Export
         patient = hms.get_patient(bill.patient_id)
-        p_name = f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
+        p_name = f"{patient.last_name}, {patient.first_name}" if patient else "Unknown"
         
         writer.writerow(['LIMBE MEDICAL CLINIC'])
         writer.writerow(['STATEMENT OF ACCOUNT'])
@@ -1908,8 +1908,8 @@ def prescriptions():
     def map_display(rx):
         patient = hms.get_patient(rx.patient_id)
         doctor = hms.get_doctor(rx.doctor_id)
-        p_name = f"{patient.first_name} {patient.last_name}" if patient else 'Unknown'
-        p_reverse = f"{patient.last_name} {patient.first_name}" if patient else 'Unknown'
+        p_name = f"{patient.last_name}, {patient.first_name}" if patient else 'Unknown'
+        p_reverse = f"{patient.first_name} {patient.last_name}" if patient else 'Unknown'
         d_name = f"Dr. {doctor.last_name}" if doctor else 'Unknown'
         d_full = f"{doctor.first_name} {doctor.last_name}" if doctor else 'Unknown'
         d_reverse = f"{doctor.last_name} {doctor.first_name}" if doctor else 'Unknown'
@@ -2082,7 +2082,7 @@ def medical_records():
         display_list.append({
             'record_id': record.record_id,
             'date': record.date,
-            'patient_name': f"{patient.first_name} {patient.last_name}" if patient else 'Unknown',
+            'patient_name': f"{patient.last_name}, {patient.first_name}" if patient else 'Unknown',
             'doctor_name': f"Dr. {doctor.last_name}" if doctor else 'Unknown',
             'diagnosis': record.diagnosis,
             'consult_reason': record.consult_reason

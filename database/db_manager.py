@@ -288,12 +288,13 @@ class DatabaseManager:
             print(f"Error deleting from {table}: {e}")
             return False
 
-    def get_all(self, cls: Type[T], table: str, limit: int = 100, offset: int = 0) -> List[T]:
-        """Generic get all with pagination"""
+    def get_all(self, cls: Type[T], table: str, limit: int = 100, offset: int = 0, order_by: str = None) -> List[T]:
+        """Generic get all with pagination and ordering"""
         try:
+            order_clause = f"ORDER BY {order_by}" if order_by else ""
             conn = self.get_connection()
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM {table} LIMIT ? OFFSET ?", (limit, offset))
+            cursor.execute(f"SELECT * FROM {table} {order_clause} LIMIT ? OFFSET ?", (limit, offset))
             rows = cursor.fetchall()
             conn.close()
             return [self._row_to_obj(cls, row) for row in rows]

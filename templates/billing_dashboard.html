@@ -670,7 +670,7 @@
                 {% for p in patients %}
                 { 
                     value: "{{ p.patient_id }}", 
-                    text: "{{ p.first_name }} {{ p.last_name }}",
+                    text: "{{ p.last_name }}, {{ p.first_name }}",
                     scheme: "{{ p.scheme_provider or 'Cash' }}"
                 },
                 {% endfor %}

@@ -88,10 +88,10 @@ class HospitalManagementSystem:
 
     @property
     def patients(self) -> List[Patient]:
-        return self.db.get_all(Patient, 'patients', limit=10000)
+        return self.db.get_all(Patient, 'patients', limit=10000, order_by='rowid DESC')
 
     def get_patients_paginated(self, page: int = 1, per_page: int = 20) -> List[Patient]:
-        return self.db.get_all(Patient, 'patients', limit=per_page, offset=(page-1)*per_page)
+        return self.db.get_all(Patient, 'patients', limit=per_page, offset=(page-1)*per_page, order_by='rowid DESC')
 
     def get_patients_count(self) -> int:
         return self.db.count('patients')
@@ -481,7 +481,7 @@ class HospitalManagementSystem:
     def add_patient(self, patient: Patient) -> bool:
         if self.db.save('patients', patient, 'patient_id'):
             try:
-                name = f"{getattr(patient,'first_name','')} {getattr(patient,'last_name','')}".strip()
+                name = f"{getattr(patient,'last_name','')} {getattr(patient,'first_name','')}".strip()
                 self.add_activity(None, 'add', 'patient', patient.patient_id, name)
             except Exception:
                 pass

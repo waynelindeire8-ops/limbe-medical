@@ -96,7 +96,7 @@
                         {% for patient in patients %}
                         <tr ondblclick="window.location.href='{{ url_for('patient_details', patient_id=patient.patient_id) }}'" style="cursor: pointer;" title="Double click to view details">
                             <td>{{ patient.patient_id }}</td>
-                            <td>{{ patient.first_name }} {{ patient.last_name }}</td>
+                            <td>{{ patient.last_name }}, {{ patient.first_name }}</td>
                             <td>{{ patient.date_of_birth }}</td>
                             <td>{{ patient.gender }}</td>
                             <td>{{ patient.phone }}</td>

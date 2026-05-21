@@ -153,7 +153,7 @@
                                 <div class="appt-info">
                                     <div style="font-weight: 600; font-size: 14px;">
                                     {% if patient %}
-                                        {{ patient.first_name }} {{ patient.last_name }}
+                                        {{ patient.last_name }}, {{ patient.first_name }}
                                     {% else %}
                                         Unknown Patient ({{ appt.patient_id }})
                                     {% endif %}
