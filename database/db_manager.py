@@ -288,6 +288,20 @@ class DatabaseManager:
             print(f"Error deleting from {table}: {e}")
             return False
 
+    def count(self, table: str, where_clause: str = None, params: tuple = ()) -> int:
+        """Efficiently count records in a table"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            where = f"WHERE {where_clause}" if where_clause else ""
+            cursor.execute(f"SELECT COUNT(*) FROM {table} {where}", params)
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except Exception as e:
+            print(f"[ERROR] DatabaseManager.count: {e}")
+            return 0
+
     def get_all(self, cls: Type[T], table: str, limit: int = 100, offset: int = 0, order_by: str = None) -> List[T]:
         """Generic get all with pagination and ordering"""
         try:

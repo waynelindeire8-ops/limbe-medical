@@ -2808,6 +2808,5 @@ def inventory_bulk_price_update():
 
 
 if __name__ == '__main__':
-    # On some systems, the reloader can cause threading issues with background initializations.
-    # We use threaded=True (default) and can try use_reloader=False if issues persist.
-    app.run(debug=True, port=5000, threaded=True)
+    # We use use_reloader=False to avoid threading issues during interpreter shutdown
+    app.run(debug=True, port=5000, threaded=True, use_reloader=False)

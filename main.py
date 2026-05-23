@@ -65,6 +65,15 @@ class HospitalManagementSystem:
         # The following are kept for backward compatibility but should be migrated to DB queries
         self._patients_cache: List[Patient] = []
         self._doctors_cache: List[Doctor] = []
+        self._appointments_cache: List[Appointment] = []
+        self._medical_records_cache: List[MedicalRecord] = []
+        self._prescriptions_cache: List[Prescription] = []
+        self._bills_cache: List[Bill] = []
+        self._inventory_cache: List[InventoryItem] = []
+        self._users_cache: List[User] = []
+        self._messages_cache: List[Message] = []
+        self._queue_cache: List[QueueItem] = []
+        self._lab_results_cache: List[LabResult] = []
         
         self.activity: List[Dict[str, Any]] = []
         self.patient_files: Dict[str, List[Dict[str, Any]]] = {}
@@ -95,6 +104,25 @@ class HospitalManagementSystem:
 
     def get_patients_count(self) -> int:
         return self.db.count('patients')
+
+    def get_doctors_count(self) -> int:
+        return self.db.count('doctors')
+
+    def get_appointments_count(self, date: str = None) -> int:
+        if date:
+            return self.db.count('appointments', "appointment_date = ?", (date,))
+        return self.db.count('appointments')
+
+    def get_bills_count(self, status: str = None) -> int:
+        if status:
+            return self.db.count('bills', "status = ?", (status,))
+        return self.db.count('bills')
+
+    def get_medical_records_count(self) -> int:
+        return self.db.count('medical_records')
+
+    def get_low_stock_count(self) -> int:
+        return self.db.count('inventory', "quantity <= min_quantity")
 
     @property
     def doctors(self) -> List[Doctor]:

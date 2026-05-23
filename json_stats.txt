@@ -1,6 +1,0 @@
-﻿JSON Stats:
-  Patients: 2865
-  Appointments: 21
-  Medical Records: 388
-  Unique Patient IDs: 2824
-  Found 41 duplicate IDs

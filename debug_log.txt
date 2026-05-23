@@ -1,8 +1,0 @@
-Total doctors before: 500
-Specialties found: [('',)]
-Sample doctors: [('DOC-00000', 'Dr0', 'Doctor0', ''), ('DOC-00001', 'Dr1', 'Doctor1', ''), ('DOC-00002', 'Dr2', 'Doctor2', ''), ('DOC-00003', 'Dr3', 'Doctor3', ''), ('DOC-00004', 'Dr4', 'Doctor4', '')]
-Deleted 0 doctors with specialty = 'GENERAL'
-Deleted 0 doctors with specialty = 'General'
-Deleted 500 doctors with name pattern 'Dr%' or 'Doctor%'
-Total doctors after: 0
-Done

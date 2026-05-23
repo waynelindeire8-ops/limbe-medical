@@ -162,19 +162,19 @@ class HospitalGUI:
         stats_container = tk.Frame(self.content_area, bg=self.colors['bg'])
         stats_container.pack(fill='x', pady=(0, 20))
         
-        # Calculate Stats
+        # Calculate Stats (Optimized)
         today_str = datetime.datetime.now().strftime('%Y-%m-%d')
-        today_appts = len([a for a in self.hms.appointments if a.appointment_date == today_str])
-        pending_bills = len([b for b in self.hms.bills if b.status == 'Pending'])
-        low_stock = len(self.hms.get_low_stock_items())
+        today_appts = self.hms.get_appointments_count(date=today_str)
+        pending_bills = self.hms.get_bills_count(status='Pending')
+        low_stock = self.hms.get_low_stock_count()
         
         stats_data = [
-            ("Total Patients", len(self.hms.patients), self.colors['accent']),
-            ("Total Doctors", len(self.hms.doctors), self.colors['success']),
+            ("Total Patients", self.hms.get_patients_count(), self.colors['accent']),
+            ("Total Doctors", self.hms.get_doctors_count(), self.colors['success']),
             ("Today's Appointments", today_appts, self.colors['warning']),
             ("Pending Bills", pending_bills, self.colors['danger']),
             ("Low Stock Items", low_stock, self.colors['danger']),
-            ("Total Medical Records", len(self.hms.medical_records), self.colors['info'])
+            ("Total Medical Records", self.hms.get_medical_records_count(), self.colors['info'])
         ]
         
         # Create Grid for Stats
