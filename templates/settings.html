@@ -54,6 +54,18 @@
             display: flex;
             align-items: center;
         }
+        .form-group .input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .form-group .toggle-password {
+            position: absolute;
+            right: 12px;
+            cursor: pointer;
+            color: #6b7280;
+            z-index: 10;
+        }
         .btn-save {
             background-color: #4361ee;
             color: white;
@@ -147,11 +159,17 @@
                         </div>
                         <div class="form-group">
                             <label for="supabase_api_key">Supabase API Key</label>
-                            <input type="text" name="supabase_api_key" id="supabase_api_key" value="{{ settings.supabase_api_key if settings.supabase_api_key else '' }}">
+                            <div class="input-group">
+                                <input type="password" name="supabase_api_key" id="supabase_api_key" value="{{ settings.supabase_api_key if settings.supabase_api_key else '' }}">
+                                <i class="fas fa-eye toggle-password" onclick="toggleVisibility('supabase_api_key', this)"></i>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="supabase_service_role">Supabase Service Role Key</label>
-                            <input type="text" name="supabase_service_role" id="supabase_service_role" value="{{ settings.supabase_service_role if settings.supabase_service_role else '' }}">
+                            <div class="input-group">
+                                <input type="password" name="supabase_service_role" id="supabase_service_role" value="{{ settings.supabase_service_role if settings.supabase_service_role else '' }}">
+                                <i class="fas fa-eye toggle-password" onclick="toggleVisibility('supabase_service_role', this)"></i>
+                            </div>
                         </div>
                     </div>
 
@@ -162,6 +180,21 @@
             </div>
         </main>
     </div>
+
+    <script>
+        function toggleVisibility(inputId, icon) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+    </script>
 </body>
 </html>
 
