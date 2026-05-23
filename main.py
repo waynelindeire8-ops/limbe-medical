@@ -540,8 +540,7 @@ class HospitalManagementSystem:
             if self.get_patient(new_id):
                 return False
                 
-            # Update ID in all related records (this is a bit heavy for SQL but necessary if IDs change)
-            # Better to use a non-changing internal ID, but project uses patient_id as PK.
+            # Update ID in all related records
             conn = self.db.get_connection()
             try:
                 conn.execute("UPDATE appointments SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
@@ -550,10 +549,13 @@ class HospitalManagementSystem:
                 conn.execute("UPDATE bills SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
                 conn.execute("UPDATE lab_results SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
                 conn.execute("UPDATE queue SET patient_id = ? WHERE patient_id = ?", (new_id, patient_id))
+                # Delete the old patient record before saving the new one with new ID
+                conn.execute("DELETE FROM patients WHERE patient_id = ?", (patient_id,))
                 conn.commit()
             except Exception as e:
                 print(f"Error updating related IDs: {e}")
                 conn.rollback()
+                return False
             finally:
                 conn.close()
 
