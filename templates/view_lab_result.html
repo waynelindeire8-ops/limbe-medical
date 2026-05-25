@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Lab Result</title>
+    
+</head>
+<body>
+    <div class="container">
+        {% include 'sidebar.html' %}
+        <main class="main-content">
+            <div class="header-bar">
+                <h1>Lab Result Details</h1>
+                <div>
+                    <a href="{{ url_for('edit_lab_result', result_id=result.result_id) }}" class="btn btn-secondary">Edit</a>
+                    <a href="{{ url_for('print_lab_result', result_id=result.result_id) }}" class="btn btn-primary" target="_blank">Print</a>
+                </div>
+            </div>
+            <div class="details-grid">
+                <div class="detail-item">
+                    <label>Test Name</label>
+                    <p>{{ result.test_name }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Patient</label>
+                    <p>{{ hms.get_patient(result.patient_id).first_name }} {{ hms.get_patient(result.patient_id).last_name }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Doctor</label>
+                    <p>Dr. {{ hms.get_doctor(result.doctor_id).last_name }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Test Date</label>
+                    <p>{{ result.test_date }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Result</label>
+                    <p>{{ result.result_value }} {{ result.units }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Reference Range</label>
+                    <p>{{ result.reference_range }}</p>
+                </div>
+                <div class="detail-item">
+                    <label>Status</label>
+                    <p>{{ result.status }}</p>
+                </div>
+            </div>
+            <div class="notes-section">
+                <h3>Notes</h3>
+                <p>{{ result.notes }}</p>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

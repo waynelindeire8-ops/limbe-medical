@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Bill</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .bill-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .bill-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .bill-details, .patient-details {
+            margin-bottom: 20px;
+        }
+        .item-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .item-table th, .item-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .item-table th {
+            background-color: #f8f9fa;
+        }
+        .total-row td {
+            font-weight: bold;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" >
+        {% include 'sidebar.html' %}
+        <main class="main-content" >
+            <div class="bill-container">
+                <div class="bill-header">
+                    <h2>Bill Details</h2>
+                    <a href="{{ url_for('billing_dashboard') }}">Back to Billing</a>
+                </div>
+                <div class="bill-details">
+                    <p><strong>Bill ID:</strong> {{ bill.bill_id }}</p>
+                    <p><strong>Date:</strong> {{ bill.created_date }}</p>
+                    <p><strong>Status:</strong> {{ bill.status }}</p>
+                </div>
+                <div class="patient-details">
+                    <h4>Patient</h4>
+                    <p>{{ patient.last_name }}, {{ patient.first_name }}</p>
+                    <p>{{ patient.email }}</p>
+                    <p>{{ patient.phone }}</p>
+                </div>
+                <table class="item-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in bill.items %}
+                        <tr>
+                            <td>
+                                {% if item.name %}
+                                    {{ item.name }}
+                                {% else %}
+                                    {% set srv_list = [] %}
+                                    {% if item.con and item.con > 0 %}{% set srv_list = srv_list + ["CON"] %}{% endif %}
+                                    {% if item.drug and item.drug > 0 %}{% set srv_list = srv_list + ["DRUG"] %}{% endif %}
+                                    {% if item.lab and item.lab > 0 %}{% set srv_list = srv_list + ["LAB"] %}{% endif %}
+                                    {{ srv_list|join(', ') }} ({{ item.date }})
+                                {% endif %}
+                            </td>
+                            <td>{{ "%.2f"|format(item.cost or item.amount or 0) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td>Total</td>
+                            <td>{{ "%.2f"|format(bill.amount) }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
+

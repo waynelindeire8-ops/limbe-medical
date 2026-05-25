@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Records for {{ patient.last_name }}, {{ patient.first_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .records-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+        .record-item {
+            border-bottom: 1px solid #eee;
+            padding: 20px 0;
+        }
+        .record-item:last-child {
+            border-bottom: none;
+        }
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .record-header h3 {
+            margin: 0;
+        }
+        .back-link {
+            display: block;
+            margin-bottom: 20px;
+            color: #4361ee;
+            text-decoration: none;
+        }
+        .section-card {
+            background-color: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .section-header h3 {
+            margin: 0;
+            color: #444;
+        }
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .file-icon {
+            color: #4361ee;
+            font-size: 20px;
+        }
+        .upload-form {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .upload-form input[type="file"] {
+            flex: 1;
+        }
+        .btn-upload {
+            background-color: #4361ee;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" >
+        {% include 'sidebar.html' %}
+        <main class="main-content" >
+            <a href="{{ url_for('patients') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Patients</a>
+            
+            <div class="records-container">
+                <h2>Medical Records for {{ patient.last_name }}, {{ patient.first_name }}</h2>
+                <br>
+                {% if records %}
+                    {% for record in records %}
+                        <div class="record-item">
+                            <div class="record-header">
+                                <h3>Record #{{ record.record_id }}</h3>
+                                <span><strong>Date:</strong> {{ record.visit_date }}</span>
+                            </div>
+                            <p><strong>Doctor:</strong> {{ hms.get_doctor(record.doctor_id).name if hms.get_doctor(record.doctor_id) else 'Unknown' }}</p>
+                            <p><strong>Diagnosis:</strong> {{ record.diagnosis }}</p>
+                            <p><strong>Treatment:</strong> {{ record.treatment }}</p>
+                            <p><strong>Prescription:</strong> {{ record.prescription }}</p>
+                            <p><strong>Notes:</strong> {{ record.notes }}</p>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No medical records found for this patient.</p>
+                {% endif %}
+            </div>
+
+            <!-- Files Section -->
+            <div class="section-card">
+                <div class="section-header">
+                    <h3>Files & Documents</h3>
+                </div>
+                
+                <form action="{{ url_for('upload_patient_file', patient_id=patient.patient_id) }}" method="post" enctype="multipart/form-data" class="upload-form">
+                    <input type="file" name="file" required>
+                    <input type="hidden" name="redirect_url" value="{{ url_for('view_medical_records', patient_id=patient.patient_id) }}">
+                    <button type="submit" class="btn-upload"><i class="fas fa-upload"></i> Upload</button>
+                </form>
+
+                <ul class="file-list">
+                    {% for file in files %}
+                    <li class="file-item">
+                        {% set is_image = file.file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')) %}
+                        <div class="file-info">
+                            {% if is_image %}
+                                <i class="fas fa-file-image file-icon" style="color: #4cc9f0; cursor: pointer;" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')"></i>
+                                <div>
+                                    <div style="font-weight: 500; cursor: pointer; color: #4361ee;" onclick="openPreview('{{ file.path|replace('\\', '/') }}', '{{ file.file_name }}')">{{ file.file_name }}</div>
+                                    <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
+                                </div>
+                            {% else %}
+                                <i class="fas fa-file-pdf file-icon" style="color: #f72585;"></i>
+                                <div>
+                                    <div style="font-weight: 500;">{{ file.file_name }}</div>
+                                    <div style="font-size: 12px; color: #888;">{{ file.uploaded_at }}</div>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="file-actions">
+                            <a href="{{ url_for('download_file', path=file.path) }}" style="color: #4361ee; margin-right: 15px;" title="Download"><i class="fas fa-download"></i></a>
+                            <a href="{{ url_for('delete_patient_file', patient_id=patient.patient_id, path=file.path, redirect_url=url_for('view_medical_records', patient_id=patient.patient_id)) }}" style="color: #dc3545;" title="Delete" onclick="return confirm('Delete this file?')"><i class="fas fa-trash"></i></a>
+                        </div>
+                    </li>
+                    {% else %}
+                    <li style="text-align: center; color: #888; padding: 20px;">No files uploaded yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </main>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div id="imagePreviewModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8);">
+      <span class="close" onclick="closePreview()" style="position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+      <img class="modal-content" id="previewImage" style="margin: auto; display: block; width: 80%; max-width: 700px; margin-top: 50px;">
+      <div id="caption" style="margin: auto; display: block; width: 80%; max-width: 700px; text-align: center; color: #ccc; padding: 10px 0;"></div>
+    </div>
+
+    <script>
+    function openPreview(path, filename) {
+        var modal = document.getElementById("imagePreviewModal");
+        var modalImg = document.getElementById("previewImage");
+        var captionText = document.getElementById("caption");
+        modal.style.display = "block";
+        modalImg.src = "{{ url_for('serve_file') }}?path=" + encodeURIComponent(path);
+        captionText.innerHTML = filename;
+    }
+
+    function closePreview() {
+        document.getElementById("imagePreviewModal").style.display = "none";
+    }
+    </script>
+</body>
+</html>
+

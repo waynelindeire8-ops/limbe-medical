@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Record - {{ record.record_id }}</title>
+    <style>
+        @media print {
+            .no-print { display: none; }
+            body { padding: 0; margin: 0; }
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+            color: #333;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
+        .header p { margin: 5px 0; color: #666; }
+        
+        .record-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+        }
+        .info-row { margin-bottom: 8px; }
+        .info-row label { font-weight: bold; width: 140px; display: inline-block; }
+        
+        .section { margin-bottom: 25px; }
+        .section-title {
+            background-color: #eee;
+            padding: 5px 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-left: 5px solid #333;
+            margin-bottom: 10px;
+        }
+        
+        .content-box {
+            padding: 0 10px;
+            white-space: pre-wrap;
+        }
+        
+        .exam-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .exam-item {
+            text-align: center;
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .exam-item label { display: block; font-size: 11px; font-weight: bold; color: #666; }
+        .exam-item span { font-size: 14px; font-weight: 600; }
+        
+        .footer {
+            margin-top: 50px;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signature-line {
+            border-top: 1px solid #333;
+            width: 200px;
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .btn-print {
+            background-color: #4361ee;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 20px; text-align: right;">
+        <a href="{{ url_for('view_medical_record', record_id=record.record_id) }}" style="margin-right: 15px; text-decoration: none; color: #666;">&larr; Back</a>
+        <button onclick="window.print()" class="btn-print">Print Record</button>
+    </div>
+
+    <div class="header">
+        <h1>Limbe Medical Clinic</h1>
+        <p>Private Bag 67, Blantyre, Malawi</p>
+        <p>Tel: +265 (0) 888 288 968 | Email: info@limbemedical.com</p>
+        <h2 style="margin-top: 15px;">MEDICAL RECORD</h2>
+    </div>
+
+    <div class="record-info">
+        <div>
+            <div class="info-row"><label>Record ID:</label> {{ record.record_id }}</div>
+            <div class="info-row"><label>Date:</label> {{ record.date }}</div>
+            <div class="info-row"><label>Patient Name:</label> {{ patient.first_name }} {{ patient.last_name }}</div>
+            <div class="info-row"><label>Patient ID:</label> {{ patient.patient_id }}</div>
+        </div>
+        <div>
+            <div class="info-row"><label>Gender:</label> {{ patient.gender or 'N/A' }}</div>
+            <div class="info-row"><label>DOB:</label> {{ patient.date_of_birth or 'N/A' }}</div>
+            <div class="info-row"><label>Doctor:</label> Dr. {{ doctor.last_name }}</div>
+            <div class="info-row"><label>Specialty:</label> {{ doctor.specialty or 'General' }}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Clinical Presentation</div>
+        <div class="content-box">
+            <strong>Reason for Visit:</strong><br>
+            {{ record.consult_reason }}
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Vital Signs</div>
+        <div class="exam-grid">
+            <div class="exam-item">
+                <label>Blood Pressure</label>
+                <span>{{ record.details.get('blood_pressure', 'N/A') }}</span>
+            </div>
+            <div class="exam-item">
+                <label>Temperature (°C)</label>
+                <span>{{ record.details.get('temperature', 'N/A') }}</span>
+            </div>
+            <div class="exam-item">
+                <label>Heart Rate (BPM)</label>
+                <span>{{ record.details.get('heart_rate', 'N/A') }}</span>
+            </div>
+            <div class="exam-item">
+                <label>Weight (KG)</label>
+                <span>{{ record.details.get('weight', 'N/A') }}</span>
+            </div>
+        </div>
+        <div style="margin-top: 10px; padding: 0 10px;">
+            <strong>Pain Level:</strong> {{ record.details.get('pain_level', '0') }} / 10
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Assessment & Diagnosis</div>
+        <div class="content-box">
+            <strong>Medical Examination:</strong><br>
+            {{ record.details.get('preliminary_diagnosis', 'None') }}
+            <br><br>
+            <strong>Final Diagnosis:</strong><br>
+            {{ record.diagnosis }}
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Treatment Plan</div>
+        <div class="content-box">
+            {{ record.treatment }}
+        </div>
+    </div>
+    
+    {% if record.details.get('notes') %}
+    <div class="section">
+        <div class="section-title">Office Notes</div>
+        <div class="content-box">
+            {{ record.details.get('notes') }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <div>
+            <div class="signature-line">Doctor's Signature</div>
+            <div style="font-size: 11px; margin-top: 5px;">Dr. {{ doctor.first_name }} {{ doctor.last_name }}</div>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #888; align-self: flex-end;">
+            Printed on: {{ now }}<br>
+            Limbe Medical Management System
+        </div>
+    </div>
+</body>
+</html>

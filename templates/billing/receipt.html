@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt - Limbe Medical</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 40px; color: #333; }
+        .receipt-box { max-width: 600px; margin: auto; padding: 30px; border: 1px solid #ddd; background: #fdfdfd; }
+        .receipt-header { text-align: center; border-bottom: 2px dashed #bbb; padding-bottom: 20px; margin-bottom: 20px; }
+        .logo { font-size: 24px; font-weight: bold; color: #4361ee; margin-bottom: 5px; }
+        .receipt-title { font-size: 18px; color: #555; text-transform: uppercase; letter-spacing: 2px; }
+        .receipt-details { margin-bottom: 30px; font-size: 14px; }
+        .receipt-details div { margin-bottom: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
+        th { border-bottom: 1px solid #ccc; padding: 8px; text-align: left; }
+        td { padding: 8px; border-bottom: 1px dotted #eee; }
+        .total { text-align: right; font-size: 16px; font-weight: bold; border-top: 2px dashed #bbb; padding-top: 10px; margin-top: 10px; }
+        .footer { text-align: center; font-size: 11px; color: #999; margin-top: 40px; }
+        @media print { .no-print { display: none; } body { padding: 0; } .receipt-box { border: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="text-align: right; max-width: 600px; margin: auto; margin-bottom: 10px;">
+        <button onclick="window.print()" style="padding: 10px 20px; background: #4361ee; color: white; border: none; border-radius: 4px; cursor: pointer;">Print Receipt</button>
+    </div>
+
+    <div class="receipt-box">
+        <div class="receipt-header">
+            <div class="logo">Limbe Medical</div>
+            <div class="receipt-title">Payment Receipt</div>
+            <div style="font-size: 12px; color: #777; margin-top: 5px;">Thank you for your payment</div>
+        </div>
+
+        <div class="receipt-details">
+            <div><strong>Receipt No:</strong> {{ bill.bill_id }}-R</div>
+            <div><strong>Date:</strong> {{ bill.created_date }}</div> <!-- Should ideally be payment date -->
+            <div><strong>Patient:</strong> {{ patient.first_name }} {{ patient.last_name }}</div>
+            <div><strong>Status:</strong> PAID</div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in bill.services.split(', ') %}
+                {% if ' (MWK ' in item %}
+                <tr>
+                    <td>{{ item.split(' (MWK ')[0] }}</td>
+                    <td style="text-align: right;">MWK {{ item.split(' (MWK ')[1].replace(')', '') }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="total">
+            Total Paid: MWK {{ "%.2f"|format(bill.amount) }}
+        </div>
+
+        <div class="footer">
+            Limbe Medical Center<br>
+            123 Hospital Road, Limbe<br>
+            Tel: +237 600 000 000
+        </div>
+    </div>
+</body>
+</html>

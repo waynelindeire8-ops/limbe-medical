@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 500;
+            color: #666;
+        }
+        .tab.active {
+            border-bottom-color: #4361ee;
+            color: #4361ee;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .form-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            max-width: 600px;
+        }
+        .bill-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        .bill-table th, .bill-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .bill-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-pending { background: #fef9c3; color: #854d0e; }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .invoice-table-container {
+            overflow-x: auto; /* Allow horizontal scroll if needed */
+            margin-top: 15px;
+            min-height: 400px; /* Ensure space for dropdowns */
+        }
+        .bill-table input, .bill-table select {
+            width: 100%;
+            border: 1px solid #eee;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .bill-table input[type="number"] {
+            min-width: 140px;
+        }
+        .bill-table input[type="date"] {
+            min-width: 130px;
+        }
+        .bill-table input[type="text"] {
+            min-width: 120px;
+        }
+        .remove-item {
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .remove-item:hover {
+            background: #cc0000;
+        }
+        .bill-table td {
+            overflow: visible !important;
+        }
+        .mini-input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .mini-input-row {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .mini-input-row input {
+            min-width: 80px !important;
+        }
+        .add-mini-input, .remove-mini-input {
+            padding: 2px 6px;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            background: #f8f9fa;
+        }
+        .remove-mini-input {
+            color: #dc3545;
+        }
+
+        .autocomplete-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .autocomplete-input,
+        .autocomplete-suggestion {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box; /* Ensure padding doesn't affect width */
+        }
+
+        .autocomplete-suggestion {
+            position: absolute;
+            top: 0;
+            left: 0;
+            color: #a0a0a0; /* Greyed-out text */
+            background-color: transparent;
+            z-index: 1; /* Place suggestion behind the input text */
+            pointer-events: none; /* Allow clicks to go through to the input */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Billing Dashboard</h2>
+                <button onclick="switchTab('create')" class="btn-primary"><i class="fas fa-plus"></i> Create New Bill</button>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid" style="margin-bottom: 30px;">
+                <div class="card stat-card">
+                    <div class="stat-icon green-bg"><i class="fas fa-dollar-sign"></i></div>
+                    <h3>Total Revenue</h3>
+                    <div class="stat-value"><h2>MWK{{ total_revenue }}</h2></div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon red-bg"><i class="fas fa-clock"></i></div>
+                    <h3>Pending Payments</h3>
+                    <div class="stat-value"><h2>MWK{{ pending_amount }}</h2></div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon blue-bg"><i class="fas fa-file-invoice"></i></div>
+                    <h3>Total Bills</h3>
+                    <div class="stat-value"><h2>{{ total_bills }}</h2></div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('search')">Search Bills</div>
+                <div class="tab" onclick="switchTab('create')">Create New Bill</div>
+                <div class="tab" onclick="switchTab('process')">Process Payment</div>
+                <div class="tab" onclick="switchTab('report')">Generate Report</div>
+                <div class="tab" onclick="switchTab('invoice')">Bulk Invoice</div>
+                <div class="tab" onclick="switchTab('individual')">Individual Invoice</div>
+                <div class="tab" onclick="switchTab('cash')">Cash Invoice</div>
+                <span id="autosave-indicator" style="margin-left: auto; font-size: 11px; color: #888; align-self: center; opacity: 0.5; transition: opacity 0.3s;"></span>
+            </div>
+
+            <!-- Search Tab -->
+            <div id="search" class="tab-content active">
+                <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+                    <form action="{{ url_for('billing_dashboard') }}" method="get" style="display: flex; gap: 10px; flex: 1;">
+                        <input type="text" name="search" placeholder="Search by Bill ID, Patient Name..." style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; flex: 1;">
+                        <button type="submit" class="btn-primary"><i class="fas fa-search"></i> Search</button>
+                    </form>
+                </div>
+                <table class="bill-table">
+                    <thead>
+                        <tr>
+                            <th>Bill ID</th>
+                            <th>Date</th>
+                            <th>Patient</th>
+                            <th>Services</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bill in bills %}
+                        <tr ondblclick="window.location.href='{{ url_for('patients', search=bill.patient_name) }}'" style="cursor: pointer;" title="Double click to search patient">
+                            <td>{{ bill.bill_id }}</td>
+                            <td>{{ bill.date }}</td>
+                            <td><a href="{{ url_for('patients', search=bill.patient_name) }}" style="color: #4361ee; text-decoration: none;">{{ bill.patient_name }}</a></td>
+                            <td>{{ bill.services }}</td>
+                            <td>MWK{{ bill.amount }}</td>
+                            <td><span class="status-badge status-{{ bill.status|lower }}">{{ bill.status }}</span></td>
+                            <td>
+                                <a href="{{ url_for('view_bill', bill_id=bill.bill_id) }}" class="btn-action" title="View Bill"><i class="fas fa-eye"></i></a>
+                                <a href="{{ url_for('print_invoice', bill_id=bill.bill_id) }}" target="_blank" style="color: #4361ee; margin-right: 10px;" title="View Invoice"><i class="fas fa-file-invoice"></i></a>
+                                <a href="{{ url_for('export_invoice_csv', bill_id=bill.bill_id) }}" style="color: #27ae60; margin-right: 10px;" title="Export to Excel"><i class="fas fa-file-excel"></i></a>
+                                <a href="#" onclick="editInvoice('{{ bill.bill_id }}')" style="color: #ffc107; margin-right: 10px;" title="Edit Invoice"><i class="fas fa-edit"></i></a>
+                                {% if bill.status == 'Pending' %}
+                                <a href="#" onclick="openPaymentModal('{{ bill.bill_id }}', '{{ bill.amount }}')" style="color: #28a745;" title="Process Payment"><i class="fas fa-credit-card"></i></a>
+                                {% endif %}
+                                {% if current_role == 'admin' %}
+                                <a href="{{ url_for('delete_bill', bill_id=bill.bill_id) }}" style="color: #dc3545; margin-left: 10px;" title="Delete Bill" onclick="return confirm('Are you sure you want to delete this bill?')"><i class="fas fa-trash"></i></a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" style="text-align: center; color: #888;">No bills found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                {% if total_pages > 1 %}
+                <div class="pagination">
+                    <a href="{{ url_for('billing_dashboard', page=page-1, search=search_term) }}" class="pagination-btn {{ 'disabled' if page == 1 else '' }}">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </a>
+                    
+                    <div class="pagination-info">
+                        Page {{ page }} of {{ total_pages }} (Total: {{ total_count }})
+                    </div>
+
+                    <a href="{{ url_for('billing_dashboard', page=page+1, search=search_term) }}" class="pagination-btn {{ 'disabled' if page == total_pages else '' }}">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Create Bill Tab -->
+            <div id="create" class="tab-content">
+                <div class="form-card" style="max-width: 800px;">
+                    <h3>Create New Bill</h3>
+                    <form action="{{ url_for('create_bill') }}" method="post">
+                        <div class="form-group">
+                            <label>Select Patient</label>
+                            <div class="autocomplete-container">
+                                <input type="hidden" name="patient_id" class="autocomplete-value">
+                                <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                <div class="autocomplete-suggestion"></div>
+                            </div>
+                        </div>
+                        <div class="invoice-table-container">
+                            <table class="bill-table" id="create-items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>ID NO.</th>
+                                        <th>CON</th>
+                                        <th>DRUG</th>
+                                        <th>LAB</th>
+                                        <th>Amount</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="create-items-body">
+                                    <tr class="create-row">
+                                        <td><input type="date" name="item_date[]" required></td>
+                                        <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                                        <td>
+                                            <input type="hidden" name="item_con_id[]" class="autocomplete-value">
+                                            <select class="inventory-select" data-kind="con"></select>
+                                            <div class="mini-input-row">
+                                                <span style="font-size: 10px; color: #888;">Price:</span>
+                                                <input type="number" name="item_con[]" value="0" step="0.01" readonly style="width: 80px;">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="drug"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="drug">+</button>
+                                                </div>
+                                                <input type="hidden" name="item_drug[]" value="0" class="row-total-drug">
+                                                <input type="hidden" name="item_drug_ids[]" class="row-drug-ids">
+                                                <input type="hidden" name="item_drug_qtys[]" class="row-drug-qtys">
+                                                <input type="hidden" name="item_drug_prices[]" class="row-drug-prices">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="lab"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="lab">+</button>
+                                                </div>
+                                                <input type="hidden" name="item_lab[]" value="0" class="row-total-lab">
+                                                <input type="hidden" name="item_lab_ids[]" class="row-lab-ids">
+                                                <input type="hidden" name="item_lab_qtys[]" class="row-lab-qtys">
+                                                <input type="hidden" name="item_lab_prices[]" class="row-lab-prices">
+                                            </div>
+                                        </td>
+                                        <td><input type="number" name="item_amount[]" class="create-row-amount" value="0" step="0.01" readonly></td>
+                                        <td><button type="button" class="remove-item">×</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" id="add-create-item" class="btn-outline" style="margin-top: 10px;"><i class="fas fa-plus"></i> Add Row</button>
+                        <div style="margin-top: 20px; text-align: right;">
+                            <h4>Total: MWK <span id="create-total">0.00</span></h4>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 20px;">Generate Bill</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Process Payment Tab -->
+            <div id="process" class="tab-content">
+                <div class="form-card">
+                    <h3>Process Payment</h3>
+                    <form action="{{ url_for('process_payment') }}" method="post">
+                        <div class="form-group">
+                            <label>Bill ID</label>
+                            <input type="text" name="bill_id" id="payment_bill_id" placeholder="Enter Bill ID" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Method</label>
+                            <select name="payment_method">
+                                <option value="Cash">Cash</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Insurance">Insurance</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%;">Confirm Payment</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div id="report" class="tab-content">
+                <div class="form-card" style="max-width: 800px;">
+                    <h3>Financial Summary</h3>
+                    <p>Total Revenue Collected: <strong>MWK{{ total_revenue }}</strong></p>
+                    <p>Outstanding Pending Payments: <strong>MWK{{ pending_amount }}</strong></p>
+                    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+                    <button onclick="window.print()" class="btn-outline"><i class="fas fa-print"></i> Print Report</button>
+                </div>
+            </div>
+
+            <!-- Bulk Invoice Tab -->
+            <div id="invoice" class="tab-content">
+                <div class="form-card" style="max-width: 1000px;">
+                    <h3>Create/Edit Bulk Invoice</h3>
+                    <form action="/invoice" method="post">
+                        <div class="form-group">
+                            <label>Select Provider</label>
+                            <div class="autocomplete-container">
+                                <input type="hidden" name="provider" class="autocomplete-value">
+                                <input type="text" class="autocomplete-input" data-source="providers" placeholder="-- Select Provider --">
+                                <div class="autocomplete-suggestion"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Invoice Date</label>
+                            <input type="date" name="invoice_date" value="{{ today_date }}" required>
+                        </div>
+                        <div class="invoice-table-container">
+                            <table class="bill-table" id="invoice-items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Patient Name</th>
+                                        <th>ID NO.</th>
+                                        <th>CON</th>
+                                        <th>DRUG</th>
+                                        <th>LAB</th>
+                                        <th>Amount</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invoice-items-body">
+                                    <tr class="invoice-row">
+                                        <td><input type="date" name="item_date[]" required></td>
+                                        <td>
+                                            <div class="autocomplete-container">
+                                                <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                                                <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                                <div class="autocomplete-suggestion"></div>
+                                            </div>
+                                        </td>
+                                        <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                                        <td>
+                                            <input type="hidden" name="item_con_id[]" class="autocomplete-value">
+                                            <select class="inventory-select" data-kind="con"></select>
+                                            <input type="number" name="item_con[]" value="0" step="0.01" readonly>
+                                        </td>
+                                        <td>
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="drug"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="drug">+</button>
+                                                </div>
+                                                <input type="hidden" name="item_drug[]" value="0" class="row-total-drug">
+                                                <input type="hidden" name="item_drug_ids[]" class="row-drug-ids">
+                                                <input type="hidden" name="item_drug_qtys[]" class="row-drug-qtys">
+                                                <input type="hidden" name="item_drug_prices[]" class="row-drug-prices">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="lab"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="lab">+</button>
+                                                </div>
+                                                <input type="hidden" name="item_lab[]" value="0" class="row-total-lab">
+                                                <input type="hidden" name="item_lab_ids[]" class="row-lab-ids">
+                                                <input type="hidden" name="item_lab_qtys[]" class="row-lab-qtys">
+                                                <input type="hidden" name="item_lab_prices[]" class="row-lab-prices">
+                                            </div>
+                                        </td>
+                                        <td><input type="number" name="item_amount[]" value="0" step="0.01" class="row-amount" readonly></td>
+                                        <td><button type="button" class="remove-item">×</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" id="add-item" class="btn-outline" style="margin-top: 10px;"><i class="fas fa-plus"></i> Add Row</button>
+                        <div style="margin-top: 20px; text-align: right;">
+                            <h4>Total: MWK <span id="invoice-total">0.00</span></h4>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 20px;">Save Bulk Invoice</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Individual Invoice Tab -->
+            <div id="individual" class="tab-content">
+                <div class="form-card" style="max-width: 800px;">
+                    <h3>Create New Individual Invoice</h3>
+                    <form action="/invoice/individual" method="post">
+                        <div class="form-group">
+                            <label>Select Patient</label>
+                            <div class="autocomplete-container">
+                                <input type="hidden" name="patient_id" class="autocomplete-value">
+                                <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                <div class="autocomplete-suggestion"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Invoice Date</label>
+                            <input type="date" name="invoice_date" value="{{ today_date }}" required>
+                        </div>
+                        
+                        <div id="individual-items-container">
+                            <table class="bill-table" id="individual-items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>ID NO.</th>
+                                        <th>CON</th>
+                                        <th>DRUG</th>
+                                        <th>LAB</th>
+                                        <th>Amount</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="individual-items-body">
+                                    <tr class="individual-row">
+                                        <td><input type="date" name="ind_date[]" required></td>
+                                        <td><input type="text" name="ind_id_no[]" placeholder="ID NO."></td>
+                                        <td>
+                                            <input type="hidden" name="ind_con_id[]" class="autocomplete-value">
+                                            <select class="inventory-select" data-kind="con"></select>
+                                            <input type="number" name="ind_con[]" value="0" step="0.01" readonly>
+                                        </td>
+                                        <td>
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="drug"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="drug">+</button>
+                                                </div>
+                                                <input type="hidden" name="ind_drug[]" value="0" class="ind-row-total-drug">
+                                                <input type="hidden" name="ind_drug_ids[]" class="row-drug-ids">
+                                                <input type="hidden" name="ind_drug_qtys[]" class="row-drug-qtys">
+                                                <input type="hidden" name="ind_drug_prices[]" class="row-drug-prices">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="lab"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="lab">+</button>
+                                                </div>
+                                                <input type="hidden" name="ind_lab[]" value="0" class="ind-row-total-lab">
+                                                <input type="hidden" name="ind_lab_ids[]" class="row-lab-ids">
+                                                <input type="hidden" name="ind_lab_qtys[]" class="row-lab-qtys">
+                                                <input type="hidden" name="ind_lab_prices[]" class="row-lab-prices">
+                                            </div>
+                                        </td>
+                                        <td><input type="number" name="ind_amount[]" class="ind-row-amount" value="0" step="0.01" readonly></td>
+                                        <td><button type="button" class="remove-item">×</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" id="add-individual-item" class="btn-outline" style="margin-top: 10px;"><i class="fas fa-plus"></i> Add Item</button>
+                        
+                        <div style="margin-top: 20px; text-align: right;">
+                            <h4>Total: MWK <span id="individual-total">0.00</span></h4>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 20px;">Save Individual Invoice</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Cash Invoice Tab -->
+            <div id="cash" class="tab-content">
+                <div class="form-card" style="max-width: 1000px;">
+                    <h3>Create New Cash Invoice</h3>
+                    <form action="/invoice" method="post">
+                        <input type="hidden" name="provider" value="Cash">
+                        <div class="form-group">
+                            <label>Invoice Date</label>
+                            <input type="date" name="invoice_date" value="{{ today_date }}" required>
+                        </div>
+                        <div class="invoice-table-container">
+                            <table class="bill-table" id="cash-items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Patient Name</th>
+                                        <th>ID NO.</th>
+                                        <th>CON</th>
+                                        <th>DRUG</th>
+                                        <th>LAB</th>
+                                        <th>Amount</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cash-items-body">
+                                    <tr class="cash-row">
+                                        <td><input type="date" name="item_date[]" required></td>
+                                        <td>
+                                            <div class="autocomplete-container">
+                                                <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                                                <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                                                <div class="autocomplete-suggestion"></div>
+                                            </div>
+                                        </td>
+                                        <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                                        <td>
+                                            <input type="hidden" name="item_con_id[]" class="autocomplete-value">
+                                            <select class="inventory-select" data-kind="con"></select>
+                                            <input type="number" name="item_con[]" value="0" step="0.01" readonly>
+                                        </td>
+                                        <td>
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="drug"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="drug">+</button>
+                                                </div>
+                                                <input type="hidden" name="item_drug[]" value="0" class="cash-row-total-drug">
+                                                <input type="hidden" name="item_drug_ids[]" class="row-drug-ids">
+                                                <input type="hidden" name="item_drug_qtys[]" class="row-drug-qtys">
+                                                <input type="hidden" name="item_drug_prices[]" class="row-drug-prices">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="mini-input-container">
+                                                <div class="mini-input-row">
+                                                    <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                                                    <select class="inventory-select" data-kind="lab"></select>
+                                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                                    <span style="font-size: 10px; color: #888;">x</span>
+                                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                                                    <button type="button" class="add-mini-input" data-type="lab">+</button>
+                                                </div>
+                                                <input type="hidden" name="item_lab[]" value="0" class="cash-row-total-lab">
+                                                <input type="hidden" name="item_lab_ids[]" class="row-lab-ids">
+                                                <input type="hidden" name="item_lab_qtys[]" class="row-lab-qtys">
+                                                <input type="hidden" name="item_lab_prices[]" class="row-lab-prices">
+                                            </div>
+                                        </td>
+                                        <td><input type="number" name="item_amount[]" value="0" step="0.01" class="cash-row-amount" readonly></td>
+                                        <td><button type="button" class="remove-item">×</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <button type="button" id="add-cash-item" class="btn-outline" style="margin-top: 10px;"><i class="fas fa-plus"></i> Add Row</button>
+                        <div style="margin-top: 20px; text-align: right;">
+                            <h4>Total: MWK <span id="cash-total">0.00</span></h4>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width: 100%; margin-top: 20px;">Save Cash Invoice</button>
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        window.isEditing = false;
+
+        const autocompleteData = {
+            patients: [
+                {% for p in patients %}
+                { 
+                    value: "{{ p.patient_id }}", 
+                    text: "{{ p.last_name }}, {{ p.first_name }}",
+                    scheme: "{{ p.scheme_provider or 'Cash' }}"
+                },
+                {% endfor %}
+            ],
+            providers: [
+                {% for p in hms_providers %}
+                { value: "{{ p }}", text: "{{ p }}" },
+                {% endfor %}
+            ],
+            inventory: [
+                {% for item in inventory %}
+                { 
+                    value: "{{ item.item_id }}", 
+                    text: "{{ item.name }}", 
+                    price: {{ item.unit_price }},
+                    schemes: {{ item.billing_codes | tojson if item.billing_codes else '{}' }}
+                },
+                {% endfor %}
+            ]
+        };
+
+        function setupAutocomplete(container) {
+            const inputs = container.querySelectorAll('.autocomplete-input');
+            inputs.forEach(input => {
+                const suggestionBox = input.nextElementSibling;
+                const valueInput = input.previousElementSibling;
+                const source = autocompleteData[input.dataset.source] || [];
+
+                input.addEventListener('input', () => {
+                    const query = input.value.toLowerCase();
+                    if (query.length === 0) {
+                        suggestionBox.textContent = '';
+                        valueInput.value = '';
+                        // Clear price if it's an inventory field
+                        if (input.dataset.source === 'inventory') {
+                            const priceInput = input.closest('td').querySelector('input[type="number"]');
+                            if (priceInput) {
+                                priceInput.value = '0.00';
+                                updateCalculations(input.closest('tr'));
+                            }
+                        }
+                        return;
+                    }
+
+                    const match = source.find(item => item.text.toLowerCase().startsWith(query));
+
+                    if (match) {
+                        suggestionBox.textContent = match.text;
+                        valueInput.value = match.value;
+                        
+                        // Set price if it's an inventory field
+                        if (input.dataset.source === 'inventory') {
+                            const priceInput = input.closest('td').querySelector('input[type="number"]');
+                            if (priceInput) {
+                                priceInput.value = match.price.toFixed(2);
+                                updateCalculations(input.closest('tr'));
+                            }
+                        }
+
+                        // Trigger change event so other listeners know a selection was made
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else {
+                        suggestionBox.textContent = '';
+                        valueInput.value = '';
+                    }
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    if ((e.key === 'Tab' || e.key === 'Enter') && suggestionBox.textContent) {
+                        e.preventDefault();
+                        input.value = suggestionBox.textContent;
+                        suggestionBox.textContent = '';
+                    }
+                });
+            });
+        }
+
+        // Helper to update calculations based on row type
+        function updateCalculations(row) {
+            const prefix = row.classList.contains('individual-row') ? 'ind' : (row.classList.contains('cash-row') ? 'cash' : '');
+            updateMiniTotals(row, prefix);
+
+            if (row.classList.contains('create-row')) {
+                updateCreateRowAmount(row);
+                updateCreateTotal();
+            } else if (row.classList.contains('invoice-row')) {
+                updateRowAmount(row);
+                updateTotal();
+            } else if (row.classList.contains('individual-row')) {
+                updateIndividualRowAmount(row);
+                updateIndividualTotal();
+            } else if (row.classList.contains('cash-row')) {
+                updateCashRowAmount(row);
+                updateCashTotal();
+            }
+        }
+
+        // Populate inventory selects with options
+        function populateInventorySelects(scope=document, filterProvider = null) {
+            let filteredInventory = autocompleteData.inventory;
+            
+            // Standardize the provider names for comparison
+            const masmFull = "Medical Aid Society of Malawi (MASM)";
+            const preciousFull = "Precious Medical International";
+            
+            // Determine target filter based on user's rule
+            let targetFilter = (filterProvider || 'Cash').trim();
+            
+            // Normalize targetFilter to match our known schemes if it's a partial match
+            if (targetFilter.toLowerCase().includes('masm') || targetFilter.toLowerCase().includes('medical aid society of malawi')) {
+                targetFilter = masmFull;
+            } else if (targetFilter.toLowerCase().includes('precious')) {
+                targetFilter = preciousFull;
+            } else if (targetFilter.toLowerCase() === 'cash') {
+                targetFilter = 'Cash';
+            }
+            
+            // Special rule: MASM and Precious use their own items.
+            // Everyone else uses Cash items.
+            if (targetFilter !== masmFull && targetFilter !== preciousFull) {
+                targetFilter = 'Cash';
+            }
+            
+            console.log(`Filtering items for scheme: ${targetFilter}`);
+
+            filteredInventory = autocompleteData.inventory.filter(item => {
+                if (!item.schemes) return targetFilter === 'Cash';
+                // Check if the item has a billing code for our target scheme
+                return Object.keys(item.schemes).some(s => s.trim() === targetFilter);
+            });
+
+            // Sort by billing code for the selected provider
+            filteredInventory.sort((a, b) => {
+                const codeA = (a.schemes && a.schemes[targetFilter]) || "";
+                const codeB = (b.schemes && b.schemes[targetFilter]) || "";
+                
+                // If codes exist, sort them
+                if (codeA && codeB) {
+                    // Try numeric sort first if both are numbers
+                    const numA = parseInt(codeA);
+                    const numB = parseInt(codeB);
+                    if (!isNaN(numA) && !isNaN(numB)) {
+                        if (numA !== numB) return numA - numB;
+                    }
+                    return codeA.localeCompare(codeB);
+                }
+                
+                // Items with codes come first
+                if (codeA && !codeB) return -1;
+                if (!codeA && codeB) return 1;
+                
+                // Fallback to name sort
+                return a.text.localeCompare(b.text);
+            });
+
+            const opts = ['<option value=\"\"></option>'].concat(
+                filteredInventory.map(i => {
+                    const code = (i.schemes && i.schemes[targetFilter]) || "";
+                    const label = `${code ? `[${code}] ` : ''}${i.text} — MWK${Number(i.price).toFixed(2)}`;
+                    return `<option value=\"${i.value}\" data-price=\"${i.price}\">${label}</option>`;
+                })
+            ).join('');
+            
+            scope.querySelectorAll('select.inventory-select').forEach(sel => {
+                const currentVal = sel.value || sel.dataset.selected;
+                sel.innerHTML = opts;
+                if (currentVal) sel.value = currentVal;
+            });
+        }
+
+        // When a medicine is selected from listbox, auto-fill price and recalc totals
+        document.addEventListener('change', function(e) {
+            if (!e.target.matches('select.inventory-select')) return;
+            const kind = e.target.dataset.kind;
+            const selected = e.target.selectedOptions[0];
+            const price = parseFloat(selected ? (selected.dataset.price || '0') : '0') || 0;
+            const td = e.target.closest('td');
+            const tr = e.target.closest('tr');
+
+            // Set hidden ID value
+            const valueInput = td.querySelector('.autocomplete-value');
+            if (valueInput) valueInput.value = e.target.value;
+
+            if (kind === 'con') {
+                const priceInput = td.querySelector('[name="item_con[]"], [name="ind_con[]"]');
+                if (priceInput) priceInput.value = price.toFixed(2);
+            } else if (kind === 'drug') {
+                const row = e.target.closest('.mini-input-row') || td;
+                const priceInput = row.querySelector('.mini-drug') || td.querySelector('[name="item_drug[]"]');
+                const qtyInput = row.querySelector('.mini-qty') || td.querySelector('[name="item_drug_qty[]"]');
+                const qty = parseFloat(qtyInput ? qtyInput.value : '1') || 1;
+                if (priceInput) priceInput.value = (price * qty).toFixed(2);
+                priceInput.dataset.unitPrice = price; // Store unit price
+                updateMiniTotals(tr, tr.classList.contains('individual-row') ? 'ind' : (tr.classList.contains('cash-row') ? 'cash' : ''));
+            } else if (kind === 'lab') {
+                const row = e.target.closest('.mini-input-row') || td;
+                const priceInput = row.querySelector('.mini-lab') || td.querySelector('[name="item_lab[]"]');
+                const qtyInput = row.querySelector('.mini-qty') || td.querySelector('[name="item_lab_qty[]"]');
+                const qty = parseFloat(qtyInput ? qtyInput.value : '1') || 1;
+                if (priceInput) priceInput.value = (price * qty).toFixed(2);
+                priceInput.dataset.unitPrice = price; // Store unit price
+                updateMiniTotals(tr, tr.classList.contains('individual-row') ? 'ind' : (tr.classList.contains('cash-row') ? 'cash' : ''));
+            }
+            updateCalculations(tr);
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sort autocomplete data
+            autocompleteData.patients.sort((a, b) => a.text.localeCompare(b.text));
+            autocompleteData.providers.sort((a, b) => a.text.localeCompare(b.text));
+            
+            // Sort inventory: prioritize items starting with "CASH" (case-insensitive), then alphabetical
+            autocompleteData.inventory.sort((a, b) => {
+                const aText = a.text.toLowerCase();
+                const bText = b.text.toLowerCase();
+                const aIsCash = aText.includes('cash');
+                const bIsCash = bText.includes('cash');
+                
+                if (aIsCash && !bIsCash) return -1;
+                if (!aIsCash && bIsCash) return 1;
+                return a.text.localeCompare(b.text);
+            });
+            
+            setupAutocomplete(document.body);
+            populateInventorySelects(document);
+        });
+
+        // Helper to update mini-input totals
+        function updateMiniTotals(row, prefix = '') {
+            const containers = row.querySelectorAll('.mini-input-container');
+            containers.forEach(container => {
+                const addBtn = container.querySelector('.add-mini-input');
+                if (!addBtn) return;
+                const type = addBtn.dataset.type;
+                
+                let total = 0;
+                let ids = [];
+                let qtys = [];
+                let prices = [];
+
+                container.querySelectorAll('.mini-input-row').forEach(miniRow => {
+                    const price = parseFloat(miniRow.querySelector('.mini-' + type).value) || 0;
+                    const id = miniRow.querySelector('.autocomplete-value').value;
+                    const qty = parseFloat(miniRow.querySelector('.mini-qty').value) || 1;
+                    const unitPrice = parseFloat(miniRow.querySelector('.mini-' + type).dataset.unitPrice) || 0;
+
+                    total += price;
+                    if (id) {
+                        ids.push(id);
+                        qtys.push(qty);
+                        prices.push(unitPrice);
+                    }
+                });
+
+                const totalInput = row.querySelector(prefix ? `.${prefix}-row-total-${type}` : `.row-total-${type}`);
+                if (totalInput) totalInput.value = total.toFixed(2);
+
+                const idsInput = container.querySelector(`.row-${type}-ids`);
+                const qtysInput = container.querySelector(`.row-${type}-qtys`);
+                const pricesInput = container.querySelector(`.row-${type}-prices`);
+
+                if (idsInput) idsInput.value = ids.join(',');
+                if (qtysInput) qtysInput.value = qtys.join(',');
+                if (pricesInput) pricesInput.value = prices.join(',');
+            });
+        }
+
+        // Handle mini-input buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('add-mini-input')) {
+                const type = e.target.getAttribute('data-type');
+                const container = e.target.closest('.mini-input-container');
+                const newRow = document.createElement('div');
+                newRow.className = 'mini-input-row';
+                newRow.innerHTML = `
+                    <input type="hidden" name="mini_${type}_id[]" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="${type}"></select>
+                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                    <span style="font-size: 10px; color: #888;">x</span>
+                    <input type="number" class="mini-${type}" value="0" step="0.01" readonly style="width: 80px;">
+                    <button type="button" class="remove-mini-input">×</button>
+                `;
+                
+                const targetInput = container.querySelector(':scope > input[type="hidden"]');
+                if (targetInput) {
+                    container.insertBefore(newRow, targetInput);
+                } else {
+                    container.appendChild(newRow);
+                }
+                
+                // Get provider from tab context
+                const tab = e.target.closest('.tab-content');
+                let provider = null;
+                if (tab) {
+                    if (tab.id === 'individual' || tab.id === 'create') {
+                        const patientInput = tab.querySelector('.autocomplete-input[data-source="patients"]');
+                        if (patientInput && patientInput.previousElementSibling) {
+                            const patientId = patientInput.previousElementSibling.value;
+                            const patientMatch = autocompleteData.patients.find(p => p.value === patientId);
+                            provider = patientMatch ? (patientMatch.scheme || 'Cash') : 'Cash';
+                        } else {
+                            provider = 'Cash';
+                        }
+                    } else {
+                        const providerInput = tab.querySelector('.autocomplete-input[data-source="providers"]');
+                        if (providerInput) {
+                            provider = providerInput.value;
+                        } else if (tab.id === 'cash') {
+                            provider = 'Cash';
+                        }
+                    }
+                }
+                populateInventorySelects(newRow, provider);
+                
+                // Update totals for the row
+                updateCalculations(e.target.closest('tr'));
+            }
+            if (e.target.classList.contains('remove-mini-input')) {
+                const row = e.target.closest('tr');
+                e.target.closest('.mini-input-row').remove();
+                updateCalculations(row);
+            }
+        });
+
+        // Handle mini-input changes
+            document.addEventListener('input', function(e) {
+                if (e.target.classList.contains('mini-drug') || e.target.classList.contains('mini-lab') || e.target.classList.contains('mini-qty') || e.target.classList.contains('qty-input')) {
+                    const row = e.target.closest('tr');
+                    
+                    // If it's a qty change, update the row amount
+                    if (e.target.classList.contains('mini-qty') || e.target.classList.contains('qty-input')) {
+                        const miniRow = e.target.closest('.mini-input-row') || e.target.closest('td');
+                        const priceInput = miniRow.querySelector('.mini-drug') || miniRow.querySelector('.mini-lab') || miniRow.querySelector('[name="item_drug[]"]') || miniRow.querySelector('[name="item_lab[]"]');
+                        if (priceInput && priceInput.dataset.unitPrice) {
+                            const unitPrice = parseFloat(priceInput.dataset.unitPrice);
+                            const qty = parseFloat(e.target.value) || 0;
+                            priceInput.value = (unitPrice * qty).toFixed(2);
+                        }
+                    }
+
+                    const prefix = row.classList.contains('individual-row') ? 'ind' : (row.classList.contains('cash-row') ? 'cash' : '');
+                    updateCalculations(row);
+                }
+            });
+
+            // Event listener for provider selection change in Bulk Invoice tab
+            document.addEventListener('change', function(e) {
+                if (e.target.matches('#invoice .autocomplete-input[data-source="providers"]')) {
+                    const selectedProvider = e.target.value;
+                    const invoiceItemsBody = document.getElementById('invoice-items-body');
+                    populateInventorySelects(invoiceItemsBody, selectedProvider);
+                }
+            });
+
+            // Event listener for patient selection change in Individual Invoice tab
+            document.addEventListener('change', function(e) {
+                if (e.target.matches('#individual .autocomplete-input[data-source="patients"]')) {
+                    const patientId = e.target.previousElementSibling.value; // the hidden valueInput
+                    const patientMatch = autocompleteData.patients.find(p => p.value === patientId);
+                    if (patientMatch) {
+                         const scheme = patientMatch.scheme || 'Cash';
+                         const individualItemsBody = document.getElementById('individual-items-body');
+                         populateInventorySelects(individualItemsBody, scheme);
+                     }
+                 }
+             });
+
+        // Autosave / Draft Logic
+        function saveDraft(tabId) {
+            const tab = document.getElementById(tabId);
+            if (!tab) return;
+            const form = tab.querySelector('form');
+            if (!form) return;
+
+            // Collect form data as structured JSON
+            const formData = new FormData(form);
+            const data = {};
+            formData.forEach((value, key) => {
+                if (!data[key]) {
+                    data[key] = value;
+                } else {
+                    if (!Array.isArray(data[key])) {
+                        data[key] = [data[key]];
+                    }
+                    data[key].push(value);
+                }
+            });
+
+            fetch('/api/billing/autosave', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tab: tabId,
+                    form_data: data
+                })
+            }).then(r => r.json())
+              .then(res => {
+                  const indicator = document.getElementById('autosave-indicator');
+                  if (indicator) {
+                      const now = new Date();
+                      indicator.innerText = `Last saved: ${now.toLocaleTimeString()}`;
+                      indicator.style.opacity = '1';
+                      setTimeout(() => indicator.style.opacity = '0.5', 2000);
+                  }
+              });
+        }
+
+        function checkForDrafts() {
+            const tabs = ['create', 'invoice', 'individual', 'cash'];
+            tabs.forEach(tabId => {
+                fetch(`/api/billing/draft/${tabId}`)
+                    .then(r => r.json())
+                    .then(draft => {
+                        if (draft && !draft.error) {
+                            showDraftAlert(tabId, draft);
+                        }
+                    });
+            });
+        }
+
+        function showDraftAlert(tabId, draft) {
+            const tab = document.getElementById(tabId);
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'draft-alert';
+            alertDiv.style = 'background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ffeeba; display: flex; justify-content: space-between; align-items: center;';
+            
+            const time = new Date(draft.timestamp).toLocaleString();
+            alertDiv.innerHTML = `
+                <span style="font-size: 13px; color: #856404;">
+                    <i class="fas fa-info-circle"></i> Found an unsaved draft from <strong>${time}</strong>
+                </span>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn-restore" style="background: #856404; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">Restore</button>
+                    <button type="button" class="btn-discard" style="background: transparent; color: #856404; border: 1px solid #856404; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">Discard</button>
+                </div>
+            `;
+            
+            alertDiv.querySelector('.btn-restore').onclick = () => restoreDraft(tabId, draft.data, alertDiv);
+            alertDiv.querySelector('.btn-discard').onclick = () => alertDiv.remove();
+            
+            const existing = tab.querySelector('.draft-alert');
+            if (existing) existing.remove();
+            tab.insertBefore(alertDiv, tab.firstChild);
+        }
+
+        function restoreDraft(tabId, data, alertDiv) {
+            // This is a simplified restore. For complex forms with dynamic rows, 
+            // we'd need to reconstruct the rows first.
+            // For now, let's just alert that it's partially implemented or 
+            // do a basic restore for simple fields.
+            console.log('Restoring draft for', tabId, data);
+            
+            // To properly restore, we'd need to:
+            // 1. Clear current items
+            // 2. Loop through item arrays in 'data' and add rows
+            // 3. Populate fields
+            
+            alert('Draft restore is initializing. Please wait...');
+            
+            // Basic implementation for demonstration
+            // (In a real app, you'd match the editInvoice logic here)
+            alertDiv.remove();
+        }
+
+        // Run on load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkForDrafts();
+            setInterval(() => {
+                const activeTab = document.querySelector('.tab-content.active');
+                if (activeTab && !window.isEditing) saveDraft(activeTab.id);
+            }, 30000); // Autosave every 30s
+        });
+
+        function switchTab(tabName) {
+            // Autosave current tab before switching
+            const currentTab = document.querySelector('.tab-content.active');
+            if (currentTab && !window.isEditing) {
+                saveDraft(currentTab.id);
+            }
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            // More robust selector for finding the tab button
+            const tabButton = Array.from(document.querySelectorAll('.tab')).find(t => 
+                t.getAttribute('onclick') && t.getAttribute('onclick').includes(`'${tabName}'`)
+            );
+            if (tabButton) tabButton.classList.add('active');
+            
+            const tabContent = document.getElementById(tabName);
+            if (tabContent) tabContent.classList.add('active');
+
+            // Skip reset if we are currently populating for edit (handled by editInvoice)
+            if (window.isEditing) return;
+
+            // Reset Create form if switching to it normally
+            if (tabName === 'create') {
+                const form = document.querySelector('#create form');
+                form.reset();
+                document.getElementById('create-items-body').innerHTML = `
+                    <tr class="create-row">
+                        <td><input type="date" name="item_date[]" required></td>
+                        <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                        <td>
+                            <input type="hidden" name="item_con_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="con"></select>
+                            <div class="mini-input-row">
+                                <span style="font-size: 10px; color: #888;">Price:</span>
+                                <input type="number" name="item_con[]" value="0" step="0.01" readonly style="width: 80px;">
+                            </div>
+                        </td>
+                        <td>
+                            <input type="hidden" name="item_drug_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug"></select>
+                            <div class="mini-input-row">
+                                <input type="number" name="item_drug_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
+                                <span style="font-size: 10px; color: #888;">x</span>
+                                <input type="number" name="item_drug[]" value="0" step="0.01" readonly style="width: 80px;">
+                            </div>
+                        </td>
+                        <td>
+                            <input type="hidden" name="item_lab_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab"></select>
+                            <div class="mini-input-row">
+                                <input type="number" name="item_lab_qty[]" value="1" min="1" step="1" class="qty-input" style="width: 50px;" title="Quantity">
+                                <span style="font-size: 10px; color: #888;">x</span>
+                                <input type="number" name="item_lab[]" value="0" step="0.01" readonly style="width: 80px;">
+                            </div>
+                        </td>
+                        <td><input type="number" name="item_amount[]" class="create-row-amount" value="0" step="0.01" readonly></td>
+                        <td><button type="button" class="remove-item">×</button></td>
+                    </tr>
+                `;
+                populateInventorySelects(document.getElementById('create-items-body'));
+                updateCreateTotal();
+            }
+
+            // Reset Invoice form if switching to it normally
+            if (tabName === 'invoice') {
+                const form = document.querySelector('#invoice form');
+                form.action = '/invoice';
+                document.querySelector('#invoice h3').innerText = 'Create New Bulk Invoice';
+                form.reset();
+                document.getElementById('invoice-items-body').innerHTML = '';
+                document.getElementById('add-item').click();
+                updateTotal();
+                // Re-populate inventory selects based on selected provider
+                const providerInput = form.querySelector('.autocomplete-input[data-source="providers"]');
+                const selectedProvider = providerInput ? providerInput.value : null;
+                populateInventorySelects(document.getElementById('invoice-items-body'), selectedProvider);
+            }
+            
+            // Reset Individual Invoice form
+            if (tabName === 'individual') {
+                const form = document.querySelector('#individual form');
+                form.action = '/invoice/individual';
+                document.querySelector('#individual h3').innerText = 'Create New Individual Invoice';
+                form.reset();
+                document.getElementById('individual-items-body').innerHTML = `
+                    <tr class="individual-row">
+                        <td><input type="date" name="ind_date[]" required></td>
+                        <td><input type="text" name="ind_id_no[]" placeholder="ID NO."></td>
+                        <td>
+                            <input type="hidden" name="ind_con_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="con"></select>
+                            <div class="mini-input-row">
+                                <span style="font-size: 10px; color: #888;">Price:</span>
+                                <input type="number" name="ind_con[]" value="0" step="0.01" readonly style="width: 80px;">
+                            </div>
+                        </td>
+                        <td>
+                            <div class="mini-input-container">
+                                <div class="mini-input-row">
+                                    <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                                    <select class="inventory-select" data-kind="drug"></select>
+                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                    <span style="font-size: 10px; color: #888;">x</span>
+                                    <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                                    <button type="button" class="add-mini-input" data-type="drug">+</button>
+                                </div>
+                                <input type="hidden" name="ind_drug[]" value="0" class="ind-row-total-drug">
+                            </div>
+                        </td>
+                        <td>
+                            <div class="mini-input-container">
+                                <div class="mini-input-row">
+                                    <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                                    <select class="inventory-select" data-kind="lab"></select>
+                                    <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                                    <span style="font-size: 10px; color: #888;">x</span>
+                                    <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                                    <button type="button" class="add-mini-input" data-type="lab">+</button>
+                                </div>
+                                <input type="hidden" name="ind_lab[]" value="0" class="ind-row-total-lab">
+                            </div>
+                        </td>
+                        <td><input type="number" name="ind_amount[]" class="ind-row-amount" value="0" step="0.01" readonly></td>
+                        <td><button type="button" class="remove-item">×</button></td>
+                    </tr>
+                `;
+                populateInventorySelects(document.getElementById('individual-items-body'));
+                updateIndividualTotal();
+            }
+
+            // Reset Cash Invoice form
+            if (tabName === 'cash') {
+                const form = document.querySelector('#cash form');
+                form.action = '/invoice';
+                document.querySelector('#cash h3').innerText = 'Create New Cash Invoice';
+                form.reset();
+                document.getElementById('cash-items-body').innerHTML = '';
+                document.getElementById('add-cash-item').click();
+                updateCashTotal();
+                populateInventorySelects(document.getElementById('cash-items-body'), 'Cash');
+            }
+        }
+
+        function openPaymentModal(billId, amount) {
+            switchTab('process');
+            document.getElementById('payment_bill_id').value = billId;
+        }
+
+        function editInvoice(billId) {
+            window.isEditing = true; // Set global flag to prevent switchTab from resetting
+            fetch(`/api/bill/${billId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(bill => {
+                    if (bill.error) {
+                        alert(bill.error);
+                        window.isEditing = false;
+                        return;
+                    }
+                    
+                    try {
+                        // Determine if it's bulk or individual
+                        if (bill.provider) {
+                            if (bill.provider === 'Cash') {
+                                // Cash Invoice
+                                switchTab('cash');
+                                
+                                // Update form action for update
+                                const form = document.querySelector('#cash form');
+                                form.action = `/invoice/update/${billId}`;
+                                document.querySelector('#cash h3').innerText = `Edit Cash Invoice #${billId}`;
+                                
+                                // Populate basic info
+                                form.querySelector('[name="invoice_date"]').value = bill.created_date || "";
+                                
+                                // Populate items
+                                const body = document.getElementById('cash-items-body');
+                                body.innerHTML = ''; // Clear existing
+                                
+                                // Populate inventory selects with 'Cash' filter
+                                populateInventorySelects(body, 'Cash');
+                                
+                                if (bill.items && bill.items.length > 0) {
+                                    bill.items.forEach(item => {
+                                        const row = document.createElement('tr');
+                                        row.classList.add('cash-row');
+                                        row.innerHTML = `
+                <td><input type="date" name="item_date[]" value="${item.date}" required></td>
+                <td>
+                    <div class="autocomplete-container">
+                        <input type="hidden" name="item_patient_id[]" value="${item.patient_id || ''}" class="autocomplete-value">
+                        <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                        <div class="autocomplete-suggestion"></div>
+                    </div>
+                </td>
+                <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="item_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
+                    <div class="mini-input-row">
+                        <span style="font-size: 10px; color: #888;">Price:</span>
+                        <input type="number" name="item_con[]" value="${item.con || 0}" step="0.01" readonly style="width: 80px;">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        ${(item.drugs || [{id: item.drug_id, qty: item.drug_qty, price: item.drug}]).map((d, idx) => `
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" value="${d.id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug" data-selected="${d.id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${d.qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="${d.price || 0}" step="0.01" readonly style="width: 80px;">
+                            ${idx === 0 ? '<button type="button" class="add-mini-input" data-type="drug">+</button>' : '<button type="button" class="remove-mini-input">×</button>'}
+                        </div>
+                        `).join('')}
+                        <input type="hidden" name="item_drug[]" value="${item.drug || 0}" class="cash-row-total-drug">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        ${(item.labs || [{id: item.lab_id, qty: item.lab_qty, price: item.lab}]).map((l, idx) => `
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" value="${l.id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab" data-selected="${l.id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${l.qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="${l.price || 0}" step="0.01" readonly style="width: 80px;">
+                            ${idx === 0 ? '<button type="button" class="add-mini-input" data-type="lab">+</button>' : '<button type="button" class="remove-mini-input">×</button>'}
+                        </div>
+                        `).join('')}
+                        <input type="hidden" name="item_lab[]" value="${item.lab || 0}" class="cash-row-total-lab">
+                    </div>
+                </td>
+                <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="cash-row-amount" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
+                                        const patientInput = row.querySelector('[data-source="patients"]');
+                                        const patientValueInput = row.querySelector('[name="item_patient_id[]"]');
+                                        const patientMatch = autocompleteData.patients.find(p => p.value === item.patient_id);
+                                        if (patientMatch) {
+                                            patientInput.value = patientMatch.text;
+                                            patientValueInput.value = patientMatch.value;
+                                        }
+                                        body.appendChild(row);
+                                    });
+                                } else {
+                                    // If no items, add one empty row
+                                    document.getElementById('add-cash-item').click();
+                                }
+                                
+                                updateCashTotal();
+                                setupAutocomplete(form);
+                                populateInventorySelects(form);
+                            } else {
+                                // Bulk Invoice
+                                switchTab('invoice');
+                                
+                                // Update form action for update
+                                const form = document.querySelector('#invoice form');
+                                form.action = `/invoice/update/${billId}`;
+                                document.querySelector('#invoice h3').innerText = `Edit Bulk Invoice #${billId}`;
+                                
+                                // Populate basic info
+                                const providerInput = form.querySelector('[data-source="providers"]');
+                                const providerValueInput = form.querySelector('[name="provider"]');
+                                const providerMatch = autocompleteData.providers.find(p => p.value === bill.provider);
+                                if (providerMatch) {
+                                    providerInput.value = providerMatch.text;
+                                    providerValueInput.value = providerMatch.value;
+                                }
+                                
+                                // Populate items
+                                const body = document.getElementById('invoice-items-body');
+                                body.innerHTML = ''; // Clear existing
+                                
+                                // Populate inventory selects with the bill's provider
+                                populateInventorySelects(body, bill.provider);
+                                
+                                if (bill.items && bill.items.length > 0) {
+                                    bill.items.forEach(item => {
+                                        const row = document.createElement('tr');
+                                        row.classList.add('invoice-row');
+                                        row.innerHTML = `
+                <td><input type="date" name="item_date[]" value="${item.date}" required></td>
+                <td>
+                    <div class="autocomplete-container">
+                        <input type="hidden" name="item_patient_id[]" value="${item.patient_id || ''}" class="autocomplete-value">
+                        <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                        <div class="autocomplete-suggestion"></div>
+                    </div>
+                </td>
+                <td><input type="text" name="item_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="item_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
+                    <div class="mini-input-row">
+                        <span style="font-size: 10px; color: #888;">Price:</span>
+                        <input type="number" name="item_con[]" value="${item.con || 0}" step="0.01" readonly style="width: 80px;">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        ${(item.drugs || [{id: item.drug_id, qty: item.drug_qty, price: item.drug}]).map((d, idx) => `
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" value="${d.id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug" data-selected="${d.id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${d.qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="${d.price || 0}" step="0.01" readonly style="width: 80px;">
+                            ${idx === 0 ? '<button type="button" class="add-mini-input" data-type="drug">+</button>' : '<button type="button" class="remove-mini-input">×</button>'}
+                        </div>
+                        `).join('')}
+                        <input type="hidden" name="item_drug[]" value="${item.drug || 0}" class="row-total-drug">
+                        <input type="hidden" name="item_drug_ids[]" class="row-drug-ids">
+                        <input type="hidden" name="item_drug_qtys[]" class="row-drug-qtys">
+                        <input type="hidden" name="item_drug_prices[]" class="row-drug-prices">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        ${(item.labs || [{id: item.lab_id, qty: item.lab_qty, price: item.lab}]).map((l, idx) => `
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" value="${l.id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab" data-selected="${l.id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${l.qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="${l.price || 0}" step="0.01" readonly style="width: 80px;">
+                            ${idx === 0 ? '<button type="button" class="add-mini-input" data-type="lab">+</button>' : '<button type="button" class="remove-mini-input">×</button>'}
+                        </div>
+                        `).join('')}
+                        <input type="hidden" name="item_lab[]" value="${item.lab || 0}" class="row-total-lab">
+                        <input type="hidden" name="item_lab_ids[]" class="row-lab-ids">
+                        <input type="hidden" name="item_lab_qtys[]" class="row-lab-qtys">
+                        <input type="hidden" name="item_lab_prices[]" class="row-lab-prices">
+                    </div>
+                </td>
+                <td><input type="number" name="item_amount[]" value="${item.amount || 0}" step="0.01" class="row-amount" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
+                                        const patientInput = row.querySelector('[data-source="patients"]');
+                                        const patientValueInput = row.querySelector('[name="item_patient_id[]"]');
+                                        const patientMatch = autocompleteData.patients.find(p => p.value === item.patient_id);
+                                        if (patientMatch) {
+                                            patientInput.value = patientMatch.text;
+                                            patientValueInput.value = patientMatch.value;
+                                        }
+                                        body.appendChild(row);
+                                    });
+                                } else {
+                                    // If no items, add one empty row
+                                    document.getElementById('add-item').click();
+                                }
+                                
+                                updateTotal();
+                                setupAutocomplete(form);
+                                populateInventorySelects(form);
+                            }
+                        } else {
+                            // Individual Invoice or Standard Bill
+                            switchTab('individual');
+                            
+                            // Update form action for update
+                            const form = document.querySelector('#individual form');
+                            form.action = `/invoice/individual/update/${billId}`;
+                            document.querySelector('#individual h3').innerText = `Edit Individual Invoice #${billId}`;
+                            
+                            // Populate basic info
+                            const patientInput = form.querySelector('[data-source="patients"]');
+                            const patientValueInput = form.querySelector('[name="patient_id"]');
+                            const patientMatch = autocompleteData.patients.find(p => p.value === bill.patient_id);
+                            if (patientMatch) {
+                                patientInput.value = patientMatch.text;
+                                patientValueInput.value = patientMatch.value;
+                            }
+                            form.querySelector('[name="invoice_date"]').value = bill.created_date || "";
+                            
+                            // Populate items
+                            const body = document.getElementById('individual-items-body');
+                            body.innerHTML = ''; // Clear existing
+                            
+                                if (bill.items && bill.items.length > 0) {
+                                    bill.items.forEach(item => {
+                                        const row = document.createElement('tr');
+                                        row.classList.add('individual-row');
+                                        row.innerHTML = `
+                <td><input type="date" name="ind_date[]" value="${item.date}" required></td>
+                <td><input type="text" name="ind_id_no[]" value="${item.id_no || ''}" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="ind_con_id[]" value="${item.con_id || ''}" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con" data-selected="${item.con_id || ''}"></select>
+                    <div class="mini-input-row">
+                        <span style="font-size: 10px; color: #888;">Price:</span>
+                        <input type="number" name="ind_con[]" value="${item.con || 0}" step="0.01" readonly style="width: 80px;">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        ${(item.drugs || [{id: item.drug_id, qty: item.drug_qty, price: item.drug}]).map((d, idx) => `
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" value="${d.id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug" data-selected="${d.id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${d.qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="${d.price || 0}" step="0.01" readonly style="width: 80px;">
+                            ${idx === 0 ? '<button type="button" class="add-mini-input" data-type="drug">+</button>' : '<button type="button" class="remove-mini-input">×</button>'}
+                        </div>
+                        `).join('')}
+                        <input type="hidden" name="ind_drug[]" value="${item.drug || 0}" class="ind-row-total-drug">
+                        <input type="hidden" name="ind_drug_ids[]" class="row-drug-ids">
+                        <input type="hidden" name="ind_drug_qtys[]" class="row-drug-qtys">
+                        <input type="hidden" name="ind_drug_prices[]" class="row-drug-prices">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        ${(item.labs || [{id: item.lab_id, qty: item.lab_qty, price: item.lab}]).map((l, idx) => `
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" value="${l.id || ''}" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab" data-selected="${l.id || ''}"></select>
+                            <input type="number" class="mini-qty" value="${l.qty || 1}" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="${l.price || 0}" step="0.01" readonly style="width: 80px;">
+                            ${idx === 0 ? '<button type="button" class="add-mini-input" data-type="lab">+</button>' : '<button type="button" class="remove-mini-input">×</button>'}
+                        </div>
+                        `).join('')}
+                        <input type="hidden" name="ind_lab[]" value="${item.lab || 0}" class="ind-row-total-lab">
+                        <input type="hidden" name="ind_lab_ids[]" class="row-lab-ids">
+                        <input type="hidden" name="ind_lab_qtys[]" class="row-lab-qtys">
+                        <input type="hidden" name="ind_lab_prices[]" class="row-lab-prices">
+                    </div>
+                </td>
+                <td><input type="number" name="ind_amount[]" class="ind-row-amount" value="${item.amount || 0}" step="0.01" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
+                                    body.appendChild(row);
+                                });
+                            } else {
+                                // Standard bill with services string - best effort to map
+                                const row = document.createElement('tr');
+                                row.classList.add('individual-row');
+                                row.innerHTML = `
+                                    <td><input type="date" name="ind_date[]" value="${bill.date || ''}" required></td>
+                                    <td><input type="text" name="ind_id_no[]" value="" placeholder="ID NO."></td>
+                                    <td>
+                                        <input type="hidden" name="ind_con_id[]" class="autocomplete-value">
+                                        <select class="inventory-select" data-kind="con"></select>
+                                        <input type="number" name="ind_con[]" value="${bill.amount || 0}" step="0.01" readonly>
+                                    </td>
+                                    <td>
+                                        <div class="mini-input-container">
+                                            <div class="mini-input-row">
+                                                <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                                                <select class="inventory-select" data-kind="drug"></select>
+                                                <input type="number" class="mini-drug" value="0" step="0.01" readonly>
+                                                <button type="button" class="add-mini-input" data-type="drug">+</button>
+                                            </div>
+                                            <input type="hidden" name="ind_drug[]" value="0" class="ind-row-total-drug">
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="mini-input-container">
+                                            <div class="mini-input-row">
+                                                <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                                                <select class="inventory-select" data-kind="lab"></select>
+                                                <input type="number" class="mini-lab" value="0" step="0.01" readonly>
+                                                <button type="button" class="add-mini-input" data-type="lab">+</button>
+                                            </div>
+                                            <input type="hidden" name="ind_lab[]" value="0" class="ind-row-total-lab">
+                                        </div>
+                                    </td>
+                                    <td><input type="number" name="ind_amount[]" class="ind-row-amount" value="${bill.amount || 0}" step="0.01" readonly></td>
+                                    <td><button type="button" class="remove-item">×</button></td>
+                                `
+                                body.appendChild(row);
+                            }
+                            
+                            updateIndividualTotal();
+                            setupAutocomplete(form);
+                            
+                            // Determine scheme for individual invoice
+                            const patientMatchForScheme = autocompleteData.patients.find(p => p.value === bill.patient_id);
+                            const currentScheme = patientMatchForScheme ? (patientMatchForScheme.scheme || 'Cash') : 'Cash';
+                            populateInventorySelects(form, currentScheme);
+                        }
+                    } catch (err) {
+                        console.error('Error populating form:', err);
+                        alert('Error loading bill data into the form.');
+                    }
+                    window.isEditing = false;
+                })
+                .catch(err => {
+                    console.error('Fetch error:', err);
+                    alert('Failed to fetch bill data from the server.');
+                    window.isEditing = false;
+                });
+        }
+
+        document.getElementById('add-item').addEventListener('click', function() {
+            var body = document.getElementById('invoice-items-body');
+            var newRow = document.createElement('tr');
+            newRow.classList.add('invoice-row');
+            newRow.innerHTML = `
+                <td><input type="date" name="item_date[]" required></td>
+                <td>
+                    <div class="autocomplete-container">
+                        <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                        <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                        <div class="autocomplete-suggestion"></div>
+                    </div>
+                </td>
+                <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="item_con_id[]" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con"></select>
+                    <input type="number" name="item_con[]" value="0" step="0.01" readonly>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="drug">+</button>
+                        </div>
+                        <input type="hidden" name="item_drug[]" value="0" class="row-total-drug">
+                        <input type="hidden" name="item_drug_ids[]" class="row-drug-ids">
+                        <input type="hidden" name="item_drug_qtys[]" class="row-drug-qtys">
+                        <input type="hidden" name="item_drug_prices[]" class="row-drug-prices">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="lab">+</button>
+                        </div>
+                        <input type="hidden" name="item_lab[]" value="0" class="row-total-lab">
+                        <input type="hidden" name="item_lab_ids[]" class="row-lab-ids">
+                        <input type="hidden" name="item_lab_qtys[]" class="row-lab-qtys">
+                        <input type="hidden" name="item_lab_prices[]" class="row-lab-prices">
+                    </div>
+                </td>
+                <td><input type="number" name="item_amount[]" value="0" step="0.01" class="row-amount" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
+            body.appendChild(newRow);
+            setupAutocomplete(newRow);
+            
+            // Get current provider from Bulk Invoice tab
+            const providerInput = document.querySelector('#invoice .autocomplete-input[data-source="providers"]');
+            const provider = providerInput ? providerInput.value : null;
+            populateInventorySelects(newRow, provider);
+        });
+
+        document.getElementById('invoice').addEventListener('input', function(e) {
+            if (e.target.name === 'item_con[]') {
+                updateRowAmount(e.target.closest('tr'));
+                updateTotal();
+            }
+        });
+
+        document.getElementById('invoice-items-body').addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-item')) {
+                e.target.closest('tr').remove();
+                updateTotal();
+            }
+        });
+
+        function updateRowAmount(row) {
+            var con = parseFloat(row.querySelector('[name="item_con[]"]').value) || 0;
+            var drug = parseFloat(row.querySelector('.row-total-drug').value) || 0;
+            var lab = parseFloat(row.querySelector('.row-total-lab').value) || 0;
+            var amount = con + drug + lab;
+            row.querySelector('.row-amount').value = amount.toFixed(2);
+        }
+
+        function updateTotal() {
+            var total = 0;
+            document.querySelectorAll('.row-amount').forEach(function(input) {
+                total += parseFloat(input.value) || 0;
+            });
+            document.getElementById('invoice-total').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        // Individual Invoice Logic
+        document.getElementById('add-individual-item').addEventListener('click', function() {
+            var body = document.getElementById('individual-items-body');
+            var newRow = document.createElement('tr');
+            newRow.classList.add('individual-row');
+            newRow.innerHTML = `
+                <td><input type="date" name="ind_date[]" required></td>
+                <td><input type="text" name="ind_id_no[]" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="ind_con_id[]" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con"></select>
+                    <input type="number" name="ind_con[]" value="0" step="0.01" readonly>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="drug">+</button>
+                        </div>
+                        <input type="hidden" name="ind_drug[]" value="0" class="ind-row-total-drug">
+                        <input type="hidden" name="ind_drug_ids[]" class="row-drug-ids">
+                        <input type="hidden" name="ind_drug_qtys[]" class="row-drug-qtys">
+                        <input type="hidden" name="ind_drug_prices[]" class="row-drug-prices">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="lab">+</button>
+                        </div>
+                        <input type="hidden" name="ind_lab[]" value="0" class="ind-row-total-lab">
+                        <input type="hidden" name="ind_lab_ids[]" class="row-lab-ids">
+                        <input type="hidden" name="ind_lab_qtys[]" class="row-lab-qtys">
+                        <input type="hidden" name="ind_lab_prices[]" class="row-lab-prices">
+                    </div>
+                </td>
+                <td><input type="number" name="ind_amount[]" class="ind-row-amount" value="0" step="0.01" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
+            body.appendChild(newRow);
+            setupAutocomplete(newRow);
+            
+            // Get selected patient's scheme
+            const patientInput = document.querySelector('#individual .autocomplete-input[data-source="patients"]');
+            const patientId = patientInput.previousElementSibling.value;
+            const patientMatch = autocompleteData.patients.find(p => p.value === patientId);
+            const scheme = patientMatch ? (patientMatch.scheme || 'Cash') : 'Cash';
+            populateInventorySelects(newRow, scheme);
+        });
+
+        document.getElementById('individual').addEventListener('input', function(e) {
+            if (e.target.name === 'ind_con[]') {
+                updateIndividualRowAmount(e.target.closest('tr'));
+                updateIndividualTotal();
+            }
+        });
+
+        document.getElementById('individual-items-body').addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-item')) {
+                e.target.closest('tr').remove();
+                updateIndividualTotal();
+            }
+        });
+
+        function updateIndividualRowAmount(row) {
+            var con = parseFloat(row.querySelector('[name="ind_con[]"]').value) || 0;
+            var drug = parseFloat(row.querySelector('.ind-row-total-drug').value) || 0;
+            var lab = parseFloat(row.querySelector('.ind-row-total-lab').value) || 0;
+            var amount = con + drug + lab;
+            row.querySelector('.ind-row-amount').value = amount.toFixed(2);
+        }
+
+        function updateIndividualTotal() {
+            var total = 0;
+            document.querySelectorAll('.ind-row-amount').forEach(function(input) {
+                total += parseFloat(input.value) || 0;
+            });
+            document.getElementById('individual-total').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        // Cash Invoice Logic
+        document.getElementById('add-cash-item').addEventListener('click', function() {
+            var body = document.getElementById('cash-items-body');
+            var newRow = document.createElement('tr');
+            newRow.classList.add('cash-row');
+            newRow.innerHTML = `
+                <td><input type="date" name="item_date[]" required></td>
+                <td>
+                    <div class="autocomplete-container">
+                        <input type="hidden" name="item_patient_id[]" class="autocomplete-value">
+                        <input type="text" class="autocomplete-input" data-source="patients" placeholder="-- Select Patient --">
+                        <div class="autocomplete-suggestion"></div>
+                    </div>
+                </td>
+                <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="item_con_id[]" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con"></select>
+                    <input type="number" name="item_con[]" value="0" step="0.01" readonly>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="drug">+</button>
+                        </div>
+                        <input type="hidden" name="item_drug[]" value="0" class="cash-row-total-drug">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="lab">+</button>
+                        </div>
+                        <input type="hidden" name="item_lab[]" value="0" class="cash-row-total-lab">
+                    </div>
+                </td>
+                <td><input type="number" name="item_amount[]" value="0" step="0.01" class="cash-row-amount" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
+            body.appendChild(newRow);
+            setupAutocomplete(newRow);
+            populateInventorySelects(newRow);
+        });
+
+        document.getElementById('cash').addEventListener('input', function(e) {
+            if (e.target.name === 'item_con[]') {
+                updateCashRowAmount(e.target.closest('tr'));
+                updateCashTotal();
+            }
+        });
+
+        document.getElementById('cash-items-body').addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-item')) {
+                e.target.closest('tr').remove();
+                updateCashTotal();
+            }
+        });
+
+        function updateCashRowAmount(row) {
+            var con = parseFloat(row.querySelector('[name="item_con[]"]').value) || 0;
+            var drug = parseFloat(row.querySelector('.cash-row-total-drug').value) || 0;
+            var lab = parseFloat(row.querySelector('.cash-row-total-lab').value) || 0;
+            var amount = con + drug + lab;
+            row.querySelector('.cash-row-amount').value = amount.toFixed(2);
+        }
+
+        function updateCashTotal() {
+            var total = 0;
+            document.querySelectorAll('.cash-row-amount').forEach(function(input) {
+                total += parseFloat(input.value) || 0;
+            });
+            document.getElementById('cash-total').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        document.getElementById('add-create-item').addEventListener('click', function() {
+            const tbody = document.getElementById('create-items-body');
+            const newRow = document.createElement('tr');
+            newRow.className = 'create-row';
+            newRow.innerHTML = `
+                <td><input type="date" name="item_date[]" required></td>
+                <td><input type="text" name="item_id_no[]" placeholder="ID NO."></td>
+                <td>
+                    <input type="hidden" name="item_con_id[]" class="autocomplete-value">
+                    <select class="inventory-select" data-kind="con"></select>
+                    <div class="mini-input-row">
+                        <span style="font-size: 10px; color: #888;">Price:</span>
+                        <input type="number" name="item_con[]" value="0" step="0.01" readonly style="width: 80px;">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_drug_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="drug"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-drug" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="drug">+</button>
+                        </div>
+                        <input type="hidden" name="item_drug[]" value="0" class="row-total-drug">
+                        <input type="hidden" name="item_drug_ids[]" class="row-drug-ids">
+                        <input type="hidden" name="item_drug_qtys[]" class="row-drug-qtys">
+                        <input type="hidden" name="item_drug_prices[]" class="row-drug-prices">
+                    </div>
+                </td>
+                <td>
+                    <div class="mini-input-container">
+                        <div class="mini-input-row">
+                            <input type="hidden" name="mini_lab_id[]" class="autocomplete-value">
+                            <select class="inventory-select" data-kind="lab"></select>
+                            <input type="number" class="mini-qty" value="1" min="1" step="1" style="width: 50px;" title="Quantity">
+                            <span style="font-size: 10px; color: #888;">x</span>
+                            <input type="number" class="mini-lab" value="0" step="0.01" readonly style="width: 80px;">
+                            <button type="button" class="add-mini-input" data-type="lab">+</button>
+                        </div>
+                        <input type="hidden" name="item_lab[]" value="0" class="row-total-lab">
+                        <input type="hidden" name="item_lab_ids[]" class="row-lab-ids">
+                        <input type="hidden" name="item_lab_qtys[]" class="row-lab-qtys">
+                        <input type="hidden" name="item_lab_prices[]" class="row-lab-prices">
+                    </div>
+                </td>
+                <td><input type="number" name="item_amount[]" class="create-row-amount" value="0" step="0.01" readonly></td>
+                <td><button type="button" class="remove-item">×</button></td>
+            `;
+            tbody.appendChild(newRow);
+            setupAutocomplete(newRow);
+            populateInventorySelects(newRow);
+            updateCreateTotal();
+        });
+
+        document.getElementById('create').addEventListener('input', function(e) {
+            if (e.target.name === 'item_con[]' || e.target.name === 'item_drug[]' || e.target.name === 'item_lab[]') {
+                updateCreateRowAmount(e.target.closest('tr'));
+                updateCreateTotal();
+            }
+        });
+
+        document.getElementById('create-items-body').addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-item')) {
+                e.target.closest('tr').remove();
+                updateCreateTotal();
+            }
+        });
+
+        function updateCreateRowAmount(row) {
+            var con = parseFloat(row.querySelector('[name="item_con[]"]').value) || 0;
+            var drug = parseFloat(row.querySelector('[name="item_drug[]"]').value) || 0;
+            var lab = parseFloat(row.querySelector('[name="item_lab[]"]').value) || 0;
+            var amount = con + drug + lab;
+            row.querySelector('.create-row-amount').value = amount.toFixed(2);
+        }
+
+        function updateCreateTotal() {
+            var total = 0;
+            document.querySelectorAll('.create-row-amount').forEach(function(input) {
+                total += parseFloat(input.value) || 0;
+            });
+            document.getElementById('create-total').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+    </script>
+</body>
+</html>

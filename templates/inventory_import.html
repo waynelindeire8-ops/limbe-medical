@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Medicines and Services</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .form-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            max-width: 900px;
+            margin: 20px auto;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { font-weight: 600; margin-bottom: 8px; display: block; }
+        select, textarea {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+        }
+        .btn-submit {
+            background-color: #4361ee;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+        .example {
+            background: #f8f9fa;
+            border: 1px dashed #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container" >
+        {% include 'sidebar.html' %}
+        <main class="main-content" >
+            <a href="{{ url_for('inventory') }}" style="color: #4361ee; text-decoration: none; display: block; margin-bottom: 10px;"><i class="fas fa-arrow-left"></i> Back to Inventory</a>
+            <div class="form-container">
+                <h2>Import Medicines and Services</h2>
+                <p style="color:#666;">Paste items in the format: CODE ITEM PRICE (one per line). Select the scheme provider to associate codes.</p>
+                <div class="example">
+33157 LONART TABLETS 12S Tablets 500<br>
+33169 AMINOPHYLLINE vial 50mg 3280<br>
+32243 TRAMADOL Tablets 50mg 750
+                </div>
+                <form method="POST">
+                    <div class="form-group">
+                        <label>Scheme Provider</label>
+                        <select name="provider" required>
+                            <option value="">Select Provider</option>
+                            {% for p in providers %}
+                            <option value="{{ p }}">{{ p }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Items (one per line)</label>
+                        <textarea name="items_text" rows="12" placeholder="e.g.&#10;33157 LONART TABLETS 12S Tablets 500&#10;33169 AMINOPHYLLINE vial 50mg 3280" required></textarea>
+                    </div>
+                    <button type="submit" class="btn-submit"><i class="fas fa-file-import"></i> Import</button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
+
+

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Appointment</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+    <style>
+        .form-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .btn-submit {
+            background-color: #4361ee;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        .btn-submit:hover {
+            background-color: #3f37c9;
+        }
+        .back-link {
+            display: block;
+            margin-bottom: 20px;
+            color: #4361ee;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" >
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content" >
+            <a href="{{ url_for('view_schedule') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Schedule</a>
+            
+            <div class="form-container">
+                <h2>Edit Appointment</h2>
+                <br>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="patient_id">Patient</label>
+                        <select id="patient_id" name="patient_id" required>
+                            {% for patient in patients %}
+                            <option value="{{ patient.patient_id }}" {% if patient.patient_id == appointment.patient_id %}selected{% endif %}>
+                                {{ patient.last_name }}, {{ patient.first_name }} ({{ patient.patient_id }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="doctor_id">Doctor</label>
+                        <select id="doctor_id" name="doctor_id" required>
+                            {% for doctor in doctors %}
+                            <option value="{{ doctor.doctor_id }}" {% if doctor.doctor_id == appointment.doctor_id %}selected{% endif %}>
+                                Dr. {{ doctor.last_name }} ({{ doctor.specialty }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date">Date</label>
+                        <input type="date" id="date" name="date" value="{{ appointment.appointment_date }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="time">Time</label>
+                        <input type="time" id="time" name="time" value="{{ appointment.appointment_time }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reason">Reason</label>
+                        <textarea id="reason" name="reason" rows="3" required>{{ appointment.reason }}</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select id="status" name="status" required>
+                            <option value="Scheduled" {% if appointment.status == 'Scheduled' %}selected{% endif %}>Scheduled</option>
+                            <option value="Completed" {% if appointment.status == 'Completed' %}selected{% endif %}>Completed</option>
+                            <option value="Cancelled" {% if appointment.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                            <option value="No Show" {% if appointment.status == 'No Show' %}selected{% endif %}>No Show</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-submit">Update Appointment</button>
+                </form>
+            </div>
+            
+            {% if current_patient %}
+            <div class="form-container" style="margin-top: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">Patient Information</h3>
+                    <a href="{{ url_for('patient_details', patient_id=current_patient.patient_id) }}" style="color: #4361ee; text-decoration: none; font-size: 14px;"><i class="fas fa-external-link-alt"></i> View Full Profile</a>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <label style="font-size: 12px; color: #666; display: block;">Name</label>
+                        <div style="font-weight: 500;">{{ current_patient.last_name }}, {{ current_patient.first_name }}</div>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #666; display: block;">ID</label>
+                        <div style="font-weight: 500;">{{ current_patient.patient_id }}</div>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #666; display: block;">Phone</label>
+                        <div style="font-weight: 500;">{{ current_patient.phone }}</div>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #666; display: block;">DOB</label>
+                        <div style="font-weight: 500;">{{ current_patient.date_of_birth }}</div>
+                    </div>
+                </div>
+                
+                <h4 style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Attached Files</h4>
+                
+                <ul style="list-style: none; padding: 0;">
+                    {% for file in patient_files %}
+                    <li style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-file-alt" style="color: #4361ee;"></i>
+                            <div>
+                                <div style="font-weight: 500;">{{ file.file_name }}</div>
+                                <div style="font-size: 11px; color: #888;">{{ file.uploaded_at }}</div>
+                            </div>
+                        </div>
+                        <a href="{{ file.public_url }}" download="{{ file.file_name }}" title="Download" style="color: #4361ee;"><i class="fas fa-download"></i></a>
+                    </li>
+                    {% else %}
+                    <li style="padding: 10px; text-align: center; color: #888; font-style: italic;">No files attached to this patient.</li>
+                    {% endfor %}
+                </ul>
+                
+                <div style="margin-top: 15px; text-align: right;">
+                    <a href="{{ url_for('patient_details', patient_id=current_patient.patient_id) }}" style="color: #4361ee; text-decoration: none; font-size: 13px;">Manage Files & Upload New</a>
+                </div>
+            </div>
+            {% endif %}
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectElements = document.querySelectorAll('select');
+        selectElements.forEach(select => {
+            new Choices(select, {
+                searchEnabled: true,
+                itemSelectText: '',
+                placeholder: true,
+            });
+        });
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prescriptions</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .table-container { background-color: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-add { background-color: #4361ee; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: 500; }
+        .btn-add:hover { background-color: #3f37c9; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        .actions a { margin-right: 10px; color: #666; text-decoration: none; }
+        .actions a:hover { color: #4361ee; }
+        .actions a.delete { color: #dc3545; }
+        .actions a.delete:hover { color: #b02a37; }
+        .status { padding: 4px 8px; border-radius: 6px; font-size: 12px; }
+        .status.active { background-color: #e8f0fe; color: #4361ee; }
+        .status.inactive { background-color: #fde8e8; color: #dc3545; }
+    </style>
+    </head>
+<body>
+    <div class="container">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content">
+            <div class="header-actions">
+                <h2>Prescriptions</h2>
+                <div style="display: flex; gap: 10px;">
+                    <form action="{{ url_for('prescriptions') }}" method="get" class="search-form" style="display: flex; align-items: center; gap: 10px;">
+                        <input type="text" name="search" placeholder="Search prescriptions..." value="{{ search_term if search_term else '' }}" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px; outline: none; width: 250px;">
+                        <button type="submit" style="background-color: #4361ee; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;"><i class="fas fa-search"></i></button>
+                        {% if search_term %}
+                        <a href="{{ url_for('prescriptions') }}" style="color: #666; text-decoration: none; display: flex; align-items: center; padding: 0 5px;"><i class="fas fa-times"></i></a>
+                        {% endif %}
+                    </form>
+                    <a href="{{ url_for('add_prescription') }}" class="btn-add"><i class="fas fa-plus"></i> Add Prescription</a>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Date</th>
+                            <th>Patient</th>
+                            <th>Doctor</th>
+                            <th>Medication</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rx in prescriptions %}
+                        <tr>
+                            <td>{{ rx.prescription_id }}</td>
+                            <td>{{ rx.date }}</td>
+                            <td>{{ rx.patient_name }}</td>
+                            <td>{{ rx.doctor_name }}</td>
+                            <td>{{ rx.medication }}</td>
+                            <td><span class="status {{ rx.status|lower }}">{{ rx.status }}</span></td>
+                            <td class="actions">
+                                <a href="{{ url_for('view_prescription', prescription_id=rx.prescription_id) }}" title="View"><i class="fas fa-eye"></i></a>
+                                <a href="{{ url_for('edit_prescription', prescription_id=rx.prescription_id) }}" title="Edit"><i class="fas fa-edit"></i></a>
+                                <a href="{{ url_for('delete_prescription', prescription_id=rx.prescription_id) }}" class="delete" title="Delete" onclick="return confirm('Delete this prescription?')"><i class="fas fa-trash"></i></a>
+                                <a href="{{ url_for('print_prescription', prescription_id=rx.prescription_id) }}" title="Print"><i class="fas fa-print"></i></a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" style="text-align:center;">No prescriptions found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                <a href="{{ url_for('prescriptions', page=page-1, search=search_term) }}" class="pagination-btn {{ 'disabled' if page == 1 else '' }}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </a>
+                
+                <div class="pagination-info">
+                    Page {{ page }} of {{ total_pages }} (Total: {{ total_count }})
+                </div>
+
+                <a href="{{ url_for('prescriptions', page=page+1, search=search_term) }}" class="pagination-btn {{ 'disabled' if page == total_pages else '' }}">
+                    Next <i class="fas fa-chevron-right"></i>
+                </a>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

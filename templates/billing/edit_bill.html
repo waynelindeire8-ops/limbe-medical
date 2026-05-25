@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Bill - Limbe Medical</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .form-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .btn-submit {
+            background-color: #4361ee;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        .btn-submit:hover {
+            background-color: #3f37c9;
+        }
+        .back-link {
+            display: block;
+            margin-bottom: 20px;
+            color: #4361ee;
+            text-decoration: none;
+        }
+        .invoice-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .item-row {
+            display: flex;
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .item-row input[type="text"] {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .item-row input[type="number"] {
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" >
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content" >
+            <a href="{{ url_for('view_bill', bill_id=bill.bill_id) }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Bill Details</a>
+            
+            <div class="form-container">
+                <h2>Edit Bill: {{ bill.bill_id }}</h2>
+                <p style="color: #666; margin-bottom: 20px;">Patient: {{ patient.last_name }}, {{ patient.first_name }}</p>
+                <form method="POST">
+                    <div class="form-group">
+                        <label>Services / Items</label>
+                        <div id="itemList">
+                            {% for item in bill.items %}
+                            <div class="invoice-item">
+                                <div class="item-row">
+                                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" 
+                                           value="{% if item.description %}{{ item.description }}{% elif item.name %}{{ item.name }}{% else %}{{ 'Service' }}{% endif %}" required>
+                                    <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" 
+                                           value="{{ item.cost or item.amount or 0 }}" required>
+                                </div>
+                                <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn-add" onclick="addItem()"><i class="fas fa-plus"></i> Add Item</button>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Total Amount (MWK)</label>
+                        <input type="number" id="amount" name="amount" step="0.01" value="{{ bill.amount }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select id="status" name="status" required>
+                            <option value="Pending" {% if bill.status == 'Pending' %}selected{% endif %}>Pending</option>
+                            <option value="Paid" {% if bill.status == 'Paid' %}selected{% endif %}>Paid</option>
+                            <option value="Cancelled" {% if bill.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-submit">Save Changes</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function addItem() {
+            const list = document.getElementById('itemList');
+            const item = document.createElement('div');
+            item.className = 'invoice-item';
+            item.innerHTML = `
+                <div class="item-row">
+                    <input type="text" name="items[]" class="form-control" placeholder="Service / Item Description" required>
+                    <input type="number" name="costs[]" class="form-control" placeholder="Cost (MWK)" step="0.01" min="0" required>
+                </div>
+                <button type="button" class="remove-btn" onclick="removeItem(this)"><i class="fas fa-trash"></i></button>
+            `;
+            list.appendChild(item);
+        }
+
+        function removeItem(btn) {
+            const item = btn.parentNode;
+            if (document.querySelectorAll('.invoice-item').length > 1) {
+                item.remove();
+            } else {
+                alert("At least one item is required.");
+            }
+        }
+    </script>
+</body>
+</html>
+

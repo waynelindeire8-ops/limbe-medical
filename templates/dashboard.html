@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Using Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        {% include 'sidebar.html' %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1>Dashboard</h1>
+                    <p>Welcome back! Here's what's happening in your medical practice today.</p>
+                </div>
+                <div class="header-right">
+                    {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
+                    <a href="{{ url_for('view_schedule') }}" class="btn btn-outline" style="text-decoration: none;"><i class="fas fa-calendar"></i> View Schedule</a>
+                    {% endif %}
+                    
+                    {% if current_role in ['admin', 'doctor'] %}
+                    <a href="{{ url_for('analytics') }}" class="btn btn-primary" style="text-decoration: none;"><i class="fas fa-chart-line"></i> Analytics</a>
+                    {% endif %}
+                    
+                    <div class="icon-btn"><i class="fas fa-envelope"></i></div>
+                    <div class="icon-btn"><i class="fas fa-bell"></i></div>
+                    <div class="user-profile" title="Role: {{ current_role|title }}">
+                        <span style="margin-right: 10px; font-weight: bold;">{{ current_user }}</span>
+                        <img src="https://ui-avatars.com/api/?name={{ current_user }}&background=random" alt="User">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="card stat-card">
+                    <div class="stat-icon blue-bg"><i class="fas fa-users"></i></div>
+                    <h3>Total Patients</h3>
+                    <p class="subtext">Active registered users</p>
+                    <div class="stat-value">
+                        <h2>{{ total_patients }}</h2>
+                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +23%</span> -->
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon green-bg"><i class="fas fa-user-md"></i></div>
+                    <h3>Active Doctors</h3>
+                    <p class="subtext">Available medical staff</p>
+                    <div class="stat-value">
+                        <h2>{{ active_doctors }}</h2>
+                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +10%</span> -->
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon red-bg"><i class="fas fa-calendar-check"></i></div>
+                    <h3>Today Appointments</h3>
+                    <p class="subtext">Scheduled consultations</p>
+                    <div class="stat-value">
+                        <h2>{{ todays_appointments }}</h2>
+                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +13%</span> -->
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon yellow-bg"><i class="fas fa-hourglass-half"></i></div>
+                    <h3>Waiting Queue</h3>
+                    <p class="subtext">Patients waiting</p>
+                    <div class="stat-value">
+                        <h2>{{ queue|length }}</h2>
+                        <!-- <span class="badge warning"><i class="fas fa-history"></i> +64%</span> -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-grid" style="grid-template-columns: 2fr 1fr;">
+                <!-- Queue System -->
+                <div class="card recent-appointments">
+                    <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
+                        <h3>Patient Queue</h3>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="text" id="queueSearch" placeholder="Filter queue..." style="padding: 5px 10px; border: 1px solid #ddd; border-radius: 15px; font-size: 12px; outline: none;">
+                            <span class="badge" style="background: #e8f0fe; color: #4361ee;">{{ queue|length }} Waiting</span>
+                            <a href="{{ url_for('queue_dashboard') }}" style="font-size: 13px; color: var(--primary-color); text-decoration: none; font-weight: 600;">View All <i class="fas fa-external-link-alt"></i></a>
+                        </div>
+                    </div>
+                    <div class="appointment-list" id="queueList">
+                        {% for item in queue %}
+                        {% set patient = hms.get_patient(item.patient_id) %}
+                        <div class="appointment-item" ondblclick="window.location.href='{{ url_for('patients', search=item.patient_name) }}'" style="display: flex; justify-content: space-between; align-items: center; border-left: 4px solid {% if item.triage_level == '1' %}#dc3545{% elif item.triage_level == '2' %}#fd7e14{% elif item.triage_level == '3' %}#ffc107{% else %}#28a745{% endif %}; padding-left: 15px; margin-bottom: 10px; background: #fcfcfc; cursor: pointer;" title="Double click to search patient">
+                            <div class="appt-info">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <h4 style="margin: 0;">{{ item.patient_name }}</h4>
+                                    <span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #eee; color: #666;">{{ item.department }}</span>
+                                    {% if patient and (patient.scheme_provider or patient.scheme_type) %}
+                                    <span style="font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #e8f0fe; color: #4361ee; font-weight: 600;">
+                                        {{ patient.scheme_provider or '' }} {% if patient.scheme_provider and patient.scheme_type %}-{% endif %} {{ patient.scheme_type or '' }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <p style="font-size: 12px; color: #666; margin-top: 4px;">
+                                    <i class="far fa-clock"></i> {{ item.arrival_time }}
+                                    {% if item.date_added %}
+                                    <span style="font-size: 11px; color: #888; font-weight: 500;">({{ item.date_added }})</span>
+                                    {% endif %}
+                                    &bull; <span style="font-weight: 600; color: {% if item.status == 'Calling' %}#4361ee{% elif item.status == 'In Consultation' %}#28a745{% else %}#666{% endif %};">{{ item.status }}</span>
+                                    {% if item.priority != 'Routine' %}
+                                    &bull; <span style="color: #dc3545; font-weight: bold;">{{ item.priority }}</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="appt-actions" style="display: flex; gap: 5px;">
+                                {% if item.status == 'Waiting' %}
+                                <a href="{{ url_for('queue_call', queue_id=item.queue_id) }}" class="btn-sm" style="background: #4361ee; color: white; text-decoration: none;" title="Call Patient"><i class="fas fa-bullhorn"></i></a>
+                                {% endif %}
+                                
+                                {% if item.status == 'Calling' or item.status == 'Waiting' %}
+                                <a href="{{ url_for('update_queue_status', queue_id=item.queue_id, status='In Consultation') }}" class="btn-sm" style="background: #28a745; color: white; text-decoration: none;" title="Start Consultation"><i class="fas fa-play"></i></a>
+                                {% endif %}
+                                
+                                {% if item.status == 'In Consultation' %}
+                                <a href="{{ url_for('queue_complete', queue_id=item.queue_id) }}" class="btn-sm" style="background: #28a745; color: white; text-decoration: none;" title="Complete"><i class="fas fa-check"></i></a>
+                                {% endif %}
+                                
+                                <a href="{{ url_for('remove_from_queue', queue_id=item.queue_id) }}" class="btn-sm" style="background: #dc3545; color: white; text-decoration: none;" title="Remove" onclick="return confirm('Remove from queue?')"><i class="fas fa-times"></i></a>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="appointment-item" style="text-align: center; padding: 20px; color: #888;">
+                            <p>No patients in queue</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="right-column">
+                    <!-- Recent Appointments -->
+                    <div class="card quick-actions" style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin: 0;">Recent Appointments</h3>
+                            <input type="text" id="apptSearch" placeholder="Filter..." style="padding: 4px 8px; border: 1px solid #ddd; border-radius: 10px; font-size: 11px; outline: none; width: 80px;">
+                        </div>
+                        <div class="appointment-list" id="apptList" style="max-height: 300px; overflow-y: auto;">
+                            {% for appt in recent_appointments %}
+                            {% set patient = hms.get_patient(appt.patient_id) %}
+                            <div class="appointment-item" ondblclick="window.location.href='{{ url_for('patients', search=patient.first_name + ' ' + patient.last_name if patient else appt.patient_id) }}'" style="padding: 10px 0; border-bottom: 1px solid #eee; cursor: pointer;" title="Double click to search patient">
+                                <div class="appt-info">
+                                    <div style="font-weight: 600; font-size: 14px;">
+                                    {% if patient %}
+                                        {{ patient.last_name }}, {{ patient.first_name }}
+                                    {% else %}
+                                        Unknown Patient ({{ appt.patient_id }})
+                                    {% endif %}
+                                </div>
+                                    <div style="font-size: 12px; color: #888;">
+                                        {{ appt.appointment_time }} &bull; {{ appt.status }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('add_to_queue', patient_id=appt.patient_id) }}" class="btn-sm" style="background: #e2eafc; color: #4361ee; text-decoration: none; padding: 4px 8px; font-size: 11px;" title="Add to Queue"><i class="fas fa-plus"></i> Queue</a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <!-- Quick Actions -->
+                    <div class="card quick-actions">
+                        <h3>Quick Actions</h3>
+                        <div class="action-list">
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-user-plus"></i> Add New Patient</div>
+                                <a href="{{ url_for('add_patient') }}" class="btn-sm" style="text-decoration: none;">Add</a>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-calendar-plus"></i> Schedule Appointment</div>
+                                <a href="{{ url_for('schedule_appointment') }}" class="btn-sm" style="text-decoration: none;">Add</a>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-notes-medical"></i> Create Medical Record</div>
+                                <a href="{{ url_for('add_medical_record') }}" class="btn-sm" style="text-decoration: none;">Create</a>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-flask"></i> View Lab Results</div>
+                                <a href="{{ url_for('view_lab_results') }}" class="btn-sm" style="text-decoration: none;">View</a>
+                            </div>
+                            <div class="action-item">
+                                <div class="action-icon"><i class="fas fa-file-alt"></i> General Reports</div>
+                                <a href="{{ url_for('general_reports') }}" class="btn-sm" style="text-decoration: none;">View</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Patient Analytics -->
+                    <div class="card analytics">
+                        <div class="card-header">
+                            <h3>Patient Analytics</h3>
+                            <div class="toggle-group">
+                                <button>7 Days</button>
+                                <button class="active">30 Days</button>
+                                <button>90 Days</button>
+                            </div>
+                        </div>
+                        <div class="chart-placeholder">
+                            <p>Chart component will be integrated here</p>
+                            <small>Patient registration and appointment trends.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script>
+        document.getElementById('queueSearch').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            let items = document.querySelectorAll('#queueList .appointment-item');
+            items.forEach(item => {
+                let text = item.textContent.toLowerCase();
+                item.style.display = text.includes(filter) ? '' : 'none';
+            });
+        });
+        document.getElementById('apptSearch').addEventListener('keyup', function() {
+            let filter = this.value.toLowerCase();
+            let items = document.querySelectorAll('#apptList .appointment-item');
+            items.forEach(item => {
+                let text = item.textContent.toLowerCase();
+                item.style.display = text.includes(filter) ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
