@@ -288,6 +288,24 @@ class DatabaseManager:
             print(f"Error deleting from {table}: {e}")
             return False
 
+    def delete_all(self, table: str) -> bool:
+        """Delete all records from a table"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(f"DELETE FROM {table}")
+            conn.commit()
+            conn.close()
+            
+            if self.use_supabase:
+                # Warning: Supabase delete without filters might be restricted or require special handling
+                # depending on the configuration. For now, we focus on SQLite.
+                pass
+            return True
+        except Exception as e:
+            print(f"Error deleting all from {table}: {e}")
+            return False
+
     def count(self, table: str, where_clause: str = None, params: tuple = ()) -> int:
         """Efficiently count records in a table"""
         try:
@@ -302,13 +320,14 @@ class DatabaseManager:
             print(f"[ERROR] DatabaseManager.count: {e}")
             return 0
 
-    def get_all(self, cls: Type[T], table: str, limit: int = 100, offset: int = 0, order_by: str = None) -> List[T]:
-        """Generic get all with pagination and ordering"""
+    def get_all(self, cls: Type[T], table: str, limit: int = 100, offset: int = 0, order_by: str = None, where_clause: str = None, params: tuple = ()) -> List[T]:
+        """Generic get all with pagination, ordering, and optional filtering"""
         try:
             order_clause = f"ORDER BY {order_by}" if order_by else ""
+            where_clause = f"WHERE {where_clause}" if where_clause else ""
             conn = self.get_connection()
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM {table} {order_clause} LIMIT ? OFFSET ?", (limit, offset))
+            cursor.execute(f"SELECT * FROM {table} {where_clause} {order_clause} LIMIT ? OFFSET ?", params + (limit, offset))
             rows = cursor.fetchall()
             conn.close()
             return [self._row_to_obj(cls, row) for row in rows]
@@ -328,19 +347,6 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error getting from {table}: {e}")
             return None
-
-    def count(self, table: str) -> int:
-        """Get total count of records in a table"""
-        try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
-            cursor.execute(f"SELECT COUNT(*) FROM {table}")
-            count = cursor.fetchone()[0]
-            conn.close()
-            return count
-        except Exception as e:
-            print(f"Error counting {table}: {e}")
-            return 0
 
     def search(self, cls: Type[T], table: str, query: str, fields: List[str], limit: int = 50) -> List[T]:
         """Generic search with multiple fields"""

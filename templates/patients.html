@@ -74,6 +74,7 @@
                         <a href="{{ url_for('patients') }}" style="color: #666; text-decoration: none; display: flex; align-items: center; padding: 0 5px;"><i class="fas fa-times"></i></a>
                         {% endif %}
                     </form>
+                    <a href="{{ url_for('deleted_patients') }}" class="btn-add" style="background-color: #6c757d;"><i class="fas fa-trash-restore"></i> Recover</a>
                     <a href="{{ url_for('add_patient') }}" class="btn-add"><i class="fas fa-plus"></i> Add Patient</a>
                 </div>
             </div>

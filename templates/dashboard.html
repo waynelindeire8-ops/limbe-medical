@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <!-- Using Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -19,8 +21,12 @@
             <header class="header">
                 <div class="header-left">
                     <h1>Dashboard</h1>
-                    <p>Welcome back! Here's what's happening in your medical practice today.</p>
+                    <p id="currentDateDisplay" style="color: #666; font-size: 14px; margin-top: 5px;"></p>
                 </div>
+                <script>
+                    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                    document.getElementById('currentDateDisplay').textContent = new Date().toLocaleDateString('en-US', options);
+                </script>
                 <div class="header-right">
                     {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
                     <a href="{{ url_for('view_schedule') }}" class="btn btn-outline" style="text-decoration: none;"><i class="fas fa-calendar"></i> View Schedule</a>
@@ -40,41 +46,45 @@
             </header>
 
             <!-- Stats Cards -->
-            <div class="stats-grid">
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
                 <div class="card stat-card">
                     <div class="stat-icon blue-bg"><i class="fas fa-users"></i></div>
                     <h3>Total Patients</h3>
-                    <p class="subtext">Active registered users</p>
+                    <p class="subtext">Registered patients</p>
                     <div class="stat-value">
                         <h2>{{ total_patients }}</h2>
-                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +23%</span> -->
                     </div>
                 </div>
                 <div class="card stat-card">
                     <div class="stat-icon green-bg"><i class="fas fa-user-md"></i></div>
                     <h3>Active Doctors</h3>
-                    <p class="subtext">Available medical staff</p>
+                    <p class="subtext">On duty now</p>
                     <div class="stat-value">
                         <h2>{{ active_doctors }}</h2>
-                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +10%</span> -->
                     </div>
                 </div>
                 <div class="card stat-card">
                     <div class="stat-icon red-bg"><i class="fas fa-calendar-check"></i></div>
-                    <h3>Today Appointments</h3>
-                    <p class="subtext">Scheduled consultations</p>
+                    <h3>Today's Appts</h3>
+                    <p class="subtext">Scheduled for today</p>
                     <div class="stat-value">
                         <h2>{{ todays_appointments }}</h2>
-                        <!-- <span class="badge positive"><i class="fas fa-arrow-up"></i> +13%</span> -->
                     </div>
                 </div>
                 <div class="card stat-card">
                     <div class="stat-icon yellow-bg"><i class="fas fa-hourglass-half"></i></div>
-                    <h3>Waiting Queue</h3>
-                    <p class="subtext">Patients waiting</p>
+                    <h3>Active Queue</h3>
+                    <p class="subtext">Waiting patients</p>
                     <div class="stat-value">
                         <h2>{{ queue|length }}</h2>
-                        <!-- <span class="badge warning"><i class="fas fa-history"></i> +64%</span> -->
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-icon purple-bg" style="background: #f3e8ff; color: #9333ea;"><i class="fas fa-file-invoice-dollar"></i></div>
+                    <h3>Unpaid Bills</h3>
+                    <p class="subtext">Pending payments</p>
+                    <div class="stat-value">
+                        <h2>{{ stats.pending_bills }}</h2>
                     </div>
                 </div>
             </div>
@@ -140,6 +150,28 @@
                 </div>
 
                 <div class="right-column">
+                    <!-- Notifications -->
+                    <div class="card" style="margin-bottom: 20px; border-top: 4px solid #4361ee;">
+                        <div class="card-header">
+                            <h3 style="margin: 0; font-size: 16px;"><i class="fas fa-bell" style="color: #4361ee; margin-right: 8px;"></i> Notifications</h3>
+                            <span class="badge" style="background: #eef2ff; color: #4361ee;">{{ system_notifications|length }} New</span>
+                        </div>
+                        <div class="notification-list" style="margin-top: 10px;">
+                            {% for note in system_notifications %}
+                            <div class="notification-item" style="padding: 10px; border-bottom: 1px solid #f0f0f0; font-size: 13px;">
+                                <div style="font-weight: 600; color: #333;">{{ note.subject }}</div>
+                                <div style="color: #666; margin-top: 2px;">{{ note.content }}</div>
+                                <div style="font-size: 11px; color: #999; margin-top: 4px;">{{ note.timestamp }}</div>
+                            </div>
+                            {% else %}
+                            <div style="text-align: center; padding: 20px; color: #888; font-size: 13px;">
+                                <i class="fas fa-check-circle" style="display: block; font-size: 24px; margin-bottom: 8px; color: #d1d5db;"></i>
+                                All caught up!
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
                     <!-- Recent Appointments -->
                     <div class="card quick-actions" style="margin-bottom: 20px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -199,16 +231,13 @@
                     <!-- Patient Analytics -->
                     <div class="card analytics">
                         <div class="card-header">
-                            <h3>Patient Analytics</h3>
+                            <h3>Practice Trends</h3>
                             <div class="toggle-group">
-                                <button>7 Days</button>
-                                <button class="active">30 Days</button>
-                                <button>90 Days</button>
+                                <span style="font-size: 12px; color: #888;">Last 90 Days</span>
                             </div>
                         </div>
-                        <div class="chart-placeholder">
-                            <p>Chart component will be integrated here</p>
-                            <small>Patient registration and appointment trends.</small>
+                        <div class="chart-container" style="position: relative; height:200px; width:100%">
+                            <canvas id="practiceChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -216,6 +245,60 @@
         </main>
     </div>
     <script>
+        // Chart Initialization
+        const ctx = document.getElementById('practiceChart').getContext('2d');
+        const practiceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ chart_labels|tojson }},
+                datasets: [{
+                    label: 'Registrations',
+                    data: {{ chart_patient_reg|tojson }},
+                    borderColor: '#4361ee',
+                    backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Appointments',
+                    data: {{ chart_appointments|tojson }},
+                    borderColor: '#ef476f',
+                    backgroundColor: 'rgba(239, 71, 111, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { boxWidth: 12, font: { size: 10 } }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, font: { size: 10 } },
+                        grid: { color: '#f0f0f0' }
+                    },
+                    x: {
+                        ticks: { 
+                            font: { size: 9 },
+                            maxRotation: 45,
+                            minRotation: 45,
+                            autoSkip: true,
+                            maxTicksLimit: 10
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
         document.getElementById('queueSearch').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
             let items = document.querySelectorAll('#queueList .appointment-item');

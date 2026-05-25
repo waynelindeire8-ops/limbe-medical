@@ -97,7 +97,54 @@ def delete_file_from_supabase(supabase_path: str, bucket: str = "attachments") -
         clean_path = supabase_path.replace('\\', '/')
         if clean_path.startswith(f"{bucket}/"):
             clean_path = clean_path.replace(f"{bucket}/", "", 1)
+        
+        response = client.storage.from_(bucket).remove([clean_path])
+        return True
+    except Exception as e:
+        print(f"Error deleting from Supabase: {e}")
+        return False
+
+def list_files_in_supabase_folder(folder_path: str, bucket: str = "attachments") -> list:
+    """Lists all files in a specific Supabase storage folder."""
+    client = get_supabase_client()
+    if not client:
+        return []
+    try:
+        # Sanitize path: force forward slashes
+        clean_path = folder_path.replace('\\', '/')
+        if clean_path.startswith(f"{bucket}/"):
+            clean_path = clean_path.replace(f"{bucket}/", "", 1)
             
+        # Supabase list() returns a list of dictionaries with file metadata
+        response = client.storage.from_(bucket).list(clean_path)
+        
+        # Filter out directories (where 'id' is None or 'metadata' is empty depending on version)
+        files = []
+        for item in response:
+            if item.get('id'): # Only files have IDs
+                files.append({
+                    'name': item['name'],
+                    'size': item.get('metadata', {}).get('size', 0),
+                    'mimetype': item.get('metadata', {}).get('mimetype', ''),
+                    'created_at': item.get('created_at', '')
+                })
+        return files
+    except Exception as e:
+        print(f"Error listing files in Supabase: {e}")
+        return []
+
+def get_supabase_file_url(path: str, bucket: str = "attachments") -> str:
+    """Gets the public URL for a file in Supabase storage."""
+    client = get_supabase_client()
+    if not client:
+        return ""
+    try:
+        clean_path = path.replace('\\', '/')
+        if clean_path.startswith(f"{bucket}/"):
+            clean_path = clean_path.replace(f"{bucket}/", "", 1)
+        return client.storage.from_(bucket).get_public_url(clean_path)
+    except Exception:
+        return ""
         response = client.storage.from_(bucket).remove([clean_path])
         return response.status_code == 200
     except Exception as e:

@@ -7,7 +7,7 @@ from typing import Optional
 
 @dataclass
 class Patient:
-    patient_id: str = ""
+    patient_id: str
     first_name: str = ""
     last_name: str = ""
     date_of_birth: str = ""
@@ -21,6 +21,8 @@ class Patient:
     created_date: str = ""
     scheme_provider: str = ""
     scheme_type: str = ""
+    is_deleted: int = 0
+    deleted_at: str = ""
 
 
 @dataclass

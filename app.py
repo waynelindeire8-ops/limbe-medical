@@ -252,6 +252,7 @@ def dashboard():
 
         return render_template('dashboard.html', 
                             total_patients=total_patients,
+                            stats=stats,
                             active_doctors=stats['active_doctors'],
                             todays_appointments=stats['todays_appointments'],
                             pending_appointments=stats['pending_appointments'],
@@ -433,6 +434,9 @@ def patient_details(patient_id):
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
     
+    # Sync with Supabase to discover legacy or remote files
+    hms.sync_patient_attachments(patient_id)
+    
     files = hms.patient_files.get(patient_id, [])
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
@@ -518,6 +522,11 @@ def download_file():
     abs_path = os.path.join(base_dir, path)
     
     if not os.path.exists(abs_path):
+        # Check if we have a Supabase URL for this file
+        from supabase_data_manager import get_supabase_file_url
+        sup_url = get_supabase_file_url(path)
+        if sup_url:
+            return redirect(sup_url)
         return "File not found", 404
         
     directory = os.path.dirname(abs_path)
@@ -535,6 +544,11 @@ def serve_file():
     abs_path = os.path.join(base_dir, path)
     
     if not os.path.exists(abs_path):
+        # Check if we have a Supabase URL for this file
+        from supabase_data_manager import get_supabase_file_url
+        sup_url = get_supabase_file_url(path)
+        if sup_url:
+            return redirect(sup_url)
         return "File not found", 404
         
     directory = os.path.dirname(abs_path)
@@ -565,12 +579,46 @@ def patients():
                            total_pages=total_pages,
                            total_count=total_count)
 
+@app.route('/deleted_patients')
+def deleted_patients():
+    patients = hms.get_deleted_patients()
+    return render_template('deleted_patients.html', patients=patients, active_page='patients')
+
+@app.route('/recover_patient/<patient_id>')
+def recover_patient(patient_id):
+    if hms.recover_patient(patient_id):
+        flash('Patient recovered successfully!', 'success')
+        notify('Patient recovered', patient_id, 'admin')
+    else:
+        flash('Error recovering patient.', 'error')
+    return redirect(url_for('deleted_patients'))
+
+@app.route('/permanent_delete_patient/<patient_id>')
+def permanent_delete_patient(patient_id):
+    if hms.delete_patient(patient_id, permanent=True):
+        flash('Patient permanently deleted.', 'success')
+        notify('Patient permanently deleted', patient_id, 'admin')
+    else:
+        flash('Error deleting patient.', 'error')
+    return redirect(url_for('deleted_patients'))
+
 @app.route('/add_patient', methods=['GET', 'POST'])
 def add_patient():
     if request.method == 'POST':
         try:
+            patient_id = request.form.get('patient_id', '').strip()
+            
+            if not patient_id:
+                flash('Patient ID is required!', 'error')
+                return render_template('add_patient.html', active_page='patients', providers=PROVIDERS)
+            
+            # Check for existing patient ID
+            if hms.get_patient(patient_id):
+                flash(f'Patient ID "{patient_id}" already exists. Please use a unique ID.', 'error')
+                return render_template('add_patient.html', active_page='patients', providers=PROVIDERS)
+
             new_patient = Patient(
-                patient_id=(request.form.get('patient_id') or hms.generate_id("P")),
+                patient_id=patient_id,
                 first_name=request.form['first_name'],
                 last_name=request.form['last_name'],
                 date_of_birth=request.form.get('dob',''),
@@ -633,7 +681,8 @@ def edit_patient(patient_id):
             # Actually, we want to allow empty strings, just not None
             update_data = {k: v for k, v in update_data.items() if v is not None}
             
-            success = hms.update_patient(patient_id, **update_data)
+            # Explicitly pass original_id to avoid conflict with patient_id in update_data
+            success = hms.update_patient(original_id=patient_id, **update_data)
             print(f"[DEBUG] edit_patient: update_patient success={success}")
             if success:
                 flash('Patient updated successfully!', 'success')
@@ -652,8 +701,8 @@ def edit_patient(patient_id):
 @app.route('/delete_patient/<patient_id>')
 def delete_patient(patient_id):
     if hms.delete_patient(patient_id):
-        flash('Patient deleted successfully!', 'success')
-        notify('Patient deleted', patient_id, 'admin')
+        flash('Patient deleted successfully! You can recover it from the recovery system.', 'success')
+        notify('Patient soft-deleted', patient_id, 'admin')
     else:
         flash('Error deleting patient!', 'error')
     return redirect(url_for('patients'))
