@@ -530,14 +530,17 @@ class HospitalManagementSystem:
         return self.db.search(Patient, 'patients', search_term, ['first_name', 'last_name', 'patient_id'])
 
     def update_patient(self, patient_id: str, **kwargs) -> bool:
+        print(f"[DEBUG] update_patient called for {patient_id} with {kwargs}")
         patient = self.get_patient(patient_id)
         if not patient:
+            print(f"[DEBUG] Patient {patient_id} not found")
             return False
             
         new_id = kwargs.get('patient_id')
         if new_id and new_id != patient_id:
             # Check if new ID is already taken
             if self.get_patient(new_id):
+                print(f"[DEBUG] New ID {new_id} already taken")
                 return False
                 
             # Update ID in all related records
@@ -564,12 +567,17 @@ class HospitalManagementSystem:
                 self.patient_files[new_id] = self.patient_files.pop(patient_id)
             if patient_id in self.patient_scheme:
                 self.patient_scheme[new_id] = self.patient_scheme.pop(patient_id)
+            
+            # CRITICAL: Update the object's ID so save() uses the new primary key
+            patient.patient_id = new_id
 
         for key, value in kwargs.items():
-            if hasattr(patient, key):
+            if hasattr(patient, key) and key != 'patient_id':
                 setattr(patient, key, value)
         
-        return self.db.save('patients', patient, 'patient_id')
+        success = self.db.save('patients', patient, 'patient_id')
+        print(f"[DEBUG] DB save result: {success}")
+        return success
 
     def delete_patient(self, patient_id: str) -> bool:
         if self.db.delete('patients', patient_id, 'patient_id'):
