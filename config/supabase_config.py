@@ -48,7 +48,15 @@ class SupabaseClient:
         """Initialize Supabase client"""
         try:
             from supabase import create_client, Client
-            self._client = create_client(self.url, self.key)
+            
+            # Use the same fallback logic as supabase_data_manager.py
+            fallback_url = "https://qiudxdvssvkbpoovwpbr.supabase.co"
+            fallback_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpdWR4ZHZzc3ZrYnBvb3Z3cGJyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTUyOTQ2NywiZXhwIjoyMDgxMTA1NDY3fQ.WoHT4S5Or9sjs4TpB9gpq4ys5F9MlTNiToZA8dOfUPw"
+            
+            url = self.url if self.url and 'your-project' not in self.url else fallback_url
+            key = self.key if self.key and self.key.startswith('eyJ') else fallback_key
+            
+            self._client = create_client(url, key)
             return True
         except ImportError:
             print("Warning: supabase-py not installed. Install with: pip install supabase")

@@ -891,6 +891,57 @@ class HospitalManagementSystem:
             
         return success
 
+    def merge_patients(self, master_id: str, duplicate_ids: List[str]) -> bool:
+        """Merges multiple duplicate patient records into a single master record."""
+        master = self.get_patient(master_id)
+        if not master:
+            print(f"[ERROR] merge_patients: Master ID {master_id} not found")
+            return False
+
+        conn = self.db.get_connection()
+        try:
+            for dup_id in duplicate_ids:
+                if dup_id == master_id:
+                    continue
+                
+                print(f"[INFO] Merging {dup_id} into {master_id}...")
+                
+                # Update all related tables
+                conn.execute("UPDATE appointments SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
+                conn.execute("UPDATE medical_records SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
+                conn.execute("UPDATE prescriptions SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
+                conn.execute("UPDATE bills SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
+                conn.execute("UPDATE lab_results SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
+                conn.execute("UPDATE queue SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
+                
+                # Merge file metadata
+                if dup_id in self.patient_files:
+                    master_files = self.patient_files.get(master_id, [])
+                    dup_files = self.patient_files.pop(dup_id)
+                    # Avoid duplicate file entries by checking path
+                    existing_paths = {f.get('path') for f in master_files}
+                    for f in dup_files:
+                        if f.get('path') not in existing_paths:
+                            master_files.append(f)
+                    self.patient_files[master_id] = master_files
+                
+                # Delete the duplicate record
+                conn.execute("DELETE FROM patients WHERE patient_id = ?", (dup_id,))
+                
+            conn.commit()
+            self.save_data()
+            try:
+                self.add_activity(None, 'merge', 'patient', master_id, f"Merged {len(duplicate_ids)} duplicates")
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            print(f"[ERROR] merge_patients failed: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
+
     # ---------- Doctors ----------
     def add_doctor(self, doctor: Doctor) -> bool:
         if self.db.save('doctors', doctor, 'doctor_id'):
