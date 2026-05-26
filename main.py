@@ -717,11 +717,29 @@ class HospitalManagementSystem:
     def get_patient_by_id(self, patient_id: str) -> Optional[Patient]:
         return self.get_patient(patient_id)
 
-    def search_patients(self, search_term: str) -> List[Patient]:
-        search_term = search_term.lower().strip()
+    def search_patients(self, search_term: str):
         if not search_term:
-            return self.patients
-        return self.db.search(Patient, 'patients', search_term, ['first_name', 'last_name', 'patient_id'])
+            return []
+            
+        term = f"%{search_term.strip()}%"
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM patients 
+            WHERE is_deleted = 0 AND (
+                patient_id LIKE ? OR 
+                first_name LIKE ? OR 
+                last_name LIKE ? OR
+                (first_name || ' ' || last_name) LIKE ? OR
+                (last_name || ' ' || first_name) LIKE ?
+            )
+        """, (term, term, term, term, term))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [self.db._row_to_obj(Patient, row) for row in rows]
 
     def update_patient(self, original_id: str, **kwargs) -> bool:
         patient = self.get_patient(original_id)
@@ -826,7 +844,7 @@ class HospitalManagementSystem:
         except Exception:
             pass
             
-        return success
+        return successs
 
     # ---------- Doctors ----------
     def add_doctor(self, doctor: Doctor) -> bool:
@@ -853,12 +871,29 @@ class HospitalManagementSystem:
         conn.close()
         return [self.db._row_to_obj(Doctor, row) for row in rows]
 
-    def search_doctors(self, search_term: str) -> List[Doctor]:
-        search_term = search_term.lower().strip()
+    def search_patients(self, search_term: str):
         if not search_term:
-            return self.doctors
-        return self.db.search(Doctor, 'doctors', search_term, ['first_name', 'last_name', 'doctor_id', 'specialty'])
-
+            return []
+            
+        term = f"%{search_term.strip()}%"
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM patients 
+            WHERE is_deleted = 0 AND (
+                patient_id LIKE ? OR 
+                first_name LIKE ? OR 
+                last_name LIKE ? OR
+                (first_name || ' ' || last_name) LIKE ? OR
+                (last_name || ' ' || first_name) LIKE ?
+            )
+        """, (term, term, term, term, term))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [self.db._row_to_obj(Patient, row) for row in rows]
     def update_doctor(self, doctor_id: str, **kwargs) -> bool:
         doctor = self.get_doctor(doctor_id)
         if not doctor:
