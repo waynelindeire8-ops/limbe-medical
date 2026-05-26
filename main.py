@@ -17,14 +17,7 @@ try:
 except Exception:
     def load_dotenv():
         return False
-from supabase_data_manager import (
-    get_supabase_json, 
-    put_supabase_json, 
-    list_files_in_supabase_folder, 
-    get_supabase_file_url,
-    upload_file_to_supabase,
-    delete_file_from_supabase
-)
+from supabase_data_manager import get_supabase_json, put_supabase_json
 
 load_dotenv()
 import datetime
@@ -129,43 +122,6 @@ class HospitalManagementSystem:
                     pass
                 return True
         return False
-
-    def sync_patient_attachments(self, patient_id: str) -> int:
-        """Discovers files in Supabase storage for a patient and updates metadata."""
-        if not patient_id:
-            return 0
-            
-        print(f"[INFO] Syncing attachments for patient {patient_id}...")
-        supabase_files = list_files_in_supabase_folder(patient_id)
-        if not supabase_files:
-            return 0
-            
-        existing_entries = self.patient_files.get(patient_id, [])
-        existing_names = {e['file_name'] for e in existing_entries}
-        
-        added = 0
-        for f in supabase_files:
-            if f['name'] not in existing_names:
-                # This file is in Supabase but not in our local metadata
-                rel_path = f"attachments/{patient_id}/{f['name']}"
-                existing_entries.append({
-                    'file_name': f['name'],
-                    'path': rel_path,
-                    'uploaded_at': f['created_at'].replace('T', ' ').split('.')[0], # Simple format
-                    'source_appointment_id': '',
-                    'source_record_id': '',
-                    'supabase_file_id': '',
-                    'is_remote': True, # Flag to indicate it might not be on local disk
-                    'url': get_supabase_file_url(rel_path)
-                })
-                added += 1
-                
-        if added > 0:
-            self.patient_files[patient_id] = existing_entries
-            self.save_data()
-            print(f"[INFO] Discovered {added} new attachments for {patient_id}")
-            
-        return added
 
     def get_doctors_count(self) -> int:
         return self.db.count('doctors')
@@ -641,23 +597,16 @@ class HospitalManagementSystem:
                     root, ext = os.path.splitext(name)
                     name = f"{root}_{int(datetime.datetime.now().timestamp())}{ext}"
                     dest = os.path.join(dest_dir, name)
-                
-                # Copy locally
                 shutil.copy2(src, dest)
                 rel_path = os.path.relpath(dest, base_dir)
-                
-                # Upload to Supabase
-                sup_path = f"{patient_id}/{name}"
-                upload_file_to_supabase(dest, sup_path)
-                
+                sup_id = ''
                 entries.append({
                     'file_name': name,
                     'path': rel_path,
                     'uploaded_at': ts,
                     'source_appointment_id': source_appointment_id or '',
                     'source_record_id': source_record_id or '',
-                    'supabase_file_id': sup_path,
-                    'url': get_supabase_file_url(rel_path)
+                    'supabase_file_id': sup_id
                 })
                 added += 1
             except Exception as e:
@@ -676,26 +625,14 @@ class HospitalManagementSystem:
         base_dir = os.path.dirname(os.path.abspath(self.data_file))
         abs_path = os.path.join(base_dir, rel_path)
         entries = self.patient_files.get(patient_id, []) or []
-        
-        # Find entry to get filename for Supabase
-        entry = next((e for e in entries if e.get('path') == rel_path), None)
-        
         new_entries = [e for e in entries if e.get('path') != rel_path]
         if len(new_entries) == len(entries):
             return False
-            
         try:
-            # Delete locally
             if os.path.exists(abs_path):
                 os.remove(abs_path)
-            
-            # Delete from Supabase
-            if entry:
-                filename = entry.get('file_name')
-                delete_file_from_supabase(f"{patient_id}/{filename}")
         except Exception as e:
             print(f"[WARN] Failed to delete file '{abs_path}': {e}")
-            
         self.patient_files[patient_id] = new_entries
         self.save_data()
         try:
@@ -890,57 +827,6 @@ class HospitalManagementSystem:
             pass
             
         return success
-
-    def merge_patients(self, master_id: str, duplicate_ids: List[str]) -> bool:
-        """Merges multiple duplicate patient records into a single master record."""
-        master = self.get_patient(master_id)
-        if not master:
-            print(f"[ERROR] merge_patients: Master ID {master_id} not found")
-            return False
-
-        conn = self.db.get_connection()
-        try:
-            for dup_id in duplicate_ids:
-                if dup_id == master_id:
-                    continue
-                
-                print(f"[INFO] Merging {dup_id} into {master_id}...")
-                
-                # Update all related tables
-                conn.execute("UPDATE appointments SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
-                conn.execute("UPDATE medical_records SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
-                conn.execute("UPDATE prescriptions SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
-                conn.execute("UPDATE bills SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
-                conn.execute("UPDATE lab_results SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
-                conn.execute("UPDATE queue SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
-                
-                # Merge file metadata
-                if dup_id in self.patient_files:
-                    master_files = self.patient_files.get(master_id, [])
-                    dup_files = self.patient_files.pop(dup_id)
-                    # Avoid duplicate file entries by checking path
-                    existing_paths = {f.get('path') for f in master_files}
-                    for f in dup_files:
-                        if f.get('path') not in existing_paths:
-                            master_files.append(f)
-                    self.patient_files[master_id] = master_files
-                
-                # Delete the duplicate record
-                conn.execute("DELETE FROM patients WHERE patient_id = ?", (dup_id,))
-                
-            conn.commit()
-            self.save_data()
-            try:
-                self.add_activity(None, 'merge', 'patient', master_id, f"Merged {len(duplicate_ids)} duplicates")
-            except Exception:
-                pass
-            return True
-        except Exception as e:
-            print(f"[ERROR] merge_patients failed: {e}")
-            conn.rollback()
-            return False
-        finally:
-            conn.close()
 
     # ---------- Doctors ----------
     def add_doctor(self, doctor: Doctor) -> bool:

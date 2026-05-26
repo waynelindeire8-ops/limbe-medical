@@ -557,12 +557,12 @@ def serve_file():
 
 @app.route('/patients')
 def patients():
-    search_term = request.args.get('search', '')
+    search_term = request.args.get('search', '').strip() # Clean up whitespace
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
     if search_term:
-        # Search is still slightly limited but more scalable than loading all
+        # Calls the updated full-name SQL query block
         all_results = hms.search_patients(search_term)
         total_count = len(all_results)
         patients_slice, total_pages = paginate_list(all_results, page, per_page)
