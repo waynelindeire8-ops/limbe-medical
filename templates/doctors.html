@@ -112,7 +112,14 @@
                         {% for doctor in doctors %}
                         <tr>
                             <td>{{ doctor.doctor_id }}</td>
-                            <td>Dr. {{ doctor.first_name }} {{ doctor.last_name }}</td>
+                            <td>
+                                Dr. {{ doctor.first_name }} {{ doctor.last_name }}
+                                {% if doctor.is_locum %}
+                                <div style="font-size: 11px; color: #f72585; font-weight: 600; margin-top: 2px;">
+                                    <i class="fas fa-user-clock"></i> LOCUM: {{ doctor.locum_name if doctor.locum_name else 'TBA' }}
+                                </div>
+                                {% endif %}
+                            </td>
                             <td>{{ doctor.specialty }}</td>
                             <td>{{ doctor.phone }}</td>
                             <td>

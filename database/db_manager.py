@@ -64,7 +64,9 @@ class DatabaseManager:
                 phone TEXT,
                 email TEXT,
                 schedule TEXT,
-                status TEXT
+                status TEXT,
+                is_locum INTEGER DEFAULT 0,
+                locum_name TEXT DEFAULT ''
             )
         ''')
 
@@ -222,6 +224,17 @@ class DatabaseManager:
         ''')
         
         conn.commit()
+        
+        # Migration: Add is_locum and locum_name to doctors if they don't exist
+        try:
+            cursor.execute("ALTER TABLE doctors ADD COLUMN is_locum INTEGER DEFAULT 0")
+        except:
+            pass
+        try:
+            cursor.execute("ALTER TABLE doctors ADD COLUMN locum_name TEXT DEFAULT ''")
+        except:
+            pass
+            
         conn.close()
 
     def _row_to_obj(self, cls: Type[T], row: sqlite3.Row) -> T:

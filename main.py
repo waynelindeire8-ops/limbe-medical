@@ -844,7 +844,7 @@ class HospitalManagementSystem:
         except Exception:
             pass
             
-        return successs
+        return success
 
     # ---------- Doctors ----------
     def add_doctor(self, doctor: Doctor) -> bool:
@@ -871,29 +871,12 @@ class HospitalManagementSystem:
         conn.close()
         return [self.db._row_to_obj(Doctor, row) for row in rows]
 
-    def search_patients(self, search_term: str):
+    def search_doctors(self, search_term: str) -> List[Doctor]:
+        search_term = search_term.lower().strip()
         if not search_term:
-            return []
-            
-        term = f"%{search_term.strip()}%"
-        conn = self.db.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT * FROM patients 
-            WHERE is_deleted = 0 AND (
-                patient_id LIKE ? OR 
-                first_name LIKE ? OR 
-                last_name LIKE ? OR
-                (first_name || ' ' || last_name) LIKE ? OR
-                (last_name || ' ' || first_name) LIKE ?
-            )
-        """, (term, term, term, term, term))
-        
-        rows = cursor.fetchall()
-        conn.close()
-        
-        return [self.db._row_to_obj(Patient, row) for row in rows]
+            return self.doctors
+        return self.db.search(Doctor, 'doctors', search_term, ['first_name', 'last_name', 'doctor_id', 'specialty'])
+
     def update_doctor(self, doctor_id: str, **kwargs) -> bool:
         doctor = self.get_doctor(doctor_id)
         if not doctor:
@@ -1015,7 +998,7 @@ class HospitalManagementSystem:
     def get_patient_medical_records(self, patient_id: str) -> List[MedicalRecord]:
         conn = self.db.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM medical_records WHERE patient_id = ?", (patient_id,))
+        cursor.execute("SELECT * FROM medical_records WHERE patient_id = ? ORDER BY date DESC, rowid DESC", (patient_id,))
         rows = cursor.fetchall()
         conn.close()
         return [self.db._row_to_obj(MedicalRecord, row) for row in rows]

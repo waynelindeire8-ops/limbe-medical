@@ -35,6 +35,8 @@ class Doctor:
     email: str = ""
     schedule: str = ""
     status: str = ""
+    is_locum: int = 0
+    locum_name: str = ""
 
 
 @dataclass

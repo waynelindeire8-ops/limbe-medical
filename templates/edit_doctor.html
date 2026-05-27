@@ -91,6 +91,14 @@
                             <option value="Off" {% if doctor.status == 'Off' %}selected{% endif %}>Off Duty</option>
                         </select>
                     </div>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="is_locum" name="is_locum" style="width: auto;" onchange="toggleLocumName()" {% if doctor.is_locum %}checked{% endif %}>
+                        <label for="is_locum" style="margin-bottom: 0;">Is Locum Doctor?</label>
+                    </div>
+                    <div class="form-group" id="locum_name_group" style="display: {% if doctor.is_locum %}block{% else %}none{% endif %};">
+                        <label for="locum_name">Locum Name</label>
+                        <input type="text" id="locum_name" name="locum_name" value="{{ doctor.locum_name }}" placeholder="Enter locum doctor's name">
+                    </div>
                     <button type="submit" class="btn-submit">Update Doctor</button>
                 </form>
             </div>
@@ -98,6 +106,10 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script>
+        function toggleLocumName() {
+            const isLocum = document.getElementById('is_locum').checked;
+            document.getElementById('locum_name_group').style.display = isLocum ? 'block' : 'none';
+        }
         document.addEventListener('DOMContentLoaded', function() {
             const selectElements = document.querySelectorAll('select');
             selectElements.forEach(select => {

@@ -554,31 +554,75 @@ def serve_file():
     directory = os.path.dirname(abs_path)
     filename = os.path.basename(abs_path)
     return send_from_directory(directory, filename)
+# ADD this at the top of app.py with the other imports
+import sqlite3
 
 @app.route('/patients')
 def patients():
-    search_term = request.args.get('search', '').strip() # Clean up whitespace
     page = request.args.get('page', 1, type=int)
-    per_page = 20
-    
-    if search_term:
-        # Calls the updated full-name SQL query block
-        all_results = hms.search_patients(search_term)
-        total_count = len(all_results)
-        patients_slice, total_pages = paginate_list(all_results, page, per_page)
-    else:
-        total_count = hms.get_patients_count()
-        patients_slice = hms.get_patients_paginated(page, per_page)
-        total_pages = math.ceil(total_count / per_page)
-    
-    return render_template('patients.html', 
-                           patients=patients_slice, 
-                           active_page='patients', 
-                           search_term=search_term,
-                           page=page,
-                           total_pages=total_pages,
-                           total_count=total_count)
+    search_term = request.args.get('search', '').strip()
+    per_page = 10
 
+    conn = hms.db.get_connection()
+    cursor = conn.cursor()
+
+    if search_term:
+        search_value = f"%{search_term}%"
+        
+        query_params = (search_value, search_value, search_value, search_value, search_value, search_value)
+        
+        cursor.execute("""
+            SELECT * FROM patients
+            WHERE is_deleted = 0 AND (
+                patient_id LIKE ?
+                OR first_name LIKE ?
+                OR last_name LIKE ?
+                OR (first_name || ' ' || last_name) LIKE ?
+                OR (last_name || ' ' || first_name) LIKE ?
+                OR phone LIKE ?
+            )
+            LIMIT ? OFFSET ?
+        """, (*query_params, per_page, (page - 1) * per_page))
+        rows = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM patients
+            WHERE is_deleted = 0 AND (
+                patient_id LIKE ?
+                OR first_name LIKE ?
+                OR last_name LIKE ?
+                OR (first_name || ' ' || last_name) LIKE ?
+                OR (last_name || ' ' || first_name) LIKE ?
+                OR phone LIKE ?
+            )
+        """, query_params)
+        
+        total_count = cursor.fetchone()[0]
+
+    else:
+        cursor.execute("""
+            SELECT * FROM patients WHERE is_deleted = 0
+            LIMIT ? OFFSET ?
+        """, (per_page, (page - 1) * per_page))
+        rows = cursor.fetchall()
+
+        cursor.execute("SELECT COUNT(*) FROM patients WHERE is_deleted = 0")
+        total_count = cursor.fetchone()[0]
+
+    conn.close()
+
+    # ✅ Convert to Patient objects so template can use patient.patient_id etc.
+    patients = [hms.db._row_to_obj(Patient, row) for row in rows]
+    total_pages = math.ceil(total_count / per_page) if total_count else 1
+
+    return render_template(
+        'patients.html',
+        patients=patients,
+        page=page,
+        total_pages=total_pages,
+        total_count=total_count,
+        search_term=search_term
+    )
 @app.route('/deleted_patients')
 def deleted_patients():
     patients = hms.get_deleted_patients()
@@ -749,7 +793,9 @@ def add_doctor():
                 specialty=request.form['specialty'],
                 phone=request.form['phone'],
                 email=request.form['email'],
-                status=request.form['status']
+                status=request.form['status'],
+                is_locum=1 if 'is_locum' in request.form else 0,
+                locum_name=request.form.get('locum_name', '')
             )
             hms.add_doctor(new_doctor)
             flash('Doctor added successfully!', 'success')
@@ -776,7 +822,9 @@ def edit_doctor(doctor_id):
                 specialty=request.form['specialty'],
                 phone=request.form['phone'],
                 email=request.form['email'],
-                status=request.form['status']
+                status=request.form['status'],
+                is_locum=1 if 'is_locum' in request.form else 0,
+                locum_name=request.form.get('locum_name', '')
             )
             flash('Doctor updated successfully!', 'success')
             notify('Doctor updated', doctor_id, 'admin')
@@ -808,14 +856,17 @@ def create_medical_record():
                 patient_id=request.form['patient_id'],
                 doctor_id=request.form['doctor_id'],
                 date=request.form.get('visit_date', request.form.get('date', '')),
+                consult_reason=request.form.get('consult_reason', 'General Consultation'),
                 diagnosis=request.form['diagnosis'],
                 treatment=request.form['treatment'],
                 prescriptions=request.form.get('prescriptions', request.form.get('prescription', '')),
                 notes=request.form.get('notes', '')
             )
-            hms.add_medical_record(new_record)
-            flash('Medical record created successfully!', 'success')
-            return redirect(url_for('patients'))
+            if hms.add_medical_record(new_record):
+                flash('Medical record created successfully!', 'success')
+                return redirect(url_for('patient_details', patient_id=new_record.patient_id))
+            else:
+                flash('Failed to create medical record in database.', 'error')
         except Exception as e:
             flash(f'Error creating medical record: {e}', 'error')
 
@@ -2095,46 +2146,62 @@ def print_prescription(prescription_id):
 def medical_records():
     search_term = request.args.get('search', '').lower().strip()
     page = request.args.get('page', 1, type=int)
-    search_parts = search_term.split()
-    all_records = sorted(hms.medical_records, key=lambda x: (x.date or ''), reverse=True)
+    per_page = 20
     
-    # Pre-filter for search to avoid O(N^2) if possible
-    # But we need patient/doctor names for search, so we still need some lookup
-    # Let's at least optimize the search a bit
+    # Use a faster query that joins tables
+    conn = hms.db.get_connection()
+    cursor = conn.cursor()
     
-    filtered_records = []
-    for record in all_records:
-        patient = hms.get_patient(record.patient_id)
-        doctor = hms.get_doctor(record.doctor_id)
-        
-        p_first = patient.first_name.lower() if patient else ""
-        p_last = patient.last_name.lower() if patient else ""
-        d_last = doctor.last_name.lower() if doctor else ""
-        
-        record_text = (
-            record.record_id.lower() + " " +
-            p_first + " " +
-            p_last + " " +
-            d_last + " " +
-            record.diagnosis.lower()
-        )
-        
-        if search_term and not all(part in record_text for part in search_parts):
-            continue
-        
-        filtered_records.append((record, patient, doctor))
-
-    records_slice_info, total_pages = paginate_list(filtered_records, page)
+    where_clauses = ["1=1"]
+    params = []
+    
+    if search_term:
+        search_parts = search_term.split()
+        for part in search_parts:
+            where_clauses.append("(mr.record_id LIKE ? OR p.first_name LIKE ? OR p.last_name LIKE ? OR d.last_name LIKE ? OR mr.diagnosis LIKE ?)")
+            p_val = f"%{part}%"
+            params.extend([p_val, p_val, p_val, p_val, p_val])
+            
+    where_sql = " AND ".join(where_clauses)
+    
+    # Get total count for pagination
+    count_query = f"""
+        SELECT COUNT(*) 
+        FROM medical_records mr
+        LEFT JOIN patients p ON mr.patient_id = p.patient_id
+        LEFT JOIN doctors d ON mr.doctor_id = d.doctor_id
+        WHERE {where_sql}
+    """
+    cursor.execute(count_query, params)
+    total_count = cursor.fetchone()[0]
+    total_pages = (total_count + per_page - 1) // per_page
+    
+    # Get paginated results
+    query = f"""
+        SELECT 
+            mr.record_id, mr.date, mr.diagnosis, mr.consult_reason,
+            p.first_name as p_first, p.last_name as p_last,
+            d.last_name as d_last
+        FROM medical_records mr
+        LEFT JOIN patients p ON mr.patient_id = p.patient_id
+        LEFT JOIN doctors d ON mr.doctor_id = d.doctor_id
+        WHERE {where_sql}
+        ORDER BY mr.date DESC, mr.rowid DESC
+        LIMIT ? OFFSET ?
+    """
+    cursor.execute(query, params + [per_page, (page - 1) * per_page])
+    rows = cursor.fetchall()
+    conn.close()
     
     display_list = []
-    for record, patient, doctor in records_slice_info:
+    for row in rows:
         display_list.append({
-            'record_id': record.record_id,
-            'date': record.date,
-            'patient_name': f"{patient.last_name}, {patient.first_name}" if patient else 'Unknown',
-            'doctor_name': f"Dr. {doctor.last_name}" if doctor else 'Unknown',
-            'diagnosis': record.diagnosis,
-            'consult_reason': record.consult_reason
+            'record_id': row['record_id'],
+            'date': row['date'],
+            'patient_name': f"{row['p_last']}, {row['p_first']}" if row['p_last'] else 'Unknown',
+            'doctor_name': f"Dr. {row['d_last']}" if row['d_last'] else 'Unknown',
+            'diagnosis': row['diagnosis'],
+            'consult_reason': row['consult_reason']
         })
             
     return render_template('medical_records.html', 
@@ -2143,7 +2210,7 @@ def medical_records():
                            search_term=search_term,
                            page=page,
                            total_pages=total_pages,
-                           total_count=len(filtered_records))
+                           total_count=total_count)
 
 @app.route('/medical_records/add', methods=['GET', 'POST'])
 def add_medical_record():
@@ -2273,23 +2340,25 @@ def add_medical_record():
                 notes=request.form.get('notes', ''),
                 details=details
             )
-            hms.add_medical_record(new_record)
-            flash('Medical record added successfully!', 'success')
-            notify('Medical record added', new_record.record_id, 'doctor')
-            
-            # Check if doctor wants to send patient to lab
-            if request.form.get('action') == 'send_to_lab':
-                # Find patient in queue and update status
-                queue_item = next((q for q in hms.queue if q.patient_id == new_record.patient_id and q.status != 'Completed'), None)
-                if queue_item:
-                    queue_item.status = "In Lab"
-                    hms.save_data()
-                    notify('Lab Request', f"{new_record.patient_id} sent to lab", 'lab_assistant')
-                    flash('Patient sent to lab.', 'info')
-                else:
-                    flash('Patient not found in active queue, but record saved.', 'warning')
-            
-            return redirect(url_for('medical_records'))
+            if hms.add_medical_record(new_record):
+                flash('Medical record added successfully!', 'success')
+                notify('Medical record added', new_record.record_id, 'doctor')
+                
+                # Check if doctor wants to send patient to lab
+                if request.form.get('action') == 'send_to_lab':
+                    # Find patient in queue and update status
+                    queue_item = next((q for q in hms.queue if q.patient_id == new_record.patient_id and q.status != 'Completed'), None)
+                    if queue_item:
+                        queue_item.status = "In Lab"
+                        hms.save_data()
+                        notify('Lab Request', f"{new_record.patient_id} sent to lab", 'lab_assistant')
+                        flash('Patient sent to lab.', 'info')
+                    else:
+                        flash('Patient not found in active queue, but record saved.', 'warning')
+                
+                return redirect(url_for('medical_records'))
+            else:
+                flash('Failed to add medical record to database.', 'error')
         except Exception as e:
             flash(f'Error adding medical record: {e}', 'error')
             
