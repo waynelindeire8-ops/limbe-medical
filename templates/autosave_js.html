@@ -1,155 +1,56 @@
-<!-- Autosave and Recovery Logic -->
 <script>
 (function() {
-    const FORM_TYPE = "{{ form_type }}";
-    const AUTOSAVE_URL = "{{ url_for('generic_autosave') }}";
-    const RECOVER_URL = "{{ url_for('generic_recover', form_type=form_type) }}";
-    let autosaveTimer;
+    const FORM_KEY = 'autosave_{{ form_type }}';
 
-    function getFormData() {
+    function serializeForm() {
         const form = document.querySelector('form');
-        if (!form) return null;
-        const formData = new FormData(form);
         const data = {};
-        formData.forEach((value, key) => {
-            // Handle multiple values for same key (like checkboxes)
-            if (data[key]) {
-                if (!Array.isArray(data[key])) {
-                    data[key] = [data[key]];
-                }
-                data[key].push(value);
+        // Grab ALL fields, including those in hidden tabs
+        form.querySelectorAll('input, select, textarea').forEach(el => {
+            if (!el.name) return;
+            if (el.type === 'checkbox') {
+                data[el.name] = el.checked;
+            } else if (el.type === 'radio') {
+                if (el.checked) data[el.name] = el.value;
             } else {
-                data[key] = value;
+                data[el.name] = el.value;
             }
         });
         return data;
     }
 
-    function performAutosave() {
-        const formData = getFormData();
-        if (!formData) return;
-
-        fetch(AUTOSAVE_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                form_type: FORM_TYPE,
-                form_data: formData
-            })
-        }).then(response => response.json())
-          .then(data => {
-              if (data.status === 'success') {
-                  console.log('Autosave successful');
-                  showAutosaveStatus('Draft saved');
-              }
-          });
-    }
-
-    function showAutosaveStatus(message) {
-        let statusEl = document.getElementById('autosave-status');
-        if (!statusEl) {
-            statusEl = document.createElement('div');
-            statusEl.id = 'autosave-status';
-            statusEl.style.position = 'fixed';
-            statusEl.style.bottom = '20px';
-            statusEl.style.right = '20px';
-            statusEl.style.padding = '8px 15px';
-            statusEl.style.backgroundColor = 'rgba(0,0,0,0.7)';
-            statusEl.style.color = 'white';
-            statusEl.style.borderRadius = '20px';
-            statusEl.style.fontSize = '12px';
-            statusEl.style.zIndex = '9999';
-            document.body.appendChild(statusEl);
-        }
-        statusEl.innerText = message;
-        statusEl.style.display = 'block';
-        setTimeout(() => {
-            statusEl.style.display = 'none';
-        }, 3000);
-    }
-
-    function checkForDraft() {
-        fetch(RECOVER_URL)
-            .then(response => {
-                if (response.ok) return response.json();
-                throw new Error('No draft');
-            })
-            .then(data => {
-                if (data && data.data) {
-                    showRecoveryModal(data.data);
-                }
-            })
-            .catch(err => console.log('No draft found to recover'));
-    }
-
-    function showRecoveryModal(draftData) {
-        const modal = document.createElement('div');
-        modal.innerHTML = `
-            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 25px; border-radius: 12px; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                    <i class="fas fa-history" style="font-size: 40px; color: #4361ee; margin-bottom: 15px;"></i>
-                    <h3>Unsaved Changes Found</h3>
-                    <p>It looks like you have unsaved data for this form. Would you like to restore it?</p>
-                    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-                        <button id="restore-btn" style="background: #4361ee; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600;">Restore Data</button>
-                        <button id="discard-btn" style="background: #f8f9fa; color: #666; border: 1px solid #ddd; padding: 10px 20px; border-radius: 8px; cursor: pointer;">Discard</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        document.getElementById('restore-btn').onclick = () => {
-            restoreFormData(draftData);
-            document.body.removeChild(modal);
-        };
-
-        document.getElementById('discard-btn').onclick = () => {
-            document.body.removeChild(modal);
-        };
-    }
-
-    function restoreFormData(data) {
+    function restoreForm(data) {
         const form = document.querySelector('form');
-        if (!form) return;
-
-        for (const [key, value] of Object.entries(data)) {
-            const input = form.elements[key];
-            if (!input) continue;
-
-            if (input.type === 'checkbox') {
-                input.checked = value === 'on' || value === true || (Array.isArray(value) && value.includes(input.value));
-            } else if (input.type === 'radio') {
-                if (input.value === value) input.checked = true;
-            } else if (input.tagName === 'SELECT' && input.multiple) {
-                const values = Array.isArray(value) ? value : [value];
-                Array.from(input.options).forEach(opt => {
-                    opt.selected = values.includes(opt.value);
-                });
+        form.querySelectorAll('input, select, textarea').forEach(el => {
+            if (!el.name || !(el.name in data)) return;
+            if (el.type === 'checkbox') {
+                el.checked = data[el.name];
+            } else if (el.type === 'radio') {
+                el.checked = (el.value === data[el.name]);
             } else {
-                input.value = value;
+                el.value = data[el.name];
             }
-            
-            // Trigger change event for any listeners (like Choices.js)
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        showAutosaveStatus('Data restored');
+        });
     }
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-        const form = document.querySelector('form');
-        if (form) {
-            form.addEventListener('input', () => {
-                clearTimeout(autosaveTimer);
-                autosaveTimer = setTimeout(performAutosave, 2000); // Autosave after 2 seconds of inactivity
-            });
-            
-            // Check for drafts on load
-            checkForDraft();
-        }
+    // Restore on page load
+    const saved = localStorage.getItem(FORM_KEY);
+    if (saved) {
+        try { restoreForm(JSON.parse(saved)); } catch(e) {}
+    }
+
+    // Save on any change (debounced)
+    let timer;
+    document.querySelector('form').addEventListener('input', function() {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            localStorage.setItem(FORM_KEY, JSON.stringify(serializeForm()));
+        }, 500);
+    });
+
+    // Clear autosave on successful submit
+    document.querySelector('form').addEventListener('submit', function() {
+        localStorage.removeItem(FORM_KEY);
     });
 })();
 </script>
