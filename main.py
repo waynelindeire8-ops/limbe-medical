@@ -721,7 +721,9 @@ class HospitalManagementSystem:
         if not search_term:
             return []
             
-        term = f"%{search_term.strip()}%"
+        search_term = search_term.replace(',', ' ').strip()
+        search_term = " ".join(search_term.split()) # Normalize multiple spaces
+        term = f"%{search_term}%"
         conn = self.db.get_connection()
         cursor = conn.cursor()
         
@@ -872,7 +874,8 @@ class HospitalManagementSystem:
         return [self.db._row_to_obj(Doctor, row) for row in rows]
 
     def search_doctors(self, search_term: str) -> List[Doctor]:
-        search_term = search_term.lower().strip()
+        search_term = search_term.replace(',', ' ').lower().strip()
+        search_term = " ".join(search_term.split()) # Normalize multiple spaces
         if not search_term:
             return self.doctors
         return self.db.search(Doctor, 'doctors', search_term, ['first_name', 'last_name', 'doctor_id', 'specialty'])
@@ -930,7 +933,8 @@ class HospitalManagementSystem:
         return False
 
     def search_appointments(self, search_term: str) -> List[Appointment]:
-        search_term = search_term.lower().strip()
+        search_term = search_term.replace(',', ' ').lower().strip()
+        search_term = " ".join(search_term.split()) # Normalize multiple spaces
         if not search_term:
             return self.appointments
         return self.db.search(Appointment, 'appointments', search_term,
@@ -1146,7 +1150,8 @@ class HospitalManagementSystem:
         return False
 
     def search_inventory(self, search_term: str) -> List[InventoryItem]:
-        search_term = search_term.lower().strip()
+        search_term = search_term.replace(',', ' ').lower().strip()
+        search_term = " ".join(search_term.split()) # Normalize multiple spaces
         if not search_term:
             return self.inventory
         return self.db.search(InventoryItem, 'inventory', search_term, ['name', 'category', 'item_id'])

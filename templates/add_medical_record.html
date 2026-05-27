@@ -499,6 +499,9 @@
             });
         });
     </script>
+    {% with form_type='add_medical_record' %}
+        {% include 'autosave_js.html' %}
+    {% endwith %}
 </body>
 </html>
 

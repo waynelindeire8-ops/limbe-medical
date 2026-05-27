@@ -560,7 +560,8 @@ import sqlite3
 @app.route('/patients')
 def patients():
     page = request.args.get('page', 1, type=int)
-    search_term = request.args.get('search', '').strip()
+    search_term = request.args.get('search', '').replace(',', ' ').strip()
+    search_term = " ".join(search_term.split()) # Normalize multiple spaces
     per_page = 10
 
     conn = hms.db.get_connection()
@@ -680,6 +681,7 @@ def add_patient():
                 scheme_type=request.form.get('scheme_type','')
             )
             hms.add_patient(new_patient)
+            hms.db.delete_draft(session.get('user_id', 'default'), 'add_patient')
             flash('Patient added successfully!', 'success')
             notify('Patient added', f"{new_patient.last_name}, {new_patient.first_name} ({new_patient.patient_id})", 'admin')
             notify('Patient added', f"{new_patient.last_name}, {new_patient.first_name}", 'receptionist')
@@ -800,6 +802,7 @@ def add_doctor():
                 locum_name=request.form.get('locum_name', '')
             )
             hms.add_doctor(new_doctor)
+            hms.db.delete_draft(session.get('user_id', 'default'), 'add_doctor')
             flash('Doctor added successfully!', 'success')
             notify('Doctor added', f"{new_doctor.first_name} {new_doctor.last_name} ({new_doctor.doctor_id})", 'admin')
             return redirect(url_for('doctors'))
@@ -1695,18 +1698,10 @@ def update_invoice(bill_id):
 def billing_autosave():
     try:
         data = request.json
-        # Store drafts in a simple file or in hms
-        if not hasattr(hms, 'billing_drafts'):
-            hms.billing_drafts = {}
-        
         user_id = session.get('user_id', 'default')
         tab = data.get('tab', 'general')
-        hms.billing_drafts[f"{user_id}_{tab}"] = {
-            'data': data.get('form_data'),
-            'timestamp': datetime.datetime.now().isoformat()
-        }
-        # We don't necessarily need to hms.save_data() for every autosave 
-        # to avoid disk I/O overhead, but we could.
+        form_data = data.get('form_data')
+        hms.db.save_draft(user_id, f"billing_{tab}", form_data)
         return jsonify({'status': 'success'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -1714,9 +1709,33 @@ def billing_autosave():
 @app.route('/api/billing/draft/<tab>')
 def get_billing_draft(tab):
     user_id = session.get('user_id', 'default')
-    draft = getattr(hms, 'billing_drafts', {}).get(f"{user_id}_{tab}")
-    if draft:
-        return jsonify(draft)
+    draft_data = hms.db.get_draft(user_id, f"billing_{tab}")
+    if draft_data:
+        return jsonify({'data': draft_data})
+    return jsonify({'error': 'No draft found'}), 404
+
+@app.route('/api/autosave', methods=['POST'])
+def generic_autosave():
+    try:
+        data = request.json
+        user_id = session.get('user_id', 'default')
+        form_type = data.get('form_type')
+        form_data = data.get('form_data')
+        
+        if not form_type or not form_data:
+            return jsonify({'status': 'error', 'message': 'Missing form_type or form_data'}), 400
+            
+        hms.db.save_draft(user_id, form_type, form_data)
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/recover/<form_type>')
+def generic_recover(form_type):
+    user_id = session.get('user_id', 'default')
+    draft_data = hms.db.get_draft(user_id, form_type)
+    if draft_data:
+        return jsonify({'data': draft_data})
     return jsonify({'error': 'No draft found'}), 404
 
 @app.route('/billing/delete/<bill_id>')
@@ -2146,7 +2165,8 @@ def print_prescription(prescription_id):
 
 @app.route('/medical_records')
 def medical_records():
-    search_term = request.args.get('search', '').lower().strip()
+    search_term = request.args.get('search', '').replace(',', ' ').lower().strip()
+    search_term = " ".join(search_term.split()) # Normalize multiple spaces
     page = request.args.get('page', 1, type=int)
     per_page = 20
     
@@ -2343,6 +2363,7 @@ def add_medical_record():
                 details=details
             )
             if hms.add_medical_record(new_record):
+                hms.db.delete_draft(session.get('user_id', 'default'), 'add_medical_record')
                 flash('Medical record added successfully!', 'success')
                 notify('Medical record added', new_record.record_id, 'doctor')
                 

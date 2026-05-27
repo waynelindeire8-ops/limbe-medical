@@ -5,6 +5,10 @@ Optimized for Scalability
 
 import json
 import sqlite3
+import urllib.request
+import urllib.error
+import threading
+import os
 from typing import List, Dict, Optional, Any, Type, TypeVar
 from datetime import datetime
 from dataclasses import asdict, fields
@@ -222,6 +226,16 @@ class DatabaseManager:
                 FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
             )
         ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS drafts (
+                draft_id TEXT PRIMARY KEY,
+                user_id TEXT,
+                form_type TEXT,
+                data TEXT,
+                updated_at TEXT
+            )
+        ''')
         
         conn.commit()
         
@@ -280,6 +294,10 @@ class DatabaseManager:
             
             if self.use_supabase:
                 supabase_client.insert(table, asdict(obj)) # Supabase handles dicts/lists
+            
+            # Sync to backup server if configured
+            self.sync_to_backup(table, obj)
+            
             return True
         except Exception as e:
             print(f"Error saving to {table}: {e}")
@@ -360,6 +378,91 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error getting from {table}: {e}")
             return None
+
+    # ---------- Drafts & Backup Routing ----------
+
+    def save_draft(self, user_id: str, form_type: str, data: Dict[str, Any]) -> bool:
+        """Save a real-time draft of form data"""
+        try:
+            draft_id = f"{user_id}_{form_type}"
+            updated_at = datetime.now().isoformat()
+            data_json = json.dumps(data)
+            
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO drafts (draft_id, user_id, form_type, data, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (draft_id, user_id, form_type, data_json, updated_at))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error saving draft: {e}")
+            return False
+
+    def get_draft(self, user_id: str, form_type: str) -> Optional[Dict[str, Any]]:
+        """Retrieve a saved draft"""
+        try:
+            draft_id = f"{user_id}_{form_type}"
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT data FROM drafts WHERE draft_id = ?", (draft_id,))
+            row = cursor.fetchone()
+            conn.close()
+            return json.loads(row['data']) if row else None
+        except Exception as e:
+            print(f"Error getting draft: {e}")
+            return None
+
+    def delete_draft(self, user_id: str, form_type: str) -> bool:
+        """Clear a draft after successful submission"""
+        try:
+            draft_id = f"{user_id}_{form_type}"
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM drafts WHERE draft_id = ?", (draft_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error deleting draft: {e}")
+            return False
+
+    def sync_to_backup(self, table: str, obj: Any):
+        """Asynchronously sync data to a backup server if configured"""
+        # In a real scenario, this would read from a config or env variable
+        backup_url = os.environ.get('BACKUP_SERVER_URL')
+        if not backup_url:
+            return
+
+        def _perform_sync():
+            try:
+                data = asdict(obj)
+                # Handle JSON fields if any
+                for k, v in data.items():
+                    if isinstance(v, (dict, list)):
+                        data[k] = json.dumps(v)
+                
+                payload = json.dumps({
+                    'table': table,
+                    'action': 'save',
+                    'data': data,
+                    'timestamp': datetime.now().isoformat()
+                }).encode('utf-8')
+                
+                req = urllib.request.Request(
+                    backup_url, 
+                    data=payload, 
+                    headers={'Content-Type': 'application/json'}
+                )
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    pass
+            except Exception as e:
+                print(f"[BACKUP ERROR] Failed to sync {table} to {backup_url}: {e}")
+
+        # Run in background thread to not block the main application
+        threading.Thread(target=_perform_sync, daemon=True).start()
 
     def search(self, cls: Type[T], table: str, query: str, fields: List[str], limit: int = 50) -> List[T]:
         """Generic search with multiple fields"""
