@@ -581,6 +581,7 @@ def patients():
                 OR (last_name || ' ' || first_name) LIKE ?
                 OR phone LIKE ?
             )
+            ORDER BY rowid DESC
             LIMIT ? OFFSET ?
         """, (*query_params, per_page, (page - 1) * per_page))
         rows = cursor.fetchall()
@@ -602,6 +603,7 @@ def patients():
     else:
         cursor.execute("""
             SELECT * FROM patients WHERE is_deleted = 0
+            ORDER BY rowid DESC
             LIMIT ? OFFSET ?
         """, (per_page, (page - 1) * per_page))
         rows = cursor.fetchall()
