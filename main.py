@@ -600,6 +600,17 @@ class HospitalManagementSystem:
                 shutil.copy2(src, dest)
                 rel_path = os.path.relpath(dest, base_dir)
                 sup_id = ''
+                
+                # Sync with Supabase if enabled
+                if self.db.use_supabase:
+                    try:
+                        from supabase_data_manager import upload_file_to_supabase
+                        supabase_path = f"{patient_id}/{name}"
+                        if upload_file_to_supabase(dest, supabase_path):
+                            sup_id = 'synced'
+                    except Exception as e:
+                        print(f"[WARN] Failed to upload {name} to Supabase: {e}")
+                
                 entries.append({
                     'file_name': name,
                     'path': rel_path,
@@ -631,6 +642,16 @@ class HospitalManagementSystem:
         try:
             if os.path.exists(abs_path):
                 os.remove(abs_path)
+            
+            # Sync deletion with Supabase if enabled
+            if self.db.use_supabase:
+                try:
+                    from supabase_data_manager import delete_file_from_supabase
+                    file_name = os.path.basename(abs_path)
+                    supabase_path = f"{patient_id}/{file_name}"
+                    delete_file_from_supabase(supabase_path)
+                except Exception as e:
+                    print(f"[WARN] Failed to delete from Supabase: {e}")
         except Exception as e:
             print(f"[WARN] Failed to delete file '{abs_path}': {e}")
         self.patient_files[patient_id] = new_entries
@@ -674,6 +695,44 @@ class HospitalManagementSystem:
         except Exception:
             pass
         return True
+
+    def sync_patient_attachments(self, patient_id: str) -> None:
+        """
+        Sync with Supabase to discover legacy or remote files.
+        This updates the local patient_files metadata if new files are found in Supabase.
+        """
+        try:
+            from supabase_data_manager import list_files_in_supabase_folder
+            
+            # List files in the 'attachments/{patient_id}' folder in Supabase
+            remote_files = list_files_in_supabase_folder(patient_id)
+            if not remote_files:
+                return
+
+            local_entries = self.patient_files.get(patient_id, [])
+            local_names = {e.get('file_name') for e in local_entries}
+
+            changed = False
+            for f in remote_files:
+                file_name = f.get('name')
+                if file_name and file_name not in local_names:
+                    # Found a file in Supabase that we don't have in our local metadata
+                    local_entries.append({
+                        'file_name': file_name,
+                        'path': f"attachments/{patient_id}/{file_name}",
+                        'uploaded_at': f.get('created_at', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+                        'source_appointment_id': '',
+                        'source_record_id': '',
+                        'supabase_file_id': 'discovered'
+                    })
+                    changed = True
+            
+            if changed:
+                self.patient_files[patient_id] = local_entries
+                # Save metadata to JSON
+                self.save_data()
+        except Exception as e:
+            print(f"[WARN] Failed to sync attachments for {patient_id}: {e}")
 
     def update_patient_scheme(self, patient_id: str, scheme_info: Dict[str, Any]) -> bool:
         if not patient_id:

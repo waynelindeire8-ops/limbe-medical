@@ -54,7 +54,9 @@ class DatabaseManager:
                 medical_history TEXT,
                 created_date TEXT,
                 scheme_provider TEXT,
-                scheme_type TEXT
+                scheme_type TEXT,
+                is_deleted INTEGER DEFAULT 0,
+                deleted_at TEXT DEFAULT ''
             )
         ''')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_patient_name ON patients(first_name, last_name)')
@@ -239,13 +241,21 @@ class DatabaseManager:
         
         conn.commit()
         
-        # Migration: Add is_locum and locum_name to doctors if they don't exist
+        # Migration: Add columns if they don't exist
         try:
             cursor.execute("ALTER TABLE doctors ADD COLUMN is_locum INTEGER DEFAULT 0")
         except:
             pass
         try:
             cursor.execute("ALTER TABLE doctors ADD COLUMN locum_name TEXT DEFAULT ''")
+        except:
+            pass
+        try:
+            cursor.execute("ALTER TABLE patients ADD COLUMN is_deleted INTEGER DEFAULT 0")
+        except:
+            pass
+        try:
+            cursor.execute("ALTER TABLE patients ADD COLUMN deleted_at TEXT DEFAULT ''")
         except:
             pass
             

@@ -145,11 +145,6 @@ def get_supabase_file_url(path: str, bucket: str = "attachments") -> str:
         return client.storage.from_(bucket).get_public_url(clean_path)
     except Exception:
         return ""
-        response = client.storage.from_(bucket).remove([clean_path])
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Error deleting from Supabase: {e}")
-        return False
 
 def download_file_from_supabase(supabase_path: str, bucket: str = "attachments") -> bytes:
     client = get_supabase_client()
