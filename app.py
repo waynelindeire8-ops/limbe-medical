@@ -802,7 +802,6 @@ def add_doctor():
                 locum_name=request.form.get('locum_name', '')
             )
             hms.add_doctor(new_doctor)
-            hms.db.delete_draft(session.get('user_id', 'default'), 'add_doctor')
             flash('Doctor added successfully!', 'success')
             notify('Doctor added', f"{new_doctor.first_name} {new_doctor.last_name} ({new_doctor.doctor_id})", 'admin')
             return redirect(url_for('doctors'))
