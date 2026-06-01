@@ -109,7 +109,7 @@
                     </div>
                     <div class="info-item">
                         <label>Attending Doctor</label>
-                        <div>Dr. {{ doctor.first_name }} {{ doctor.last_name }} ({{ doctor.specialization }})</div>
+                        <div>Dr. {{ doctor.first_name }} {{ doctor.last_name }} ({{ doctor.specialty }})</div>
                     </div>
                 </div>
 
@@ -149,7 +149,7 @@
                 <div class="section-title">Diagnosis & Treatment</div>
                 <div class="info-item" style="margin-bottom: 15px;">
                     <label>Medical Examination</label>
-                    <div class="detail-block">{{ record.details.get('preliminary_diagnosis', 'None') }}</div>
+                    <div class="detail-block">{{ record.details.get('medical_examination', 'None') }}</div>
                 </div>
                 <div class="info-item" style="margin-bottom: 15px;">
                     <label>Final Diagnosis</label>

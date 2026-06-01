@@ -216,50 +216,50 @@ class HospitalManagementSystem:
         self._lab_results_cache = []
 
         migrated = False
-    
+
         # =========================
         # 1. Single JSON file
         # =========================
         if os.path.exists(self.data_file):
             print(f"[Migration] Checking: {self.data_file}")
-    
+
             try:
                 with open(self.data_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-    
+
                 if data.get('patients'):
                     self._apply_loaded_data(data, append=True)
                     migrated = True
-    
+
             except Exception as e:
                 print(f"[Migration] Failed reading {self.data_file}: {e}")
-    
+
         # =========================
         # 2. Legacy directories
         # =========================
         legacy_dirs = ['data', 'sample_data']
-    
+
         for d in legacy_dirs:
-    
+
             if not os.path.exists(d):
                 continue
-    
+
             try:
                 patients_path = os.path.join(d, 'patients.json')
-    
+
                 if not os.path.exists(patients_path):
                     continue
-    
+
                 with open(patients_path, 'r', encoding='utf-8') as f:
                     json_patients = json.load(f)
-    
+
                 if not json_patients:
                     continue
-    
+
                 print(f"[Migration] Found legacy data in {d}")
-    
+
                 legacy_data = {}
-    
+
                 files = {
                     'patients': 'patients.json',
                     'doctors': 'doctors.json',
@@ -273,59 +273,59 @@ class HospitalManagementSystem:
                     'queue': 'queue.json',
                     'lab_results': 'lab_results.json'
                 }
-    
+
                 for key, filename in files.items():
-    
+
                     path = os.path.join(d, filename)
-    
+
                     if os.path.exists(path):
-    
+
                         with open(path, 'r', encoding='utf-8') as f:
                             legacy_data[key] = json.load(f)
-    
+
                 self._apply_loaded_data(legacy_data, append=True)
-    
+
                 migrated = True
-    
+
             except Exception as e:
                 print(f"[Migration] Error in {d}: {e}")
-    
+
         # =========================
         # Save safely
         # =========================
         if migrated:
-    
+
             self._save_caches_to_db_safe()
-    
+
             print(
                 f"[Migration] Done. Patients in DB: "
                 f"{self.db.count('patients')}"
             )
-    
+
         else:
             print("[Migration] No legacy data found.")
 
-    
+
     def _save_caches_to_db_safe(self):
         """
         Save only records that do not already exist.
         Prevents overwriting live DB data.
         """
-    
+
         def save_if_missing(table, obj, key_field, cls):
-    
+
             key = getattr(obj, key_field)
-    
+
             existing = self.db.get_by_id(
                 cls,
                 table,
                 key,
                 key_field
             )
-    
+
             if not existing:
                 self.db.save(table, obj, key_field)
-    
+
         # =========================
         # Patients
         # =========================
@@ -336,7 +336,7 @@ class HospitalManagementSystem:
                 'patient_id',
                 Patient
             )
-    
+
         # =========================
         # Doctors
         # =========================
@@ -347,7 +347,7 @@ class HospitalManagementSystem:
                 'doctor_id',
                 Doctor
             )
-    
+
         # =========================
         # Appointments
         # =========================
@@ -358,7 +358,7 @@ class HospitalManagementSystem:
                 'appointment_id',
                 Appointment
             )
-    
+
         # =========================
         # Medical Records
         # =========================
@@ -369,7 +369,7 @@ class HospitalManagementSystem:
                 'record_id',
                 MedicalRecord
             )
-    
+
         # =========================
         # Prescriptions
         # =========================
@@ -380,7 +380,7 @@ class HospitalManagementSystem:
                 'prescription_id',
                 Prescription
             )
-    
+
         # =========================
         # Bills
         # =========================
@@ -391,7 +391,7 @@ class HospitalManagementSystem:
                 'bill_id',
                 Bill
             )
-    
+
         # =========================
         # Inventory
         # =========================
@@ -402,7 +402,7 @@ class HospitalManagementSystem:
                 'item_id',
                 InventoryItem
             )
-    
+
         # =========================
         # Users
         # =========================
@@ -413,7 +413,7 @@ class HospitalManagementSystem:
                 'user_id',
                 User
             )
-    
+
         # =========================
         # Messages
         # =========================
@@ -424,7 +424,7 @@ class HospitalManagementSystem:
                 'message_id',
                 Message
             )
-    
+
         # =========================
         # Queue
         # =========================
@@ -435,7 +435,7 @@ class HospitalManagementSystem:
                 'queue_id',
                 QueueItem
             )
-    
+
         # =========================
         # Lab Results
         # =========================
@@ -446,7 +446,7 @@ class HospitalManagementSystem:
                 'result_id',
                 LabResult
             )
-    
+
     # ---------- Utility ----------
     @staticmethod
     def generate_id(prefix: str) -> str:
@@ -600,7 +600,7 @@ class HospitalManagementSystem:
                 shutil.copy2(src, dest)
                 rel_path = os.path.relpath(dest, base_dir)
                 sup_id = ''
-                
+
                 # Sync with Supabase if enabled
                 if self.db.use_supabase:
                     try:
@@ -610,7 +610,7 @@ class HospitalManagementSystem:
                             sup_id = 'synced'
                     except Exception as e:
                         print(f"[WARN] Failed to upload {name} to Supabase: {e}")
-                
+
                 entries.append({
                     'file_name': name,
                     'path': rel_path,
@@ -642,7 +642,7 @@ class HospitalManagementSystem:
         try:
             if os.path.exists(abs_path):
                 os.remove(abs_path)
-            
+
             # Sync deletion with Supabase if enabled
             if self.db.use_supabase:
                 try:
@@ -703,7 +703,7 @@ class HospitalManagementSystem:
         """
         try:
             from supabase_data_manager import list_files_in_supabase_folder
-            
+
             # List files in the 'attachments/{patient_id}' folder in Supabase
             remote_files = list_files_in_supabase_folder(patient_id)
             if not remote_files:
@@ -726,10 +726,9 @@ class HospitalManagementSystem:
                         'supabase_file_id': 'discovered'
                     })
                     changed = True
-            
+
             if changed:
                 self.patient_files[patient_id] = local_entries
-                # Save metadata to JSON
                 self.save_data()
         except Exception as e:
             print(f"[WARN] Failed to sync attachments for {patient_id}: {e}")
@@ -753,9 +752,9 @@ class HospitalManagementSystem:
         if not patient.patient_id:
             print("[ERROR] add_patient: patient_id is required")
             return False
-            
-        # The db.save uses INSERT OR REPLACE by default in some implementations, 
-        # but here we want to explicitly prevent adding a patient if ID exists 
+
+        # The db.save uses INSERT OR REPLACE by default in some implementations,
+        # but here we want to explicitly prevent adding a patient if ID exists
         # unless it's an update (which is handled by update_patient)
         if self.get_patient(patient.patient_id):
             print(f"[ERROR] add_patient: Patient ID {patient.patient_id} already exists")
@@ -779,13 +778,13 @@ class HospitalManagementSystem:
     def search_patients(self, search_term: str):
         if not search_term:
             return []
-            
+
         search_term = search_term.replace(',', ' ').strip()
-        search_term = " ".join(search_term.split()) # Normalize multiple spaces
+        search_term = " ".join(search_term.split())  # Normalize multiple spaces
         term = f"%{search_term}%"
         conn = self.db.get_connection()
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             SELECT * FROM patients 
             WHERE is_deleted = 0 AND (
@@ -796,10 +795,10 @@ class HospitalManagementSystem:
                 (last_name || ' ' || first_name) LIKE ?
             )
         """, (term, term, term, term, term))
-        
+
         rows = cursor.fetchall()
         conn.close()
-        
+
         return [self.db._row_to_obj(Patient, row) for row in rows]
 
     def update_patient(self, original_id: str, **kwargs) -> bool:
@@ -825,10 +824,10 @@ class HospitalManagementSystem:
                 conn.rollback()
             finally:
                 conn.close()
-            
+
             # Delete old record since we are changing the primary key
             self.db.delete('patients', original_id, 'patient_id')
-            
+
             if original_id in self.patient_files:
                 self.patient_files[new_id] = self.patient_files.pop(original_id)
             if original_id in self.patient_scheme:
@@ -849,7 +848,7 @@ class HospitalManagementSystem:
                     pass
                 return True
             return False
-        
+
         # Soft delete
         patient = self.db.get_by_id(Patient, 'patients', patient_id, 'patient_id')
         if patient:
@@ -874,7 +873,7 @@ class HospitalManagementSystem:
             'queue',
             'patients'
         ]
-        
+
         success = True
         for table in tables_to_clear:
             try:
@@ -883,11 +882,11 @@ class HospitalManagementSystem:
             except Exception as e:
                 print(f"[ERROR] Failed to clear table {table}: {e}")
                 success = False
-        
+
         # Clear dictionaries
         self.patient_files = {}
         self.patient_scheme = {}
-        
+
         # Clear caches
         self._patients_cache = []
         self._appointments_cache = []
@@ -896,15 +895,15 @@ class HospitalManagementSystem:
         self._bills_cache = []
         self._lab_results_cache = []
         self._queue_cache = []
-        
+
         # Save changes to dictionaries
         self.save_data()
-        
+
         try:
             self.add_activity(None, 'delete_all', 'patient', 'ALL', 'All patients and related records deleted')
         except Exception:
             pass
-            
+
         return success
 
     # ---------- Doctors ----------
@@ -934,7 +933,7 @@ class HospitalManagementSystem:
 
     def search_doctors(self, search_term: str) -> List[Doctor]:
         search_term = search_term.replace(',', ' ').lower().strip()
-        search_term = " ".join(search_term.split()) # Normalize multiple spaces
+        search_term = " ".join(search_term.split())  # Normalize multiple spaces
         if not search_term:
             return self.doctors
         return self.db.search(Doctor, 'doctors', search_term, ['first_name', 'last_name', 'doctor_id', 'specialty'])
@@ -965,16 +964,16 @@ class HospitalManagementSystem:
             cursor.execute("DELETE FROM doctors WHERE doctor_id != ?", (keep_id,))
             conn.commit()
             conn.close()
-            
+
             # Clear cache
             self._doctors_cache = []
-            
+
             # Add activity
             try:
                 self.add_activity(None, 'delete_all_except', 'doctor', keep_id, f"Deleted all doctors except {keep_id}")
             except Exception:
                 pass
-                
+
             return True
         except Exception as e:
             print(f"[ERROR] Failed to delete doctors: {e}")
@@ -993,7 +992,7 @@ class HospitalManagementSystem:
 
     def search_appointments(self, search_term: str) -> List[Appointment]:
         search_term = search_term.replace(',', ' ').lower().strip()
-        search_term = " ".join(search_term.split()) # Normalize multiple spaces
+        search_term = " ".join(search_term.split())  # Normalize multiple spaces
         if not search_term:
             return self.appointments
         return self.db.search(Appointment, 'appointments', search_term,
@@ -1210,7 +1209,7 @@ class HospitalManagementSystem:
 
     def search_inventory(self, search_term: str) -> List[InventoryItem]:
         search_term = search_term.replace(',', ' ').lower().strip()
-        search_term = " ".join(search_term.split()) # Normalize multiple spaces
+        search_term = " ".join(search_term.split())  # Normalize multiple spaces
         if not search_term:
             return self.inventory
         return self.db.search(InventoryItem, 'inventory', search_term, ['name', 'category', 'item_id'])
@@ -1282,10 +1281,10 @@ class HospitalManagementSystem:
         return f"{wait_mins} mins"
 
     def call_patient(self, queue_id: str) -> bool:
+        # Fetch from DB, update status, persist — matches pattern of requeue_patient / update_queue_status
         item = self.db.get_by_id(QueueItem, 'queue', queue_id, 'queue_id')
         if item:
-            item.status = "Calling"
-            item.last_called_time = datetime.datetime.now().strftime("%H:%M:%S")
+            item.status = "Called"
             return self.db.save('queue', item, 'queue_id')
         return False
 

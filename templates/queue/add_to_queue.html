@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add to Queue - Limbe Medical</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .checkin-form {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 30px;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .patient-info {
+            background: #f8faff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4361ee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% include 'sidebar.html' %}
+        
+        <main class="main-content">
+            <header class="header">
+                <div class="header-left">
+                    <h1>Add to Queue</h1>
+                    <p>Place patient in the active queue for consultation.</p>
+                </div>
+            </header>
+
+            <div class="checkin-form">
+                <div class="patient-info">
+                    <strong>Patient:</strong> {{ patient.first_name }} {{ patient.last_name }} ({{ patient.patient_id }})
+                </div>
+                
+                <form method="POST">
+                    <div class="form-group">
+                        <label>Assigned Doctor</label>
+                        <select name="doctor_id">
+                            <option value="">-- Select Doctor (Optional) --</option>
+                            {% for doc in doctors %}
+                            <option value="{{ doc.doctor_id }}">Dr. {{ doc.last_name }} ({{ doc.specialty }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Priority</label>
+                        <select name="priority">
+                            <option value="Normal">Normal</option>
+                            <option value="Urgent">Urgent</option>
+                            <option value="Emergency">Emergency</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Notes / Reason for visit</label>
+                        <textarea name="notes" rows="4" placeholder="Any special notes..."></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">Add to Queue</button>
+                        <a href="{{ url_for('patient_details', patient_id=patient.patient_id) }}" class="btn btn-outline" style="flex: 1; text-align: center; text-decoration: none;">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

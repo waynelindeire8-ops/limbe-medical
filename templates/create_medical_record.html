@@ -3,80 +3,676 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Medical Record</title>
+    <title>Create Medical Record - Limbe Medical</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .form-container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            max-width: 800px;
+        .record-container {
+            background-color: #cccccc;
+            padding: 40px;
+            border-radius: 8px;
+            max-width: 1200px;
             margin: 20px auto;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .back-link {
-            display: block;
+        
+        .record-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #000;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #999;
+            margin-bottom: 30px;
+            background: transparent;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background: #e0e0e0;
+            border: 1px solid #999;
+            border-bottom: none;
+            margin-right: 2px;
+            font-size: 15px;
+            color: #333;
+        }
+
+        .tab.active {
+            background: #f0f0f0;
+            font-weight: bold;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: -1px;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
             margin-bottom: 20px;
-            color: #4361ee;
-            text-decoration: none;
+            gap: 20px;
+        }
+
+        .form-label {
+            width: 150px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .form-input-container {
+            flex: 1;
+        }
+
+        select, input[type="text"], input[type="date"], input[type="number"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #999;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 14px;
+        }
+
+        select {
+            width: auto;
+            min-width: 200px;
+        }
+
+        input[type="number"] {
+            width: 80px;
+        }
+
+        .vitals-section {
+            border: 1px solid #999;
+            padding: 20px;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .vitals-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .vitals-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px 40px;
+        }
+
+        .vital-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .vital-label {
+            width: 120px;
+        }
+
+        .vital-input {
+            width: 120px !important;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn-save {
+            background-color: #4361ee;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-lab {
+            background-color: #f72585;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
         }
     </style>
 </head>
 <body>
-    <div class="container" >
+    <div class="container">
         {% include 'sidebar.html' %}
-        <main class="main-content" >
-            <a href="{{ url_for('patients') }}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Patients</a>
-            <div class="form-container">
-                <h2>Create Medical Record</h2>
-                <br>
-                <form method="POST">
-                    <div class="form-group">
-                        <label for="patient_id">Patient</label>
-                        <select id="patient_id" name="patient_id" required>
-                            {% for p in patients %}
-                                <option value="{{ p.patient_id }}" {% if patient_id == p.patient_id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }}</option>
-                            {% endfor %}
-                        </select>
+        
+        <main class="main-content">
+            <div class="record-container">
+                <div class="record-title">{% if record %}Edit{% else %}Create{% endif %} Medical Record</div>
+                
+                <div class="tabs">
+                    <div class="tab active" onclick="showTab('consultation')">Consultation & Exam</div>
+                    <div class="tab" onclick="showTab('history')">Patient Info & History</div>
+                    <div class="tab" onclick="showTab('personal')">Personal Info</div>
+                    <div class="tab" onclick="showTab('emergency')">Emergency Contact</div>
+                    <div class="tab" onclick="showTab('office')">Office Use</div>
+                    <div class="tab" onclick="showTab('auth')">Authorization Release</div>
+                </div>
+
+                <form id="medicalRecordForm" method="POST">
+                    <div id="consultation" class="tab-content active">
+                        <div class="form-row">
+                            <div class="form-label">Patient:</div>
+                            <div class="form-input-container">
+                                <select name="patient_id" required>
+                                    <option value="">Select Patient ▾</option>
+                                    {% for p in patients %}
+                                    <option value="{{ p.patient_id }}" {% if (record and record.patient_id == p.patient_id) or (patient_id == p.patient_id) %}selected{% endif %}>
+                                        {{ p.first_name }} {{ p.last_name }} ({{ p.patient_id }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Doctor:</div>
+                            <div class="form-input-container">
+                                <select name="doctor_id" required>
+                                    <option value="">Select Doctor ▾</option>
+                                    {% for d in doctors %}
+                                    <option value="{{ d.doctor_id }}" {% if record and record.doctor_id == d.doctor_id %}selected{% endif %}>Dr. {{ d.last_name }} ({{ d.specialty }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Date:</div>
+                            <div class="form-input-container">
+                                <input type="date" name="date" value="{{ today }}" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Consult Reason:</div>
+                            <div class="form-input-container">
+                                <textarea name="consult_reason" rows="3" required>{{ record.consult_reason if record else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Pain Level (0-10):</div>
+                            <div class="form-input-container">
+                                <input type="number" name="pain_level" min="0" max="10" value="{{ record.details.pain_level if record and record.details else '0' }}">
+                            </div>
+                        </div>
+
+                        <div class="vitals-section">
+                            <span class="vitals-title">Vital Signs</span>
+                            <div class="vitals-grid">
+                                <div class="vital-row">
+                                    <div class="vital-label">Blood Pressure:</div>
+                                    <input type="text" name="blood_pressure" class="vital-input" value="{{ record.details.blood_pressure if record and record.details else '' }}">
+                                </div>
+                                <div class="vital-row">
+                                    <div class="vital-label">Temperature:</div>
+                                    <input type="text" name="temperature" class="vital-input" value="{{ record.details.temperature if record and record.details else '' }}">
+                                </div>
+                                <div class="vital-row">
+                                    <div class="vital-label">Heart Rate:</div>
+                                    <input type="text" name="heart_rate" class="vital-input" value="{{ record.details.heart_rate if record and record.details else '' }}">
+                                </div>
+                                <div class="vital-row">
+                                    <div class="vital-label">Weight:</div>
+                                    <input type="text" name="weight" class="vital-input" value="{{ record.details.weight if record and record.details else '' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Medical Examination:</div>
+                            <div class="form-input-container">
+                                <textarea name="medical_examination" rows="3">{{ record.details.medical_examination if record and record.details else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Diagnosis:</div>
+                            <div class="form-input-container">
+                                <textarea name="diagnosis" rows="3" required>{{ record.diagnosis if record else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Treatment:</div>
+                            <div class="form-input-container">
+                                <textarea name="treatment" rows="3" required>{{ record.treatment if record else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Prescriptions:</div>
+                            <div class="form-input-container">
+                                <textarea name="prescriptions" rows="3">{{ record.prescriptions if record else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button type="submit" name="action" value="save" class="btn-save">Save Record</button>
+                            <button type="submit" name="action" value="save_lab" class="btn-lab">Save & Send to Lab</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="doctor_id">Doctor</label>
-                        <select id="doctor_id" name="doctor_id" required>
-                            {% for d in doctors %}
-                                <option value="{{ d.doctor_id }}">Dr. {{ d.last_name }}</option>
-                            {% endfor %}
-                        </select>
+
+                    <div id="history" class="tab-content">
+                        <div class="form-row">
+                            <div class="form-label">Problem Start Date:</div>
+                            <div class="form-input-container">
+                                <input type="date" name="problem_start_date" value="{{ record.details.problem_start_date if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Problem Description:</div>
+                            <div class="form-input-container">
+                                <textarea name="problem_description" rows="3">{{ record.details.problem_description if record and record.details else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Cause of Current Problem:</div>
+                            <div class="form-input-container" style="display: flex; gap: 20px; align-items: center;">
+                                <label><input type="checkbox" name="cause" value="Car Accident" {% if record and record.details and 'Car Accident' in record.details.cause %}checked{% endif %}> Car Accident</label>
+                                <label><input type="checkbox" name="cause" value="Work injury" {% if record and record.details and 'Work injury' in record.details.cause %}checked{% endif %}> Work injury</label>
+                                <label><input type="checkbox" name="cause" value="Gradual onset" {% if record and record.details and 'Gradual onset' in record.details.cause %}checked{% endif %}> Gradual onset</label>
+                                <label><input type="checkbox" name="cause" value="Other" {% if record and record.details and 'Other' in record.details.cause %}checked{% endif %}> Other</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Problem required Surgery:</div>
+                            <div class="form-input-container" style="display: flex; gap: 20px; align-items: center;">
+                                <select name="required_surgery" style="min-width: 80px;">
+                                    <option value="No" {% if record and record.details and record.details.required_surgery == 'No' %}selected{% endif %}>No</option>
+                                    <option value="Yes" {% if record and record.details and record.details.required_surgery == 'Yes' %}selected{% endif %}>Yes</option>
+                                </select>
+                                <div class="form-label" style="width: auto;">Date of Surgery:</div>
+                                <input type="date" name="surgery_date" style="width: 200px;" value="{{ record.details.surgery_date if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="vitals-section">
+                            <span class="vitals-title">Past Medical History:</span>
+                            <div class="vitals-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                                <label><input type="checkbox" name="history_item" value="Breathing Problems" {% if record and record.details and 'Breathing Problems' in record.details.past_medical_history %}checked{% endif %}> Breathing Problems</label>
+                                <label><input type="checkbox" name="history_item" value="Pregnant" {% if record and record.details and 'Pregnant' in record.details.past_medical_history %}checked{% endif %}> Pregnant</label>
+                                <label><input type="checkbox" name="history_item" value="Heart Problems" {% if record and record.details and 'Heart Problems' in record.details.past_medical_history %}checked{% endif %}> Heart Problems</label>
+                                
+                                <label><input type="checkbox" name="history_item" value="Current Wound/Skin Problems" {% if record and record.details and 'Current Wound/Skin Problems' in record.details.past_medical_history %}checked{% endif %}> Current Wound/Skin Problems</label>
+                                <label><input type="checkbox" name="history_item" value="Pacemaker" {% if record and record.details and 'Pacemaker' in record.details.past_medical_history %}checked{% endif %}> Pacemaker</label>
+                                <label><input type="checkbox" name="history_item" value="Tumor/Cancer" {% if record and record.details and 'Tumor/Cancer' in record.details.past_medical_history %}checked{% endif %}> Tumor/Cancer</label>
+                                
+                                <label><input type="checkbox" name="history_item" value="Diabetes" {% if record and record.details and 'Diabetes' in record.details.past_medical_history %}checked{% endif %}> Diabetes</label>
+                                <label><input type="checkbox" name="history_item" value="Stroke" {% if record and record.details and 'Stroke' in record.details.past_medical_history %}checked{% endif %}> Stroke</label>
+                                <label><input type="checkbox" name="history_item" value="Bone/joint Problems" {% if record and record.details and 'Bone/joint Problems' in record.details.past_medical_history %}checked{% endif %}> Bone/joint Problems</label>
+                                
+                                <label><input type="checkbox" name="history_item" value="Kidney Problems" {% if record and record.details and 'Kidney Problems' in record.details.past_medical_history %}checked{% endif %}> Kidney Problems</label>
+                                <label><input type="checkbox" name="history_item" value="Gallbladder/Liver" {% if record and record.details and 'Gallbladder/Liver' in record.details.past_medical_history %}checked{% endif %}> Gallbladder/Liver</label>
+                                <label><input type="checkbox" name="history_item" value="Electrical implants" {% if record and record.details and 'Electrical implants' in record.details.past_medical_history %}checked{% endif %}> Electrical implants</label>
+                                
+                                <label><input type="checkbox" name="history_item" value="Anxiety attacks" {% if record and record.details and 'Anxiety attacks' in record.details.past_medical_history %}checked{% endif %}> Anxiety attacks</label>
+                                <label><input type="checkbox" name="history_item" value="Sleep Apnea" {% if record and record.details and 'Sleep Apnea' in record.details.past_medical_history %}checked{% endif %}> Sleep Apnea</label>
+                                <label><input type="checkbox" name="history_item" value="Depression" {% if record and record.details and 'Depression' in record.details.past_medical_history %}checked{% endif %}> Depression</label>
+                                
+                                <label><input type="checkbox" name="history_item" value="Bowel/Bladder" {% if record and record.details and 'Bowel/Bladder' in record.details.past_medical_history %}checked{% endif %}> Bowel/Bladder</label>
+                                <label><input type="checkbox" name="history_item" value="Heavy alcohol use" {% if record and record.details and 'Heavy alcohol use' in record.details.past_medical_history %}checked{% endif %}> Heavy alcohol use</label>
+                                <label><input type="checkbox" name="history_item" value="Drug use" {% if record and record.details and 'Drug use' in record.details.past_medical_history %}checked{% endif %}> Drug use</label>
+                                
+                                <label><input type="checkbox" name="history_item" value="Smoking" {% if record and record.details and 'Smoking' in record.details.past_medical_history %}checked{% endif %}> Smoking</label>
+                                <label><input type="checkbox" name="history_item" value="Headaches" {% if record and record.details and 'Headaches' in record.details.past_medical_history %}checked{% endif %}> Headaches</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Surgeries/ Hospitalizations:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="surgeries_hospitalizations" value="{{ record.details.surgeries_hospitalizations if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Medications (name| dose|reason):</div>
+                            <div class="form-input-container">
+                                <input type="text" name="medications_detail" value="{{ record.details.medications_detail if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Allergies:</div>
+                            <div class="form-input-container" style="display: flex; gap: 20px; align-items: center;">
+                                <label><input type="checkbox" name="allergy" value="Latex" {% if record and record.details and 'Latex' in record.details.allergies %}checked{% endif %}> Latex</label>
+                                <label><input type="checkbox" name="allergy" value="Iodine" {% if record and record.details and 'Iodine' in record.details.allergies %}checked{% endif %}> Iodine</label>
+                                <label><input type="checkbox" name="allergy" value="Bromine" {% if record and record.details and 'Bromine' in record.details.allergies %}checked{% endif %}> Bromine</label>
+                                <div class="form-label" style="width: auto;">Other:</div>
+                                <input type="text" name="other_allergy" value="{{ record.details.other_allergy if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label" style="width: 200px;">Religious/Cultural views impact treatment:</div>
+                            <div class="form-input-container">
+                                <select name="religious_impact" style="min-width: 80px;">
+                                    <option value="No" {% if record and record.details and record.details.religious_impact == 'No' %}selected{% endif %}>No</option>
+                                    <option value="Yes" {% if record and record.details and record.details.religious_impact == 'Yes' %}selected{% endif %}>Yes</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Additional Comments:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="additional_comments" value="{{ record.details.additional_comments if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">SOAP - Subjective:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="soap_subjective" value="{{ record.details.soap_subjective if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button type="submit" name="action" value="save" class="btn-save">Save Record</button>
+                            <button type="submit" name="action" value="save_lab" class="btn-lab">Save & Send to Lab</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="visit_date">Visit Date</label>
-                        <input type="date" id="visit_date" name="visit_date" required>
+                    <div id="personal" class="tab-content">
+                        <div class="form-row">
+                            <div class="form-label">Full Name:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="personal_full_name" value="{{ record.details.personal_full_name if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Place of Birth:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="place_of_birth" value="{{ record.details.place_of_birth if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Address:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="personal_address" value="{{ record.details.personal_address if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Phone Number:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="personal_phone" value="{{ record.details.personal_phone if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">E-Mail:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="personal_email" value="{{ record.details.personal_email if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">ID Number:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="id_number" value="{{ record.details.id_number if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Social Security Number:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="ssn" value="{{ record.details.ssn if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Status:</div>
+                            <div class="form-input-container">
+                                <select name="marital_status" style="min-width: 100px;">
+                                    <option value="Single" {% if record and record.details and record.details.marital_status == 'Single' %}selected{% endif %}>Single</option>
+                                    <option value="Married" {% if record and record.details and record.details.marital_status == 'Married' %}selected{% endif %}>Married</option>
+                                    <option value="Divorced" {% if record and record.details and record.details.marital_status == 'Divorced' %}selected{% endif %}>Divorced</option>
+                                    <option value="Widowed" {% if record and record.details and record.details.marital_status == 'Widowed' %}selected{% endif %}>Widowed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Occupation:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="occupation" value="{{ record.details.occupation if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label"></div>
+                            <div class="form-input-container">
+                                <label><input type="checkbox" name="is_retiree" value="Yes" {% if record and record.details and record.details.is_retiree == 'Yes' %}checked{% endif %}> Retiree</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Note:</div>
+                            <div class="form-input-container">
+                                <textarea name="personal_note" rows="3">{{ record.details.personal_note if record and record.details else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button type="submit" name="action" value="save" class="btn-save">Save Record</button>
+                            <button type="submit" name="action" value="save_lab" class="btn-lab">Save & Send to Lab</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="consult_reason">Consult Reason</label>
-                        <textarea id="consult_reason" name="consult_reason" rows="2" required>General Consultation</textarea>
+                    <div id="emergency" class="tab-content">
+                        <div class="form-row">
+                            <div class="form-label">Contact Name:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="emergency_contact_name" value="{{ record.details.emergency_contact_name if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Relationship:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="emergency_relationship" value="{{ record.details.emergency_relationship if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Home Number:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="emergency_home_phone" value="{{ record.details.emergency_home_phone if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Mobile Number:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="emergency_mobile_phone" value="{{ record.details.emergency_mobile_phone if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button type="submit" name="action" value="save" class="btn-save">Save Record</button>
+                            <button type="submit" name="action" value="save_lab" class="btn-lab">Save & Send to Lab</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="diagnosis">Diagnosis</label>
-                        <textarea id="diagnosis" name="diagnosis" rows="3" required></textarea>
+                    <div id="office" class="tab-content">
+                        <div class="form-row">
+                            <div class="form-label">Membership Type:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="membership_type" value="{{ record.details.membership_type if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Membership Number:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="membership_number" value="{{ record.details.membership_number if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Payment Type:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="payment_type" value="{{ record.details.payment_type if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Staff Name:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="staff_name" value="{{ record.details.staff_name if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Staff Signature:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="staff_signature" value="{{ record.details.staff_signature if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Office Notes:</div>
+                            <div class="form-input-container">
+                                <textarea name="office_notes" rows="4">{{ record.details.office_notes if record and record.details else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button type="submit" name="action" value="save" class="btn-save">Save Record</button>
+                            <button type="submit" name="action" value="save_lab" class="btn-lab">Save & Send to Lab</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="treatment">Treatment</label>
-                        <textarea id="treatment" name="treatment" rows="3" required></textarea>
+                    <div id="auth" class="tab-content">
+                        <div class="form-row">
+                            <div class="form-label">Requestor Name:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="auth_requestor_name" value="{{ record.details.auth_requestor_name if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Requestor Address:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="auth_requestor_address" value="{{ record.details.auth_requestor_address if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label" style="width: 80px;">City:</div>
+                            <input type="text" name="auth_city" style="flex: 1;" value="{{ record.details.auth_city if record and record.details else '' }}">
+                            <div class="form-label" style="width: 80px; text-align: center;">State:</div>
+                            <input type="text" name="auth_state" style="flex: 1;" value="{{ record.details.auth_state if record and record.details else '' }}">
+                            <div class="form-label" style="width: 80px; text-align: center;">Zip Code:</div>
+                            <input type="text" name="auth_zip" style="flex: 1;" value="{{ record.details.auth_zip if record and record.details else '' }}">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label" style="width: 80px;">Country:</div>
+                            <input type="text" name="auth_country" style="flex: 1;" value="{{ record.details.auth_country if record and record.details else '' }}">
+                            <div class="form-label" style="width: 100px; text-align: center;">Telephone:</div>
+                            <input type="text" name="auth_telephone" style="flex: 1;" value="{{ record.details.auth_telephone if record and record.details else '' }}">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label">Fax Number:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="auth_fax" value="{{ record.details.auth_fax if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div style="margin: 20px 0; display: flex; flex-direction: column; gap: 15px;">
+                            <label><input type="checkbox" name="auth_action" value="authorize" {% if record and record.details and 'authorize' in record.details.auth_actions %}checked{% endif %}> Authorize provider to access records</label>
+                            <label><input type="checkbox" name="auth_action" value="replace" {% if record and record.details and 'replace' in record.details.auth_actions %}checked{% endif %}> Replace existing authorization</label>
+                            <label><input type="checkbox" name="auth_action" value="remove" {% if record and record.details and 'remove' in record.details.auth_actions %}checked{% endif %}> Remove provider authorization</label>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label" style="width: 200px;">Purpose for disclosure:</div>
+                            <div class="form-input-container">
+                                <input type="text" name="auth_purpose" value="{{ record.details.auth_purpose if record and record.details else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-label" style="width: 150px;">Date Range From:</div>
+                            <input type="date" name="auth_date_from" style="width: 180px;" value="{{ record.details.auth_date_from if record and record.details else '' }}">
+                            <div class="form-label" style="width: 50px; text-align: center;">To:</div>
+                            <input type="date" name="auth_date_to" style="width: 180px;" value="{{ record.details.auth_date_to if record and record.details else '' }}">
+                        </div>
+
+                        <div class="vitals-section">
+                            <span class="vitals-title">Specific information to be released:</span>
+                            <div class="vitals-grid">
+                                <label><input type="checkbox" name="auth_info" value="Discharge Summary" {% if record and record.details and 'Discharge Summary' in record.details.auth_info_released %}checked{% endif %}> Discharge Summary</label>
+                                <label><input type="checkbox" name="auth_info" value="Operative Reports" {% if record and record.details and 'Operative Reports' in record.details.auth_info_released %}checked{% endif %}> Operative Reports</label>
+                                <label><input type="checkbox" name="auth_info" value="Consultation Reports" {% if record and record.details and 'Consultation Reports' in record.details.auth_info_released %}checked{% endif %}> Consultation Reports</label>
+                                <label><input type="checkbox" name="auth_info" value="Tissue Exam Reports" {% if record and record.details and 'Tissue Exam Reports' in record.details.auth_info_released %}checked{% endif %}> Tissue Exam Reports</label>
+                                <label><input type="checkbox" name="auth_info" value="Nuclear Medicine CD Images" {% if record and record.details and 'Nuclear Medicine CD Images' in record.details.auth_info_released %}checked{% endif %}> Nuclear Medicine CD Images</label>
+                                <label><input type="checkbox" name="auth_info" value="Radiology Reports" {% if record and record.details and 'Radiology Reports' in record.details.auth_info_released %}checked{% endif %}> Radiology Reports</label>
+                                <label><input type="checkbox" name="auth_info" value="Lab Results" {% if record and record.details and 'Lab Results' in record.details.auth_info_released %}checked{% endif %}> Lab Results</label>
+                                <label><input type="checkbox" name="auth_info" value="History & Physical" {% if record and record.details and 'History & Physical' in record.details.auth_info_released %}checked{% endif %}> History & Physical</label>
+                                <label><input type="checkbox" name="auth_info" value="Outpatient Progress" {% if record and record.details and 'Outpatient Progress' in record.details.auth_info_released %}checked{% endif %}> Outpatient Progress</label>
+                                <label><input type="checkbox" name="auth_info" value="Pulmonary Function" {% if record and record.details and 'Pulmonary Function' in record.details.auth_info_released %}checked{% endif %}> Pulmonary Function</label>
+                                <label><input type="checkbox" name="auth_info" value="Nuclear Medicine Reports" {% if record and record.details and 'Nuclear Medicine Reports' in record.details.auth_info_released %}checked{% endif %}> Nuclear Medicine Reports</label>
+                                <label><input type="checkbox" name="auth_info" value="Heart Diagnostics" {% if record and record.details and 'Heart Diagnostics' in record.details.auth_info_released %}checked{% endif %}> Heart Diagnostics</label>
+                                <label><input type="checkbox" name="auth_info" value="Radiology CD Image" {% if record and record.details and 'Radiology CD Image' in record.details.auth_info_released %}checked{% endif %}> Radiology CD Image</label>
+                            </div>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button type="submit" name="action" value="save" class="btn-save">Save Record</button>
+                            <button type="submit" name="action" value="save_lab" class="btn-lab">Save & Send to Lab</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="prescription">Prescription</label>
-                        <textarea id="prescription" name="prescription" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="notes">Notes</label>
-                        <textarea id="notes" name="notes" rows="3"></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary" style="width: 100%;">Create Record</button>
                 </form>
             </div>
         </main>
     </div>
+
+    <script>
+        function showTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show the selected tab content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Add active class to the clicked tab
+            event.currentTarget.classList.add('active');
+        }
+    </script>
 </body>
 </html>
-
