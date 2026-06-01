@@ -601,10 +601,7 @@ def queue_clear_all():
 
 @app.route('/queue/call/<queue_id>')
 def queue_call(queue_id):
-    queue_item = next((q for q in hms.queue if q.queue_id == queue_id), None)
-    if queue_item:
-        queue_item.status = "Calling"
-        hms.save_data()
+    if hms.update_queue_status(queue_id, 'Calling'):
         flash(f'Calling patient for queue item {queue_id}.', 'success')
         notify('Patient Called', f"Queue item {queue_id} is being called.", 'nurse')
     else:
@@ -614,10 +611,7 @@ def queue_call(queue_id):
 
 @app.route('/queue/update/<queue_id>/<status>')
 def update_queue_status(queue_id, status):
-    queue_item = next((q for q in hms.queue if q.queue_id == queue_id), None)
-    if queue_item:
-        queue_item.status = status
-        hms.save_data()
+    if hms.update_queue_status(queue_id, status):
         flash(f'Queue status updated to {status}.', 'success')
         if status == "In Lab":
             notify('Lab Request', f"Queue item {queue_id} moved to lab.", 'lab_assistant')
@@ -630,10 +624,7 @@ def update_queue_status(queue_id, status):
 
 @app.route('/queue/complete/<queue_id>')
 def queue_complete(queue_id):
-    queue_item = next((q for q in hms.queue if q.queue_id == queue_id), None)
-    if queue_item:
-        queue_item.status = 'Completed'
-        hms.save_data()
+    if hms.update_queue_status(queue_id, 'Completed'):
         flash('Queue item marked as completed.', 'success')
         notify('Queue Complete', f"Queue item {queue_id} has been completed.", 'nurse')
     else:
@@ -675,10 +666,7 @@ def queue_transfer(queue_id):
 
 @app.route('/queue/remove/<queue_id>')
 def remove_from_queue(queue_id):
-    queue_item = next((q for q in hms.queue if q.queue_id == queue_id), None)
-    if queue_item:
-        hms.queue.remove(queue_item)
-        hms.save_data()
+    if hms.remove_from_queue(queue_id):
         flash('Patient removed from queue.', 'success')
         notify('Queue Update', f"Queue item {queue_id} has been removed.", 'nurse')
     else:
