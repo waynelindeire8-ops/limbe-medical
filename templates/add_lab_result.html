@@ -3,67 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Lab Result</title>
-    {% include 'includes/styles.html' %}
+    <title>{% if result %}Edit{% else %}Add{% endif %} Lab Result - Limbe Medical</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .form-container {
+            background-color: #f8faff;
+            padding: 40px;
+            border-radius: 12px;
+            max-width: 800px;
+            margin: 20px auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        .form-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #333;
+            text-align: center;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group.full-width {
+            grid-column: 1 / span 2;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #4361ee;
+        }
+        .btn-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        .btn {
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: #4361ee;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #3752d5;
+        }
+        .btn-secondary {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+        .btn-secondary:hover {
+            background-color: #dee2e6;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         {% include 'sidebar.html' %}
+        
         <main class="main-content">
-            <div class="header-bar">
-                <h1>Add Lab Result</h1>
+            <div class="form-container">
+                <div class="form-title">{% if result %}Edit{% else %}Add{% endif %} Lab Result</div>
+                
+                <form method="POST">
+                    <div class="form-grid">
+                        <div class="form-group full-width">
+                            <label>Test Name</label>
+                            <input type="text" name="test_name" value="{{ result.test_name if result else '' }}" required placeholder="e.g. Full Blood Count">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Patient</label>
+                            <select name="patient_id" required>
+                                <option value="">Select Patient</option>
+                                {% for p in patients %}
+                                <option value="{{ p.patient_id }}" {% if (result and result.patient_id == p.patient_id) or (patient_id == p.patient_id) %}selected{% endif %}>
+                                    {{ p.first_name }} {{ p.last_name }} ({{ p.patient_id }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Doctor</label>
+                            <select name="doctor_id" required>
+                                <option value="">Select Doctor</option>
+                                {% for d in doctors %}
+                                <option value="{{ d.doctor_id }}" {% if result and result.doctor_id == d.doctor_id %}selected{% endif %}>
+                                    Dr. {{ d.last_name }} ({{ d.specialty }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Test Date</label>
+                            <input type="date" name="test_date" value="{{ result.test_date if result else today }}" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select name="status">
+                                <option value="Pending" {% if result and result.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                <option value="Completed" {% if result and result.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                <option value="Cancelled" {% if result and result.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Result Value</label>
+                            <input type="text" name="result" value="{{ result.result if result else '' }}" placeholder="e.g. 12.5">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Reference Range</label>
+                            <input type="text" name="reference_range" value="{{ result.reference_range if result else '' }}" placeholder="e.g. 11.0 - 15.0">
+                        </div>
+                        
+                        <div class="form-group full-width">
+                            <label>Notes</label>
+                            <textarea name="notes" rows="4" placeholder="Any additional clinical notes...">{{ result.notes if result else '' }}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="btn-container">
+                        <a href="{{ url_for('lab_results') }}" class="btn btn-secondary" style="text-decoration: none; text-align: center;">Cancel</a>
+                        <button type="submit" class="btn btn-primary">{% if result %}Update{% else %}Save{% endif %} Result</button>
+                    </div>
+                </form>
             </div>
-            <form method="POST">
-                <div class="form-group">
-                    <label>Test Name</label>
-                    <input type="text" name="test_name" required>
-                </div>
-                <div class="form-group">
-                    <label>Patient</label>
-                    <select name="patient_id" required>
-                        {% for p in patients %}
-                            <option value="{{ p.patient_id }}" {% if patient_id == p.patient_id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }} ({{ p.patient_id }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Doctor</label>
-                    <select name="doctor_id" required>
-                        {% for doctor in doctors %}
-                            <option value="{{ doctor.doctor_id }}">Dr. {{ doctor.last_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Test Date</label>
-                    <input type="date" name="test_date" value="{{ today }}" required>
-                </div>
-                <div class="form-group">
-                    <label>Result Value</label>
-                    <input type="text" name="result_value">
-                </div>
-                <div class="form-group">
-                    <label>Units</label>
-                    <input type="text" name="units">
-                </div>
-                <div class="form-group">
-                    <label>Reference Range</label>
-                    <input type="text" name="reference_range">
-                </div>
-                <div class="form-group">
-                    <label>Status</label>
-                    <select name="status">
-                        <option value="Pending">Pending</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Notes</label>
-                    <textarea name="notes"></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">Add Result</button>
-            </form>
         </main>
     </div>
 </body>

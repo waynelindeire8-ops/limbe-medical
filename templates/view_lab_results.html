@@ -3,105 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lab Results</title>
+    <title>Lab Result Details - Limbe Medical</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .table-container {
+        .details-container {
             background-color: white;
+            padding: 40px;
             border-radius: 16px;
+            max-width: 900px;
+            margin: 20px auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        .details-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #f0f2f5;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .patient-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+            background-color: #f8faff;
             padding: 20px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-        th {
-            font-weight: 600;
+        .info-item label {
+            display: block;
+            font-size: 13px;
             color: #666;
-            font-size: 14px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        tr:last-child td {
-            border-bottom: none;
+        .info-item div {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        .result-section {
+            margin-bottom: 40px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .result-block {
+            background: #fff;
+            border: 1px solid #eee;
+            padding: 15px;
+            border-radius: 8px;
         }
         .status-badge {
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        .status-pending {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        .status-completed {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .btn-view {
             padding: 6px 12px;
-            background-color: #eef2ff;
-            color: #4361ee;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 500;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .status-completed { background-color: #ebfbee; color: #2b8a3e; }
+        .status-pending { background-color: #fff4e6; color: #f08c00; }
+        .status-cancelled { background-color: #fff5f5; color: #fa5252; }
+        
+        .notes-area {
+            background-color: #fcfcfc;
+            border-left: 4px solid #4361ee;
+            padding: 20px;
+            font-style: italic;
+            color: #555;
+            line-height: 1.6;
+        }
+        .btn-actions {
+            display: flex;
+            gap: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="container" >
+    <div class="container">
         {% include 'sidebar.html' %}
         
-        <main class="main-content" >
-            <div class="header-actions">
-                <h2>Lab Results</h2>
-            </div>
-            
-            <div class="table-container">
-                {% if medical_records %}
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Patient ID</th>
-                            <th>Doctor</th>
-                            <th>Test Type</th>
-                            <th>Results/Notes</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for record in medical_records %}
-                        <tr>
-                            <td>{{ record.date }}</td>
-                            <td>{{ record.patient_id }}</td>
-                            <td>{{ record.doctor_id }}</td>
-                            <td>
-                                {% if 'blood' in record.consult_reason|lower %}Blood Test
-                                {% elif 'urine' in record.consult_reason|lower %}Urine Analysis
-                                {% elif 'x-ray' in record.consult_reason|lower %}X-Ray
-                                {% else %}General Lab{% endif %}
-                            </td>
-                            <td>{{ record.diagnosis }}</td>
-                            <td>
-                                <a href="#" class="btn-view">View Report</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div style="text-align: center; padding: 50px; color: #888;">
-                    <i class="fas fa-flask" style="font-size: 48px; margin-bottom: 20px; color: #ddd;"></i>
-                    <h3>No lab results found</h3>
-                    <p>Records with "Lab", "Blood", or "Test" in their details will appear here.</p>
+        <main class="main-content">
+            <div class="details-container">
+                <div class="details-header">
+                    <div>
+                        <h1 style="margin: 0; color: #333;">{{ result.test_name }}</h1>
+                        <p style="margin: 5px 0 0; color: #666;">Result ID: {{ result.result_id }}</p>
+                    </div>
+                    <div class="btn-actions">
+                        <a href="{{ url_for('edit_lab_result', result_id=result.result_id) }}" class="btn btn-secondary" style="background: #eef2ff; color: #4361ee; padding: 10px 20px; border-radius: 8px; text-decoration: none;"><i class="fas fa-edit"></i> Edit</a>
+                        <a href="{{ url_for('lab_results') }}" class="btn btn-secondary" style="background: #f8f9fa; color: #666; padding: 10px 20px; border-radius: 8px; text-decoration: none;">Back</a>
+                    </div>
+                </div>
+
+                <div class="patient-info">
+                    <div class="info-item">
+                        <label>Patient</label>
+                        <div>{{ patient.first_name }} {{ patient.last_name }} ({{ patient.patient_id }})</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Attending Doctor</label>
+                        <div>Dr. {{ doctor.last_name if doctor else 'N/A' }}</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Test Date</label>
+                        <div>{{ result.test_date }}</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Status</label>
+                        <div>
+                            <span class="status-badge status-{{ result.status|lower }}">
+                                {{ result.status }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-section">
+                    <div class="section-title"><i class="fas fa-microscope"></i> Test Findings</div>
+                    <div class="result-grid">
+                        <div class="result-block">
+                            <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">RESULT VALUE</label>
+                            <div style="font-size: 20px; font-weight: 700; color: #4361ee;">{{ result.result or 'Pending' }}</div>
+                        </div>
+                        <div class="result-block">
+                            <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">REFERENCE RANGE</label>
+                            <div style="font-size: 18px; font-weight: 600;">{{ result.reference_range or 'N/A' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if result.notes %}
+                <div class="result-section">
+                    <div class="section-title"><i class="fas fa-comment-medical"></i> Clinical Notes</div>
+                    <div class="notes-area">
+                        {{ result.notes }}
+                    </div>
                 </div>
                 {% endif %}
             </div>

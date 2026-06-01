@@ -541,12 +541,13 @@ def queue_checkin():
         try:
             patient_id = request.form.get('patient_id', '').strip()
             doctor_id = request.form.get('doctor_id', '').strip()
-            priority = request.form.get('priority', 'Normal')
+            priority = request.form.get('priority', 'Routine')
             notes = request.form.get('notes', '')
             patient = hms.get_patient(patient_id)
             if not patient:
                 flash('Patient not found!', 'error')
                 return redirect(url_for('queue_checkin'))
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             queue_item = QueueItem(
                 queue_id=hms.generate_id('Q'),
                 patient_id=patient_id,
@@ -554,10 +555,12 @@ def queue_checkin():
                 doctor_id=doctor_id,
                 priority=priority,
                 status='Waiting',
-                notes=notes,
-                timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                visit_reason=notes,
+                date_added=now_str,
+                arrival_time=now_str,
+                check_in_time=now_str
             )
-            hms.queue.append(queue_item)
+            hms.db.save('queue', queue_item, 'queue_id')
             hms.save_data()
             flash(f'{patient.first_name} {patient.last_name} checked in successfully!', 'success')
             notify('Queue Check-in', f"{patient.first_name} {patient.last_name} has checked in.", 'nurse')
@@ -691,9 +694,10 @@ def add_to_queue(patient_id):
         return redirect(url_for('patients'))
     if request.method == 'POST':
         try:
-            priority = request.form.get('priority', 'Normal')
+            priority = request.form.get('priority', 'Routine')
             notes = request.form.get('notes', '')
             doctor_id = request.form.get('doctor_id', '')
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             queue_item = QueueItem(
                 queue_id=hms.generate_id('Q'),
                 patient_id=patient_id,
@@ -701,14 +705,16 @@ def add_to_queue(patient_id):
                 doctor_id=doctor_id,
                 priority=priority,
                 status='Waiting',
-                notes=notes,
-                timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                visit_reason=notes,
+                date_added=now_str,
+                arrival_time=now_str,
+                check_in_time=now_str
             )
-            hms.queue.append(queue_item)
+            hms.db.save('queue', queue_item, 'queue_id')
             hms.save_data()
             flash('Patient added to queue successfully!', 'success')
             notify('Queue Update', f"{patient.first_name} {patient.last_name} added to queue.", 'nurse')
-            return redirect(request.referrer or url_for('queue_dashboard'))
+            return redirect(url_for('queue_dashboard'))
         except Exception as e:
             flash(f'Error adding to queue: {e}', 'error')
     doctors = hms.doctors if hms.doctors else hms.get_all_doctors()
@@ -772,7 +778,8 @@ def patient_details(patient_id):
     if not patient:
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
-    hms.sync_patient_attachments(patient_id)
+    if hasattr(hms, 'sync_patient_attachments'):
+        hms.sync_patient_attachments(patient_id)
     files = hms.patient_files.get(patient_id, [])
     appointments = hms.get_patient_appointments(patient_id)
     medical_records = hms.get_patient_medical_records(patient_id)
@@ -1577,7 +1584,48 @@ def print_prescription(prescription_id):
 
 @app.route('/medical_records')
 def medical_records():
-    return redirect(url_for('create_medical_record'))
+    page = request.args.get('page', 1, type=int)
+    search_term = request.args.get('search', '').strip()
+    per_page = 20
+    
+    conn = hms.db.get_connection()
+    cursor = conn.cursor()
+    
+    if search_term:
+        search_value = f"%{search_term}%"
+        cursor.execute("""
+            SELECT * FROM medical_records 
+            WHERE record_id LIKE ? OR patient_id LIKE ? OR diagnosis LIKE ? 
+            ORDER BY date DESC LIMIT ? OFFSET ?
+        """, (search_value, search_value, search_value, per_page, (page - 1) * per_page))
+        rows = cursor.fetchall()
+        cursor.execute("""
+            SELECT COUNT(*) FROM medical_records 
+            WHERE record_id LIKE ? OR patient_id LIKE ? OR diagnosis LIKE ?
+        """, (search_value, search_value, search_value))
+        total_count = cursor.fetchone()[0]
+    else:
+        cursor.execute("SELECT * FROM medical_records ORDER BY date DESC LIMIT ? OFFSET ?",
+                       (per_page, (page - 1) * per_page))
+        rows = cursor.fetchall()
+        cursor.execute("SELECT COUNT(*) FROM medical_records")
+        total_count = cursor.fetchone()[0]
+    
+    conn.close()
+    records_list = [hms.db._row_to_obj(MedicalRecord, row) for row in rows]
+    
+    # Enrich records with patient and doctor names
+    for record in records_list:
+        p = hms.get_patient(record.patient_id)
+        d = hms.get_doctor(record.doctor_id)
+        record.patient_name = f"{p.first_name} {p.last_name}" if p else record.patient_id
+        record.doctor_name = f"Dr. {d.last_name}" if d else record.doctor_id
+        
+    total_pages = math.ceil(total_count / per_page) if total_count else 1
+    
+    return render_template('medical_records.html', records=records_list, page=page,
+                           total_pages=total_pages, total_count=total_count,
+                           search_term=search_term, active_page='patients')
 
 
 @app.route('/medical_records/add', methods=['GET', 'POST'])
@@ -1837,16 +1885,43 @@ def view_medical_record(record_id):
                            doctor=doctor, active_page='patients')
 
 
+@app.route('/delete_medical_record/<record_id>')
+def delete_medical_record(record_id):
+    record = hms.get_medical_record(record_id)
+    if not record:
+        flash('Medical record not found!', 'error')
+        return redirect(url_for('patients'))
+    
+    patient_id = record.patient_id
+    if hms.db.delete('medical_records', record_id, 'record_id'):
+        flash('Medical record deleted successfully!', 'success')
+    else:
+        flash('Failed to delete medical record.', 'error')
+    return redirect(url_for('patient_details', patient_id=patient_id))
+
+
 @app.route('/patients/<patient_id>/records')
 def patient_records(patient_id):
     patient = hms.get_patient(patient_id)
     if not patient:
         flash('Patient not found!', 'error')
         return redirect(url_for('patients'))
-    records = hms.get_patient_medical_records(patient_id)
-    files = hms.patient_files.get(patient_id, [])
-    return render_template('view_medical_records.html', patient=patient, records=records,
-                           files=files, active_page='patients')
+    
+    conn = hms.db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM medical_records WHERE patient_id = ? ORDER BY date DESC", (patient_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    records = [hms.db._row_to_obj(MedicalRecord, row) for row in rows]
+    for record in records:
+        d = hms.get_doctor(record.doctor_id)
+        record.doctor_name = f"Dr. {d.last_name}" if d else record.doctor_id
+        record.patient_name = f"{patient.first_name} {patient.last_name}"
+
+    return render_template('medical_records.html', records=records, patient=patient, 
+                           total_pages=1, total_count=len(records), page=1,
+                           active_page='patients')
 
 
 # ── LAB RESULTS ───────────────────────────────────────────────────────────────
@@ -1926,6 +2001,47 @@ def view_lab_results(result_id):
     doctor = hms.get_doctor(result.doctor_id) if hasattr(result, 'doctor_id') else None
     return render_template('view_lab_results.html', result=result, patient=patient,
                            doctor=doctor, active_page='lab_results')
+
+
+@app.route('/lab_results/edit/<result_id>', methods=['GET', 'POST'])
+def edit_lab_result(result_id):
+    result = hms.get_lab_result(result_id)
+    if not result:
+        flash('Lab result not found!', 'error')
+        return redirect(url_for('lab_results'))
+
+    if request.method == 'POST':
+        try:
+            result.patient_id = request.form.get('patient_id', '').strip()
+            result.doctor_id = request.form.get('doctor_id', '').strip()
+            result.test_name = request.form.get('test_name', '').strip()
+            result.result = request.form.get('result', '').strip()
+            result.status = request.form.get('status', 'Pending').strip()
+            result.notes = request.form.get('notes', '').strip()
+            result.test_date = request.form.get('test_date', '').strip()
+            result.reference_range = request.form.get('reference_range', '').strip()
+            
+            if hms.update_lab_result(result):
+                flash('Lab result updated successfully!', 'success')
+                return redirect(url_for('view_lab_results', result_id=result_id))
+            else:
+                flash('Failed to update lab result.', 'error')
+        except Exception as e:
+            flash(f'Error updating lab result: {e}', 'error')
+
+    patients = hms.patients if hms.patients else hms.get_all_patients()
+    doctors = hms.doctors if hms.doctors else hms.get_all_doctors()
+    return render_template('add_lab_result.html', result=result, patients=patients, 
+                           doctors=doctors, active_page='lab_results')
+
+
+@app.route('/lab_results/delete/<result_id>')
+def delete_lab_result(result_id):
+    if hms.delete_lab_result(result_id):
+        flash('Lab result deleted successfully!', 'success')
+    else:
+        flash('Failed to delete lab result.', 'error')
+    return redirect(url_for('lab_results'))
 
 
 # ── INVENTORY ─────────────────────────────────────────────────────────────────
