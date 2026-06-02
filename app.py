@@ -2244,6 +2244,20 @@ def disable_user_2fa(username):
 
 # ── SETTINGS ──────────────────────────────────────────────────────────────────
 
+@app.route('/admin/force_cloud_sync')
+@admin_required
+def force_cloud_sync():
+    """Force a full pull of all data from Supabase."""
+    try:
+        print("[INFO] Admin triggered force cloud sync...")
+        hms.db.pull_all_from_supabase()
+        hms.load_data() # Reload metadata from JSON too
+        flash('Successfully synced all data from cloud!', 'success')
+    except Exception as e:
+        flash(f'Error during cloud sync: {e}', 'error')
+    return redirect(url_for('settings'))
+
+
 @app.route('/settings', methods=['GET', 'POST'])
 @admin_required
 def settings():

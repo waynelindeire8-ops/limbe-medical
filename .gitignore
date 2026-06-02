@@ -1,1 +1,13 @@
-__pycache__/  *.pyc  *.db-journal 
+__pycache__/
+*.pyc
+*.db-journal
+*.db
+*.json
+.env
+venv/
+.vscode/
+*.log
+*.txt
+attachments/
+!PROJECT_SUMMARY.md
+!README.md
