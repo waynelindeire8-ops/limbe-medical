@@ -2249,15 +2249,32 @@ def disable_user_2fa(username):
 def settings():
     if request.method == 'POST':
         try:
+            # Interface & Appearance
+            hms.settings['theme'] = request.form.get('theme', 'Light')
+            hms.settings['language'] = request.form.get('language', 'English')
+            hms.settings['date_format'] = request.form.get('date_format', 'DD/MM/YYYY')
+            
+            # Notifications & Backups
+            hms.settings['notifications'] = 'notifications' in request.form
+            hms.settings['auto_backup'] = 'auto_backup' in request.form
+            
+            # Integration & Server
+            hms.settings['server_url'] = request.form.get('server_url', '').strip() or None
+            hms.settings['supabase_url'] = request.form.get('supabase_url', '').strip()
+            hms.settings['supabase_project_id'] = request.form.get('supabase_project_id', '').strip()
+            hms.settings['supabase_api_key'] = request.form.get('supabase_api_key', '').strip()
+            hms.settings['supabase_service_role'] = request.form.get('supabase_service_role', '').strip()
+            
+            # Hospital Info
             hms.settings['hospital_name'] = request.form.get('hospital_name', 'Hospital')
             hms.settings['hospital_address'] = request.form.get('hospital_address', '')
             hms.settings['hospital_phone'] = request.form.get('hospital_phone', '')
             hms.settings['hospital_email'] = request.form.get('hospital_email', '')
             hms.settings['currency'] = request.form.get('currency', 'MWK')
-            hms.settings['notifications'] = 'notifications' in request.form
-            hms.settings['appointment_reminder'] = 'appointment_reminder' in request.form
-            hms.settings['low_stock_alert'] = 'low_stock_alert' in request.form
+            
+            # Inventory
             hms.settings['low_stock_threshold'] = int(request.form.get('low_stock_threshold', 10))
+            
             hms.save_data()
             flash('Settings saved successfully!', 'success')
         except Exception as e:
@@ -2353,6 +2370,65 @@ def delete_appointment(appointment_id):
 
 
 # ── ENTRY POINT ───────────────────────────────────────────────────────────────
+
+# ── API ───────────────────────────────────────────────────────────────────────
+
+@app.route('/api/receive-sync', methods=['GET', 'POST'])
+def receive_sync():
+    """Endpoint for receiving data sync from other instances."""
+    if request.method == 'GET':
+        return jsonify({
+            'status': 'ready',
+            'system': 'Limbe Medical Clinic HMS',
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON data'}), 400
+            
+        # Apply the sync data
+        hms._apply_loaded_data(data)
+        
+        # Save metadata locally
+        hms.save_data()
+        
+        # Force individual record updates to DB if present
+        if 'patients' in data:
+            for p_data in data['patients']:
+                patient = Patient(**{k: v for k, v in p_data.items() if k in Patient.__dataclass_fields__})
+                hms.db.save('patients', patient, 'patient_id')
+        
+        return jsonify({'ok': True, 'received_at': datetime.datetime.now().isoformat()})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bill/<bill_id>')
+def api_get_bill(bill_id):
+    """API endpoint to get bill details."""
+    conn = hms.db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM bills WHERE bill_id = ?", (bill_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'error': 'Bill not found'}), 404
+    bill = hms.db._row_to_obj(Bill, row)
+    return jsonify(asdict(bill))
+
+
+@app.route('/api/billing/autosave', methods=['POST'])
+def api_billing_autosave():
+    """API endpoint for billing autosave."""
+    try:
+        data = request.get_json()
+        # For now, just return success as it's a client-side feature
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     try:
