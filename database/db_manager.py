@@ -289,6 +289,45 @@ class DatabaseManager:
                 d[k] = 1 if v else 0
         return d
 
+    def pull_all_from_supabase(self):
+        """Pull all records from Supabase tables into local SQLite"""
+        if not self.use_supabase:
+            return
+            
+        print("[INFO] Pulling all data from Supabase...")
+        
+        table_models = {
+            'patients': (Patient, 'patient_id'),
+            'doctors': (Doctor, 'doctor_id'),
+            'appointments': (Appointment, 'appointment_id'),
+            'medical_records': (MedicalRecord, 'record_id'),
+            'prescriptions': (Prescription, 'prescription_id'),
+            'bills': (Bill, 'bill_id'),
+            'inventory': (InventoryItem, 'item_id'),
+            'users': (User, 'user_id'),
+            'queue': (QueueItem, 'queue_id'),
+            'lab_results': (LabResult, 'result_id')
+        }
+        
+        for table, (model_cls, id_field) in table_models.items():
+            try:
+                supabase_table = SupabaseConfig.TABLES.get(table, table)
+                records = supabase_client.select(supabase_table)
+                if records:
+                    print(f"  - Table '{table}': found {len(records)} records")
+                    conn = self.get_connection()
+                    for r in records:
+                        try:
+                            # Convert back to dataclass to use the generic save logic
+                            # (which handles JSON fields, etc.)
+                            obj = model_cls(**{k: v for k, v in r.items() if k in {f.name for f in fields(model_cls)}})
+                            self.save(table, obj, id_field)
+                        except Exception as e:
+                            print(f"    [WARN] Error saving record {r.get(id_field)} to {table}: {e}")
+                    conn.close()
+            except Exception as e:
+                print(f"  [ERROR] Failed to pull table {table}: {e}")
+
     def save(self, table: str, obj: Any, id_field: str) -> bool:
         """Generic save (insert or replace)"""
         try:
@@ -303,7 +342,11 @@ class DatabaseManager:
             conn.close()
             
             if self.use_supabase:
-                supabase_client.insert(table, asdict(obj)) # Supabase handles dicts/lists
+                try:
+                    supabase_table = SupabaseConfig.TABLES.get(table, table)
+                    supabase_client.upsert(supabase_table, self._obj_to_dict(obj))
+                except Exception as e:
+                    print(f"[WARN] Supabase upsert failed for {table}: {e}")
             
             # Sync to backup server if configured
             self.sync_to_backup(table, obj)
@@ -323,7 +366,11 @@ class DatabaseManager:
             conn.close()
             
             if self.use_supabase:
-                supabase_client.delete(table, id_field, id_value)
+                try:
+                    supabase_table = SupabaseConfig.TABLES.get(table, table)
+                    supabase_client.delete(supabase_table, id_field, id_value)
+                except Exception as e:
+                    print(f"[WARN] Supabase delete failed for {table}: {e}")
             return True
         except Exception as e:
             print(f"Error deleting from {table}: {e}")

@@ -27,6 +27,8 @@ class SupabaseConfig:
         'bills': 'bills',
         'inventory': 'inventory_items',
         'users': 'users',
+        'queue': 'queue',
+        'lab_results': 'lab_results'
     }
     
     # Connection settings
@@ -76,18 +78,22 @@ class SupabaseClient:
         return self._client
     
     # CRUD Operations
-    def insert(self, table: str, data: Dict[str, Any]) -> Optional[Dict]:
-        """Insert record into table"""
+    def upsert(self, table: str, data: Dict[str, Any]) -> Optional[Dict]:
+        """Upsert record into table"""
         try:
             client = self.get_client()
             if not client:
                 return None
             
-            response = client.table(table).insert(data).execute()
+            response = client.table(table).upsert(data).execute()
             return response.data[0] if response.data else None
         except Exception as e:
-            print(f"Error inserting into {table}: {str(e)}")
+            print(f"Error upserting into {table}: {str(e)}")
             return None
+    
+    def insert(self, table: str, data: Dict[str, Any]) -> Optional[Dict]:
+        """Insert record into table"""
+        return self.upsert(table, data)
     
     def select(self, table: str, filters: Optional[Dict] = None) -> Optional[list]:
         """Select records from table"""

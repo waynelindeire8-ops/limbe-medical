@@ -46,7 +46,10 @@ class HospitalManagementSystem:
     def __init__(self, data_file: str = "hospital_data.json", db_file: str = "hospital_data.db"):
         self.data_file = data_file
         self.db_file = db_file
-        self.db = DatabaseManager(db_file=db_file)
+        
+        # Enable Supabase by default on Render or if credentials exist
+        use_supabase = os.environ.get('RENDER') is not None or os.environ.get('SUPABASE_URL') is not None
+        self.db = DatabaseManager(db_file=db_file, use_supabase=use_supabase)
 
         # Cache settings for fast access, other data stays in DB
         self.settings: Dict[str, Any] = {
@@ -90,9 +93,15 @@ class HospitalManagementSystem:
                     pass
             self.data_file = onedrive_path
 
+        # 1. Load metadata (settings, files, etc.)
         self.load_data()
 
-        # Check for legacy data migration — skipped automatically if DB already has data
+        # 2. If the database is empty, try to pull from Supabase Cloud
+        if self.db.count('patients') == 0 and self.db.use_supabase:
+            print("[INFO] Fresh environment detected. Syncing from cloud...")
+            self.db.pull_all_from_supabase()
+
+        # 3. Check for legacy data migration — skipped automatically if DB already has data
         self._migrate_json_to_db()
 
     @property
@@ -483,16 +492,38 @@ class HospitalManagementSystem:
             print(f"[ERROR] Failed to save data: {e}")
 
     def load_data(self) -> None:
-        """Load metadata from JSON file."""
-        if not os.path.exists(self.data_file):
-            return
+        """Load metadata from JSON file or Supabase."""
+        data = None
+        
+        # 1. Try local file
+        if os.path.exists(self.data_file):
+            try:
+                with open(self.data_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            except Exception as e:
+                print(f"[ERROR] Failed to load local data from {self.data_file}: {e}")
+        
+        # 2. If no local data, try Supabase JSON
+        if not data and self.db.use_supabase:
+            try:
+                print("[INFO] No local JSON metadata found. Attempting to restore from Supabase Storage...")
+                from supabase_data_manager import get_supabase_json
+                data = get_supabase_json()
+                if data:
+                    # Cache it locally for performance
+                    try:
+                        with open(self.data_file, 'w', encoding='utf-8') as f:
+                            json.dump(data, f, indent=2)
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"[WARN] Failed to pull metadata from Supabase: {e}")
 
-        try:
-            with open(self.data_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+        if data:
             self._apply_metadata(data)
-        except Exception as e:
-            print(f"[ERROR] Failed to load data from {self.data_file}: {e}")
+            # Also apply to caches so migration can pick it up if DB is empty
+            # (though pull_all_from_supabase handles the DB directly now)
+            self._apply_loaded_data(data)
 
     def _apply_metadata(self, data: Dict[str, Any]) -> None:
         """Apply metadata from loaded JSON."""
