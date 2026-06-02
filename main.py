@@ -859,9 +859,8 @@ class HospitalManagementSystem:
                         self.patient_files[master_id] = []
                     self.patient_files[master_id].extend(self.patient_files.pop(dup_id))
                 
-                # Soft delete the duplicate
-                conn.execute("UPDATE patients SET is_deleted = 1, deleted_at = ? WHERE patient_id = ?", 
-                             (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), dup_id))
+                # PERMANENTLY delete the duplicate instead of soft-deleting
+                conn.execute("DELETE FROM patients WHERE patient_id = ?", (dup_id,))
             
             conn.commit()
             self.save_data()
