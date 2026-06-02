@@ -2377,30 +2377,67 @@ def delete_appointment(appointment_id):
 def receive_sync():
     """Endpoint for receiving data sync from other instances."""
     if request.method == 'GET':
-        return jsonify({
+        # Provide a summary of current data to help user verify sync
+        stats = {
             'status': 'ready',
             'system': 'Limbe Medical Clinic HMS',
+            'message': 'Sync system is active. View your data at /dashboard or /patients.',
+            'database_summary': {
+                'patients': hms.get_patients_count(),
+                'doctors': hms.get_doctors_count(),
+                'appointments': hms.get_appointments_count(),
+                'medical_records': hms.get_medical_records_count(),
+                'bills': hms.get_bills_count(),
+                'inventory': hms.db.count('inventory'),
+                'users': hms.db.count('users')
+            },
             'timestamp': datetime.datetime.now().isoformat()
-        })
+        }
+        return jsonify(stats)
     
     try:
         data = request.get_json()
         if not data:
             return jsonify({'error': 'Invalid JSON data'}), 400
             
-        # Apply the sync data
-        hms._apply_loaded_data(data)
-        
-        # Save metadata locally
+        # 1. Update metadata in memory and JSON
+        hms._apply_metadata(data)
         hms.save_data()
         
-        # Force individual record updates to DB if present
-        if 'patients' in data:
-            for p_data in data['patients']:
-                patient = Patient(**{k: v for k, v in p_data.items() if k in Patient.__dataclass_fields__})
-                hms.db.save('patients', patient, 'patient_id')
-        
-        return jsonify({'ok': True, 'received_at': datetime.datetime.now().isoformat()})
+        # 2. Update clinical data in Database
+        counts = {}
+        table_mapping = {
+            'patients': (Patient, 'patient_id'),
+            'doctors': (Doctor, 'doctor_id'),
+            'appointments': (Appointment, 'appointment_id'),
+            'medical_records': (MedicalRecord, 'record_id'),
+            'prescriptions': (Prescription, 'prescription_id'),
+            'bills': (Bill, 'bill_id'),
+            'inventory': (InventoryItem, 'item_id'),
+            'users': (User, 'user_id'),
+            'queue': (QueueItem, 'queue_id'),
+            'lab_results': (LabResult, 'result_id')
+        }
+
+        for key, (model_cls, id_field) in table_mapping.items():
+            if key in data:
+                added = 0
+                for item_data in data[key]:
+                    try:
+                        # Clean data for dataclass
+                        filtered_data = {k: v for k, v in item_data.items() if k in model_cls.__dataclass_fields__}
+                        obj = model_cls(**filtered_data)
+                        if hms.db.save(key, obj, id_field):
+                            added += 1
+                    except Exception:
+                        continue
+                counts[key] = added
+
+        return jsonify({
+            'ok': True, 
+            'received_at': datetime.datetime.now().isoformat(),
+            'records_updated': counts
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
