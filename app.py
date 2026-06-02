@@ -2377,7 +2377,13 @@ def delete_appointment(appointment_id):
 def receive_sync():
     """Endpoint for receiving data sync from other instances."""
     if request.method == 'GET':
-        # Provide a summary of current data to help user verify sync
+        # Provide a summary and a list of recent patients to help user verify sync
+        conn = hms.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT patient_id, first_name, last_name, created_date FROM patients WHERE is_deleted = 0 ORDER BY rowid DESC LIMIT 20")
+        recent_patients = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
         stats = {
             'status': 'ready',
             'system': 'Limbe Medical Clinic HMS',
@@ -2391,6 +2397,7 @@ def receive_sync():
                 'inventory': hms.db.count('inventory'),
                 'users': hms.db.count('users')
             },
+            'recent_patients': recent_patients,
             'timestamp': datetime.datetime.now().isoformat()
         }
         return jsonify(stats)
