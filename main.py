@@ -428,13 +428,16 @@ class HospitalManagementSystem:
         # =========================
         # Queue
         # =========================
+        today_prefix = datetime.datetime.now().strftime("%Y-%m-%d")
         for q in self._queue_cache:
-            save_if_missing(
-                'queue',
-                q,
-                'queue_id',
-                QueueItem
-            )
+            # Only migrate queue items from today to avoid stale data reappearing
+            if q.date_added and q.date_added.startswith(today_prefix):
+                save_if_missing(
+                    'queue',
+                    q,
+                    'queue_id',
+                    QueueItem
+                )
 
         # =========================
         # Lab Results
@@ -800,6 +803,44 @@ class HospitalManagementSystem:
         conn.close()
 
         return [self.db._row_to_obj(Patient, row) for row in rows]
+
+    def merge_patients(self, master_id: str, duplicate_ids: List[str]) -> bool:
+        """Merge duplicate patient records into a master record."""
+        master = self.get_patient(master_id)
+        if not master:
+            print(f"[ERROR] merge_patients: Master patient {master_id} not found")
+            return False
+
+        conn = self.db.get_connection()
+        try:
+            for dup_id in duplicate_ids:
+                if dup_id == master_id:
+                    continue
+                
+                # Update all related tables
+                tables = ['appointments', 'medical_records', 'prescriptions', 'bills', 'lab_results', 'queue']
+                for table in tables:
+                    conn.execute(f"UPDATE {table} SET patient_id = ? WHERE patient_id = ?", (master_id, dup_id))
+                
+                # Transfer files if any
+                if dup_id in self.patient_files:
+                    if master_id not in self.patient_files:
+                        self.patient_files[master_id] = []
+                    self.patient_files[master_id].extend(self.patient_files.pop(dup_id))
+                
+                # Soft delete the duplicate
+                conn.execute("UPDATE patients SET is_deleted = 1, deleted_at = ? WHERE patient_id = ?", 
+                             (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), dup_id))
+            
+            conn.commit()
+            self.save_data()
+            return True
+        except Exception as e:
+            print(f"[ERROR] merge_patients failed: {e}")
+            conn.rollback()
+            return False
+        finally:
+            conn.close()
 
     def update_patient(self, original_id: str, **kwargs) -> bool:
         patient = self.get_patient(original_id)
@@ -1380,9 +1421,17 @@ class HospitalManagementSystem:
         return [self.db._row_to_obj(Appointment, row) for row in rows]
 
     def get_active_queue(self, limit: int = 50) -> List[QueueItem]:
+        """Get all patients currently in the queue who haven't completed their visit today."""
         conn = self.db.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM queue WHERE status != 'Completed' ORDER BY check_in_time ASC LIMIT ?", (limit,))
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        # Statuses: 'Waiting', 'Calling', 'With Doctor', 'In Lab', 'Completed'
+        cursor.execute("""
+            SELECT * FROM queue 
+            WHERE status != 'Completed' 
+            AND date_added LIKE ?
+            ORDER BY check_in_time ASC LIMIT ?
+        """, (f"{today}%", limit))
         rows = cursor.fetchall()
         conn.close()
         return [self.db._row_to_obj(QueueItem, row) for row in rows]
@@ -1726,8 +1775,19 @@ class HospitalHTTPHandler(BaseHTTPRequestHandler):
                 self._send_json({'error': 'invalid json'}, 400)
                 return
             try:
+                # 1. Save locally
                 with open(self.hms.data_file, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=2)
+                
+                # 2. Sync to cloud (Supabase) if configured
+                if self.hms.db.use_supabase:
+                    try:
+                        from supabase_data_manager import put_supabase_json
+                        put_supabase_json(data)
+                    except Exception as e:
+                        print(f"[WARN] Supabase sync failed during backup server POST: {e}")
+
+                # 3. Apply to memory/DB
                 self.hms._apply_loaded_data(data)
             except Exception as e:
                 self._send_json({'error': str(e)}, 500)

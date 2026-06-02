@@ -716,20 +716,22 @@ def patients():
     page = request.args.get('page', 1, type=int)
     search_term = request.args.get('search', '').replace(',', ' ').strip()
     search_term = " ".join(search_term.split())
-    per_page = 10
+    per_page = 25
 
     conn = hms.db.get_connection()
     cursor = conn.cursor()
 
     if search_term:
         search_value = f"%{search_term}%"
-        query_params = (search_value, search_value, search_value, search_value, search_value, search_value)
+        # Search for full name, reverse full name, ID, and phone
+        query_params = (search_value, search_value, search_value, search_value, search_value, search_value, search_value)
         cursor.execute("""
             SELECT * FROM patients
             WHERE is_deleted = 0 AND (
                 patient_id LIKE ? OR first_name LIKE ? OR last_name LIKE ?
                 OR (first_name || ' ' || last_name) LIKE ?
                 OR (last_name || ' ' || first_name) LIKE ?
+                OR REPLACE(first_name || ' ' || last_name, '  ', ' ') LIKE ?
                 OR phone LIKE ?
             )
             ORDER BY rowid DESC LIMIT ? OFFSET ?
@@ -741,6 +743,7 @@ def patients():
                 patient_id LIKE ? OR first_name LIKE ? OR last_name LIKE ?
                 OR (first_name || ' ' || last_name) LIKE ?
                 OR (last_name || ' ' || first_name) LIKE ?
+                OR REPLACE(first_name || ' ' || last_name, '  ', ' ') LIKE ?
                 OR phone LIKE ?
             )
         """, query_params)
@@ -812,9 +815,12 @@ def add_patient():
                 scheme_provider=request.form.get('scheme_provider', ''),
                 scheme_type=request.form.get('scheme_type', '')
             )
-            hms.add_patient(new_patient)
-            flash('Patient added successfully!', 'success')
-            return redirect(url_for('patients'))
+            if hms.add_patient(new_patient):
+                flash('Patient added successfully!', 'success')
+                return redirect(url_for('patients'))
+            else:
+                flash('Error adding patient: ID might already be in use or database error.', 'error')
+                return render_template('add_patient.html', active_page='patients', providers=PROVIDERS)
         except Exception as e:
             print("ADD PATIENT ERROR:", e)
             flash(f'Error adding patient: {e}', 'error')
@@ -1021,10 +1027,12 @@ def add_doctor():
                 is_locum=1 if 'is_locum' in request.form else 0,
                 locum_name=request.form.get('locum_name', '')
             )
-            hms.add_doctor(new_doctor)
-            flash('Doctor added successfully!', 'success')
-            notify('Doctor added', f"{new_doctor.first_name} {new_doctor.last_name} ({new_doctor.doctor_id})", 'admin')
-            return redirect(url_for('doctors'))
+            if hms.add_doctor(new_doctor):
+                flash('Doctor added successfully!', 'success')
+                notify('Doctor added', f"{new_doctor.first_name} {new_doctor.last_name} ({new_doctor.doctor_id})", 'admin')
+                return redirect(url_for('doctors'))
+            else:
+                flash('Error adding doctor to database.', 'error')
         except Exception as e:
             flash(f'Error adding doctor: {e}', 'error')
     return render_template('add_doctor.html', active_page='doctors')
@@ -1038,7 +1046,7 @@ def edit_doctor(doctor_id):
         return redirect(url_for('doctors'))
     if request.method == 'POST':
         try:
-            hms.update_doctor(
+            if hms.update_doctor(
                 doctor_id,
                 first_name=request.form['first_name'],
                 last_name=request.form['last_name'],
@@ -1048,10 +1056,12 @@ def edit_doctor(doctor_id):
                 status=request.form['status'],
                 is_locum=1 if 'is_locum' in request.form else 0,
                 locum_name=request.form.get('locum_name', '')
-            )
-            flash('Doctor updated successfully!', 'success')
-            notify('Doctor updated', doctor_id, 'admin')
-            return redirect(url_for('doctors'))
+            ):
+                flash('Doctor updated successfully!', 'success')
+                notify('Doctor updated', doctor_id, 'admin')
+                return redirect(url_for('doctors'))
+            else:
+                flash('Error updating doctor in database.', 'error')
         except Exception as e:
             flash(f'Error updating doctor: {e}', 'error')
     return render_template('edit_doctor.html', doctor=doctor, active_page='doctors')
