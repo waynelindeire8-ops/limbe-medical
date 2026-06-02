@@ -47,8 +47,12 @@ class HospitalManagementSystem:
         self.data_file = data_file
         self.db_file = db_file
         
-        # Enable Supabase by default on Render or if credentials exist
-        use_supabase = os.environ.get('RENDER') is not None or os.environ.get('SUPABASE_URL') is not None
+        # Enable Supabase if RENDER is detected, if credentials exist, or if we can connect via fallbacks
+        from supabase_data_manager import supabase_connected
+        use_supabase = (os.environ.get('RENDER') is not None or 
+                        os.environ.get('SUPABASE_URL') is not None or 
+                        supabase_connected())
+        
         self.db = DatabaseManager(db_file=db_file, use_supabase=use_supabase)
 
         # Cache settings for fast access, other data stays in DB

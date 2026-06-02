@@ -292,18 +292,22 @@ class DatabaseManager:
     def pull_all_from_supabase(self):
         """Pull all records from Supabase (both Storage JSON and Postgres Tables)"""
         if not self.use_supabase:
+            print("[WARN] pull_all_from_supabase: Supabase sync is disabled.")
             return
             
         print("[INFO] Pulling all data from Supabase...")
         
-        # 1. Try pulling from Storage JSON first (contains full metadata + records)
+        # Temporarily disable supabase sync during pull to avoid feedback loop
+        original_use_supabase = self.use_supabase
+        self.use_supabase = False
+        
         try:
+            # 1. Try pulling from Storage JSON first (contains full metadata + records)
             from supabase_data_manager import get_supabase_json
             cloud_data = get_supabase_json()
             if cloud_data:
                 print(f"[INFO] Found JSON backup in storage with {len(cloud_data.get('patients', []))} patients.")
-                # We can't directly call hms._apply_loaded_data here without circular imports,
-                # but we can save the records to SQLite.
+                
                 table_models = {
                     'patients': (Patient, 'patient_id'),
                     'doctors': (Doctor, 'doctor_id'),
@@ -323,7 +327,6 @@ class DatabaseManager:
                         print(f"  - Restoring {len(records)} {table} from JSON...")
                         for r in records:
                             try:
-                                # Filter fields for dataclass
                                 filtered = {k: v for k, v in r.items() if k in {f.name for f in fields(model_cls)}}
                                 obj = model_cls(**filtered)
                                 self.save(table, obj, id_field)
@@ -332,43 +335,47 @@ class DatabaseManager:
                 
                 # Save settings if present
                 if 'settings' in cloud_data:
-                    with open('hospital_data.json', 'w', encoding='utf-8') as f:
+                    # Use absolute path to ensure we write to the right place
+                    config_dir = os.path.dirname(os.path.abspath(self.db_file))
+                    json_path = os.path.join(config_dir, 'hospital_data.json')
+                    with open(json_path, 'w', encoding='utf-8') as f:
                         json.dump(cloud_data, f, indent=2)
         except Exception as e:
             print(f"[WARN] Failed to pull from JSON storage: {e}")
 
         # 2. Try pulling from Postgres Tables (individual records)
-        table_models = {
-            'patients': (Patient, 'patient_id'),
-            'doctors': (Doctor, 'doctor_id'),
-            'appointments': (Appointment, 'appointment_id'),
-            'medical_records': (MedicalRecord, 'record_id'),
-            'prescriptions': (Prescription, 'prescription_id'),
-            'bills': (Bill, 'bill_id'),
-            'inventory': (InventoryItem, 'item_id'),
-            'users': (User, 'user_id'),
-            'queue': (QueueItem, 'queue_id'),
-            'lab_results': (LabResult, 'result_id')
-        }
-        
-        for table, (model_cls, id_field) in table_models.items():
-            try:
-                supabase_table = SupabaseConfig.TABLES.get(table, table)
-                records = supabase_client.select(supabase_table)
-                if records:
-                    print(f"  - Table '{table}': found {len(records)} records")
-                    conn = self.get_connection()
-                    for r in records:
-                        try:
-                            # Convert back to dataclass to use the generic save logic
-                            # (which handles JSON fields, etc.)
-                            obj = model_cls(**{k: v for k, v in r.items() if k in {f.name for f in fields(model_cls)}})
-                            self.save(table, obj, id_field)
-                        except Exception as e:
-                            print(f"    [WARN] Error saving record {r.get(id_field)} to {table}: {e}")
-                    conn.close()
-            except Exception as e:
-                print(f"  [ERROR] Failed to pull table {table}: {e}")
+        # This acts as a fallback or to get the most recent individual updates
+        try:
+            table_models = {
+                'patients': (Patient, 'patient_id'),
+                'doctors': (Doctor, 'doctor_id'),
+                'appointments': (Appointment, 'appointment_id'),
+                'medical_records': (MedicalRecord, 'record_id'),
+                'prescriptions': (Prescription, 'prescription_id'),
+                'bills': (Bill, 'bill_id'),
+                'inventory': (InventoryItem, 'item_id'),
+                'users': (User, 'user_id'),
+                'queue': (QueueItem, 'queue_id'),
+                'lab_results': (LabResult, 'result_id')
+            }
+            
+            for table, (model_cls, id_field) in table_models.items():
+                try:
+                    supabase_table = SupabaseConfig.TABLES.get(table, table)
+                    records = supabase_client.select(supabase_table)
+                    if records:
+                        print(f"  - Table '{table}': found {len(records)} records in Postgres")
+                        for r in records:
+                            try:
+                                obj = model_cls(**{k: v for k, v in r.items() if k in {f.name for f in fields(model_cls)}})
+                                self.save(table, obj, id_field)
+                            except Exception:
+                                continue
+                except Exception as e:
+                    print(f"  [ERROR] Failed to pull table {table} from Postgres: {e}")
+        finally:
+            # Re-enable sync
+            self.use_supabase = original_use_supabase
 
     def save(self, table: str, obj: Any, id_field: str) -> bool:
         """Generic save (insert or replace)"""
