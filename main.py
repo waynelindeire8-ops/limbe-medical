@@ -466,8 +466,11 @@ class HospitalManagementSystem:
         return f"{prefix}{str(uuid.uuid4())[:8]}"
 
     # ---------- Persistence ----------
-    def save_data(self) -> None:
-        """Save non-relational metadata to JSON. Relational data lives in SQLite."""
+    def save_data(self, include_all_records: bool = True) -> None:
+        """
+        Save metadata and clinical records to JSON. 
+        On Render free plan, this JSON is the primary persistence layer.
+        """
         try:
             data = {
                 'settings': self.settings,
@@ -477,16 +480,31 @@ class HospitalManagementSystem:
                 'departments': self.departments
             }
 
+            # If clinical data should be included (default True for cloud safety)
+            if include_all_records:
+                data.update({
+                    'patients': [asdict(p) for p in self.patients],
+                    'doctors': [asdict(d) for d in self.db.get_all(Doctor, 'doctors', limit=1000)],
+                    'appointments': [asdict(a) for a in self.db.get_all(Appointment, 'appointments', limit=5000)],
+                    'medical_records': [asdict(m) for m in self.db.get_all(MedicalRecord, 'medical_records', limit=5000)],
+                    'prescriptions': [asdict(p) for p in self.db.get_all(Prescription, 'prescriptions', limit=5000)],
+                    'bills': [asdict(b) for b in self.db.get_all(Bill, 'bills', limit=5000)],
+                    'inventory': [asdict(i) for i in self.db.get_all(InventoryItem, 'inventory', limit=2000)],
+                    'users': [asdict(u) for u in self.db.get_all(User, 'users', limit=100)],
+                    'queue': [asdict(q) for q in self.db.get_all(QueueItem, 'queue', limit=500)],
+                    'lab_results': [asdict(lr) for lr in self.db.get_all(LabResult, 'lab_results', limit=2000)]
+                })
+
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
 
-            # Sync with Supabase if enabled
+            # Sync with Supabase Storage if enabled
             if self.db.use_supabase:
                 try:
                     from supabase_data_manager import put_supabase_json
                     put_supabase_json(data)
                 except Exception as e:
-                    print(f"[WARN] Supabase sync failed: {e}")
+                    print(f"[WARN] Supabase Cloud Storage sync failed: {e}")
 
         except Exception as e:
             print(f"[ERROR] Failed to save data: {e}")
@@ -782,6 +800,36 @@ class HospitalManagementSystem:
         return self.patient_scheme.get(patient_id, {})
 
     # ---------- Patients ----------
+    def get_patient_file_path(self, patient_id: str, file_name: str) -> Optional[str]:
+        """Get the local path for a patient file, downloading it from cloud if missing."""
+        base_dir = os.path.dirname(os.path.abspath(self.data_file))
+        local_path = os.path.join(base_dir, 'attachments', patient_id, file_name)
+        
+        if os.path.exists(local_path):
+            return local_path
+            
+        # If missing locally but we use cloud, try to download
+        if self.db.use_supabase:
+            try:
+                from supabase_data_manager import get_supabase_client
+                client = get_supabase_client()
+                if client:
+                    print(f"[INFO] File {file_name} missing locally. Downloading from Supabase...")
+                    bucket = "attachments"
+                    supabase_path = f"{patient_id}/{file_name}"
+                    
+                    # Ensure directory exists
+                    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                    
+                    with open(local_path, 'wb+') as f:
+                        res = client.storage.from_(bucket).download(supabase_path)
+                        f.write(res)
+                    return local_path
+            except Exception as e:
+                print(f"[ERROR] Failed to download {file_name} from Supabase: {e}")
+        
+        return None
+
     def add_patient(self, patient: Patient) -> bool:
         if not patient.patient_id:
             print("[ERROR] add_patient: patient_id is required")
@@ -800,6 +848,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'add', 'patient', patient.patient_id, name)
             except Exception:
                 pass
+            self.save_data() # Ensure cloud sync on every change
             return True
         return False
 
@@ -908,7 +957,10 @@ class HospitalManagementSystem:
             if hasattr(patient, key):
                 setattr(patient, key, value)
 
-        return self.db.save('patients', patient, 'patient_id')
+        success = self.db.save('patients', patient, 'patient_id')
+        if success:
+            self.save_data()
+        return success
 
     def delete_patient(self, patient_id: str, permanent: bool = False) -> bool:
         if permanent:
@@ -917,6 +969,7 @@ class HospitalManagementSystem:
                     self.add_activity(None, 'permanent_delete', 'patient', patient_id, f"Permanently deleted patient {patient_id}")
                 except Exception:
                     pass
+                self.save_data()
                 return True
             return False
 
@@ -930,6 +983,7 @@ class HospitalManagementSystem:
                     self.add_activity(None, 'delete', 'patient', patient_id, f"Soft-deleted patient {patient_id}")
                 except Exception:
                     pass
+                self.save_data()
                 return True
         return False
 

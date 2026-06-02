@@ -290,12 +290,54 @@ class DatabaseManager:
         return d
 
     def pull_all_from_supabase(self):
-        """Pull all records from Supabase tables into local SQLite"""
+        """Pull all records from Supabase (both Storage JSON and Postgres Tables)"""
         if not self.use_supabase:
             return
             
         print("[INFO] Pulling all data from Supabase...")
         
+        # 1. Try pulling from Storage JSON first (contains full metadata + records)
+        try:
+            from supabase_data_manager import get_supabase_json
+            cloud_data = get_supabase_json()
+            if cloud_data:
+                print(f"[INFO] Found JSON backup in storage with {len(cloud_data.get('patients', []))} patients.")
+                # We can't directly call hms._apply_loaded_data here without circular imports,
+                # but we can save the records to SQLite.
+                table_models = {
+                    'patients': (Patient, 'patient_id'),
+                    'doctors': (Doctor, 'doctor_id'),
+                    'appointments': (Appointment, 'appointment_id'),
+                    'medical_records': (MedicalRecord, 'record_id'),
+                    'prescriptions': (Prescription, 'prescription_id'),
+                    'bills': (Bill, 'bill_id'),
+                    'inventory': (InventoryItem, 'item_id'),
+                    'users': (User, 'user_id'),
+                    'queue': (QueueItem, 'queue_id'),
+                    'lab_results': (LabResult, 'result_id')
+                }
+                
+                for table, (model_cls, id_field) in table_models.items():
+                    if table in cloud_data:
+                        records = cloud_data[table]
+                        print(f"  - Restoring {len(records)} {table} from JSON...")
+                        for r in records:
+                            try:
+                                # Filter fields for dataclass
+                                filtered = {k: v for k, v in r.items() if k in {f.name for f in fields(model_cls)}}
+                                obj = model_cls(**filtered)
+                                self.save(table, obj, id_field)
+                            except Exception:
+                                continue
+                
+                # Save settings if present
+                if 'settings' in cloud_data:
+                    with open('hospital_data.json', 'w', encoding='utf-8') as f:
+                        json.dump(cloud_data, f, indent=2)
+        except Exception as e:
+            print(f"[WARN] Failed to pull from JSON storage: {e}")
+
+        # 2. Try pulling from Postgres Tables (individual records)
         table_models = {
             'patients': (Patient, 'patient_id'),
             'doctors': (Doctor, 'doctor_id'),
