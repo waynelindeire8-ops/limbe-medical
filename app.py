@@ -1125,15 +1125,14 @@ def schedule_appointment():
             new_appointment = Appointment(
                 appointment_id=hms.generate_id('A'),
                 patient_id=patient_id,
-                patient_name=f"{patient.first_name} {patient.last_name}",
                 doctor_id=doctor_id,
-                date=date,
-                time=time,
+                appointment_date=date,
+                appointment_time=time,
                 reason=reason,
                 notes=notes,
                 status='Scheduled'
             )
-            hms.add_appointment(new_appointment)
+            hms.schedule_appointment(new_appointment)
             flash('Appointment scheduled successfully!', 'success')
             notify('New Appointment',
                    f"Appointment scheduled for {patient.first_name} {patient.last_name} on {date} at {time}.",
@@ -1408,7 +1407,7 @@ def prescriptions():
         cursor.execute("""
             SELECT * FROM prescriptions
             WHERE prescription_id LIKE ? OR patient_id LIKE ? OR doctor_id LIKE ? OR medication LIKE ?
-            ORDER BY date_prescribed DESC LIMIT ? OFFSET ?
+            ORDER BY date DESC LIMIT ? OFFSET ?
         """, (search_value, search_value, search_value, search_value, per_page, (page - 1) * per_page))
         rows = cursor.fetchall()
         cursor.execute("""
@@ -1417,7 +1416,7 @@ def prescriptions():
         """, (search_value, search_value, search_value, search_value))
         total_count = cursor.fetchone()[0]
     else:
-        cursor.execute("SELECT * FROM prescriptions ORDER BY date_prescribed DESC LIMIT ? OFFSET ?",
+        cursor.execute("SELECT * FROM prescriptions ORDER BY date DESC LIMIT ? OFFSET ?",
                        (per_page, (page - 1) * per_page))
         rows = cursor.fetchall()
         cursor.execute("SELECT COUNT(*) FROM prescriptions")
@@ -1437,36 +1436,41 @@ def add_prescription():
         try:
             patient_id = request.form.get('patient_id', '').strip()
             doctor_id = request.form.get('doctor_id', '').strip()
-            medication = request.form.get('medication', '').strip()
-            dosage = request.form.get('dosage', '').strip()
-            frequency = request.form.get('frequency', '').strip()
+            medications = request.form.getlist('medication[]')
+            medication_str = ", ".join([m.strip() for m in medications if m.strip()])
             duration = request.form.get('duration', '').strip()
             notes = request.form.get('notes', '').strip()
-            date_prescribed = request.form.get('date_prescribed', datetime.datetime.now().strftime("%Y-%m-%d")).strip()
-            if not patient_id or not medication:
+            date = request.form.get('date', datetime.datetime.now().strftime("%Y-%m-%d")).strip()
+            status = request.form.get('status', 'Active').strip()
+            
+            if not patient_id or not medication_str:
                 flash('Patient and medication are required!', 'error')
                 return redirect(url_for('add_prescription'))
+                
             patient = hms.get_patient(patient_id)
             if not patient:
                 flash('Patient not found!', 'error')
                 return redirect(url_for('add_prescription'))
-            prescription_id = hms.generate_id('RX')
-            conn = hms.db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO prescriptions
-                    (prescription_id, patient_id, doctor_id, medication, dosage,
-                     frequency, duration, notes, date_prescribed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (prescription_id, patient_id, doctor_id, medication, dosage,
-                  frequency, duration, notes, date_prescribed))
-            conn.commit()
-            conn.close()
-            flash('Prescription added successfully!', 'success')
-            notify('New Prescription',
-                   f"Prescription for {medication} added for {patient.first_name} {patient.last_name}.",
-                   doctor_id or 'doctor')
-            return redirect(url_for('prescriptions'))
+                
+            new_prescription = Prescription(
+                prescription_id=hms.generate_id('RX'),
+                patient_id=patient_id,
+                doctor_id=doctor_id,
+                date=date,
+                medication=medication_str,
+                duration=duration,
+                notes=notes,
+                status=status
+            )
+            
+            if hms.add_prescription(new_prescription):
+                flash('Prescription added successfully!', 'success')
+                notify('New Prescription',
+                       f"Prescription for {medication_str} added for {patient.first_name} {patient.last_name}.",
+                       doctor_id or 'doctor')
+                return redirect(url_for('prescriptions'))
+            else:
+                flash('Failed to add prescription.', 'error')
         except Exception as e:
             flash(f'Error adding prescription: {e}', 'error')
     patients = hms.patients if hms.patients else hms.get_all_patients()
@@ -1505,28 +1509,24 @@ def edit_prescription(prescription_id):
     prescription = hms.db._row_to_obj(Prescription, row)
     if request.method == 'POST':
         try:
-            conn = hms.db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE prescriptions SET
-                    patient_id = ?, doctor_id = ?, medication = ?, dosage = ?,
-                    frequency = ?, duration = ?, notes = ?, date_prescribed = ?
-                WHERE prescription_id = ?
-            """, (
-                request.form.get('patient_id', prescription.patient_id),
-                request.form.get('doctor_id', prescription.doctor_id),
-                request.form.get('medication', prescription.medication),
-                request.form.get('dosage', ''),
-                request.form.get('frequency', ''),
-                request.form.get('duration', ''),
-                request.form.get('notes', ''),
-                request.form.get('date_prescribed', ''),
-                prescription_id
-            ))
-            conn.commit()
-            conn.close()
-            flash('Prescription updated successfully!', 'success')
-            return redirect(url_for('view_prescription', prescription_id=prescription_id))
+            medications = request.form.getlist('medication[]')
+            medication_str = ", ".join([m.strip() for m in medications if m.strip()])
+            if not medication_str:
+                medication_str = request.form.get('medication', prescription.medication)
+            
+            prescription.patient_id = request.form.get('patient_id', prescription.patient_id)
+            prescription.doctor_id = request.form.get('doctor_id', prescription.doctor_id)
+            prescription.medication = medication_str
+            prescription.duration = request.form.get('duration', prescription.duration)
+            prescription.notes = request.form.get('notes', prescription.notes)
+            prescription.date = request.form.get('date', prescription.date)
+            prescription.status = request.form.get('status', prescription.status)
+            
+            if hms.update_prescription(prescription):
+                flash('Prescription updated successfully!', 'success')
+                return redirect(url_for('view_prescription', prescription_id=prescription_id))
+            else:
+                flash('Failed to update prescription.', 'error')
         except Exception as e:
             flash(f'Error updating prescription: {e}', 'error')
     patients = hms.patients if hms.patients else hms.get_all_patients()
@@ -1539,13 +1539,11 @@ def edit_prescription(prescription_id):
 @admin_required
 def delete_prescription(prescription_id):
     try:
-        conn = hms.db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM prescriptions WHERE prescription_id = ?", (prescription_id,))
-        conn.commit()
-        conn.close()
-        flash('Prescription deleted successfully!', 'success')
-        notify('Prescription Deleted', f"Prescription {prescription_id} has been deleted.", 'admin')
+        if hms.delete_prescription(prescription_id):
+            flash('Prescription deleted successfully!', 'success')
+            notify('Prescription Deleted', f"Prescription {prescription_id} has been deleted.", 'admin')
+        else:
+            flash('Failed to delete prescription.', 'error')
     except Exception as e:
         flash(f'Error deleting prescription: {e}', 'error')
     return redirect(url_for('prescriptions'))

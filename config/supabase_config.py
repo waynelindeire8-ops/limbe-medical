@@ -96,8 +96,8 @@ class SupabaseClient:
         """Insert record into table"""
         return self.upsert(table, data)
     
-    def select(self, table: str, filters: Optional[Dict] = None) -> Optional[list]:
-        """Select records from table"""
+    def select(self, table: str, filters: Optional[Dict] = None, limit: int = 1000, offset: int = 0) -> Optional[list]:
+        """Select records from table with pagination"""
         try:
             client = self.get_client()
             if not client:
@@ -109,7 +109,8 @@ class SupabaseClient:
                 for key, value in filters.items():
                     query = query.eq(key, value)
             
-            response = query.execute()
+            # Use range for pagination to overcome the 1000 record limit
+            response = query.range(offset, offset + limit - 1).execute()
             return response.data if response.data else []
         except Exception as e:
             print(f"Error selecting from {table}: {str(e)}")

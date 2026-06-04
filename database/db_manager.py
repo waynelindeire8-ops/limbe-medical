@@ -360,9 +360,16 @@ class DatabaseManager:
             for table, (model_cls, id_field) in table_models.items():
                 try:
                     supabase_table = SupabaseConfig.TABLES.get(table, table)
-                    records = supabase_client.select(supabase_table)
-                    if records:
-                        print(f"  - Table '{table}': found {len(records)} records in Postgres")
+                    
+                    # Pull in chunks of 1000 to handle large datasets
+                    offset = 0
+                    chunk_size = 1000
+                    while True:
+                        records = supabase_client.select(supabase_table, limit=chunk_size, offset=offset)
+                        if not records:
+                            break
+                            
+                        print(f"  - Table '{table}': pulled {len(records)} records (offset {offset})")
                         for r in records:
                             try:
                                 obj = model_cls(**{k: v for k, v in r.items() if k in {f.name for f in fields(model_cls)}})
@@ -372,6 +379,10 @@ class DatabaseManager:
                                     self.save(table, obj, id_field)
                             except Exception:
                                 continue
+                                
+                        if len(records) < chunk_size:
+                            break
+                        offset += chunk_size
                 except Exception as e:
                     print(f"  [ERROR] Failed to pull table {table} from Postgres: {e}")
         finally:
