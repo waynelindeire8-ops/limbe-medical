@@ -475,6 +475,16 @@ class HospitalManagementSystem:
         Save metadata and clinical records to JSON. 
         On Render free plan, this JSON is the primary persistence layer.
         """
+        # Safety check: If we have no patients and no settings, 
+        # avoid overwriting a potentially good cloud backup with an empty state
+        # unless this is explicitly a fresh initialization.
+        if include_all_records and self.db.count('patients') == 0 and not self.activity:
+             # If we are empty, only save locally, don't push to cloud
+             # This prevents a failed load from wiping the cloud backup
+             can_push_to_cloud = False
+        else:
+             can_push_to_cloud = True
+
         try:
             data = {
                 'settings': self.settings,
@@ -502,8 +512,8 @@ class HospitalManagementSystem:
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
 
-            # Sync with Supabase Storage if enabled
-            if self.db.use_supabase:
+            # Sync with Supabase Storage if enabled and safe
+            if self.db.use_supabase and can_push_to_cloud:
                 try:
                     from supabase_data_manager import put_supabase_json
                     put_supabase_json(data)

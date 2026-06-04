@@ -502,27 +502,6 @@
     {% with form_type='add_medical_record' %}
         {% include 'autosave_js.html' %}
     {% endwith %}
-
-    <script>
-        // Ensure that if a patient_id was passed in the URL, it overrides any autosaved value
-        // This prevents the autosave feature from restoring a different patient when
-        // coming from a specific patient's profile.
-        (function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const urlPatientId = urlParams.get('patient_id');
-            if (urlPatientId) {
-                const patientSelect = document.querySelector('select[name="patient_id"]');
-                if (patientSelect) {
-                    patientSelect.value = urlPatientId;
-                    // If Choices.js is already initialized, we need to update it
-                    // If not, it will pick up the correct value when it initializes on DOMContentLoaded
-                    if (patientSelect.choices) {
-                        patientSelect.choices.setChoiceByValue(urlPatientId);
-                    }
-                }
-            }
-        })();
-    </script>
 </body>
 </html>
 

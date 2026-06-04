@@ -61,8 +61,6 @@ PROVIDERS = [
     "Bakresa Health Services"
 ]
 
-hms.save_data()
-
 
 # ── HELPER FUNCTIONS (must all be defined before any routes) ──────────────────
 
@@ -1658,6 +1656,11 @@ def add_medical_record():
         except Exception as e:
             flash(f'Error creating medical record: {e}', 'error')
     patients = hms.patients if hms.patients else hms.get_all_patients()
+    # Ensure the specific patient is in the list even if deleted or not in the first 10000
+    if patient_id and not any(p.patient_id == patient_id for p in patients):
+        p = hms.get_patient(patient_id)
+        if p:
+            patients.append(p)
     doctors = hms.doctors if hms.doctors else hms.get_all_doctors()
     return render_template('add_medical_record.html', patients=patients, doctors=doctors,
                            patient_id=patient_id, active_page='patients')
@@ -1665,8 +1668,13 @@ def add_medical_record():
 
 @app.route('/create_medical_record', methods=['GET', 'POST'])
 def create_medical_record():
-    patient_id = request.args.get('patient_id')
+    patient_id = request.args.get('patient_id', '')
     patients = hms.patients if hms.patients else hms.get_all_patients()
+    # Ensure the specific patient is in the list
+    if patient_id and not any(p.patient_id == patient_id for p in patients):
+        p = hms.get_patient(patient_id)
+        if p:
+            patients.append(p)
     doctors = hms.doctors if hms.doctors else hms.get_all_doctors()
     if request.method == 'POST':
         try:

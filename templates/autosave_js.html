@@ -21,8 +21,15 @@
 
     function restoreForm(data) {
         const form = document.querySelector('form');
+        const urlParams = new URLSearchParams(window.location.search);
         form.querySelectorAll('input, select, textarea').forEach(el => {
             if (!el.name || !(el.name in data)) return;
+            
+            // If the field is present in the URL, don't let autosave overwrite it.
+            // This ensures that when clicking "New Record" for a specific patient,
+            // that patient stays selected even if there's a draft for another patient.
+            if (urlParams.has(el.name)) return;
+
             if (el.type === 'checkbox') {
                 el.checked = data[el.name];
             } else if (el.type === 'radio') {
