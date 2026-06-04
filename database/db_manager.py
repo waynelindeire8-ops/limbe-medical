@@ -324,27 +324,25 @@ class DatabaseManager:
                 for table, (model_cls, id_field) in table_models.items():
                     if table in cloud_data:
                         records = cloud_data[table]
-                        print(f"  - Restoring {len(records)} {table} from JSON...")
+                        print(f"  - Syncing {len(records)} {table} from JSON...")
                         for r in records:
                             try:
                                 filtered = {k: v for k, v in r.items() if k in {f.name for f in fields(model_cls)}}
                                 obj = model_cls(**filtered)
-                                self.save(table, obj, id_field)
+                                
+                                # Only save if the record doesn't exist locally to avoid overwriting newer local work
+                                id_val = getattr(obj, id_field)
+                                if not self.get_by_id(model_cls, table, id_val, id_field):
+                                    self.save(table, obj, id_field)
                             except Exception:
                                 continue
                 
-                # Save settings if present
-                if 'settings' in cloud_data:
-                    # Use absolute path to ensure we write to the right place
-                    config_dir = os.path.dirname(os.path.abspath(self.db_file))
-                    json_path = os.path.join(config_dir, 'hospital_data.json')
-                    with open(json_path, 'w', encoding='utf-8') as f:
-                        json.dump(cloud_data, f, indent=2)
+                # DO NOT overwrite local hospital_data.json as it may contain newer local changes
+                # if 'settings' in cloud_data: ... (removed)
         except Exception as e:
             print(f"[WARN] Failed to pull from JSON storage: {e}")
 
         # 2. Try pulling from Postgres Tables (individual records)
-        # This acts as a fallback or to get the most recent individual updates
         try:
             table_models = {
                 'patients': (Patient, 'patient_id'),
@@ -368,7 +366,10 @@ class DatabaseManager:
                         for r in records:
                             try:
                                 obj = model_cls(**{k: v for k, v in r.items() if k in {f.name for f in fields(model_cls)}})
-                                self.save(table, obj, id_field)
+                                # Only save if the record doesn't exist locally
+                                id_val = getattr(obj, id_field)
+                                if not self.get_by_id(model_cls, table, id_val, id_field):
+                                    self.save(table, obj, id_field)
                             except Exception:
                                 continue
                 except Exception as e:

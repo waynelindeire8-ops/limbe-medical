@@ -2255,7 +2255,7 @@ def force_cloud_sync():
         flash('Successfully synced all data from cloud!', 'success')
     except Exception as e:
         flash(f'Error during cloud sync: {e}', 'error')
-    return redirect(url_for('settings'))
+    return redirect(request.referrer or url_for('dashboard'))
 
 
 @app.route('/settings', methods=['GET', 'POST'])

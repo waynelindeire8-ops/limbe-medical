@@ -25,7 +25,7 @@ def recover_orphans():
     # 1. Check activity log in JSON
     json_path = r"C:\Users\user\OneDrive\Limbe Medical\hospital_data.json"
     if os.path.exists(json_path):
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, 'r', encodicccng='utf-8') as f:
             data = json.load(f)
             for act in data.get('activity', []):
                 eid = act.get('entity_id')

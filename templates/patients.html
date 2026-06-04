@@ -100,7 +100,8 @@
                         {% endif %}
                     </form>
                     <a href="{{ url_for('deleted_patients') }}" class="btn-add" style="background-color: #6c757d;" title="View and recover deleted patients"><i class="fas fa-trash-restore"></i> Deleted Patients</a>
-                    <a href="{{ url_for('add_patient') }}" class="btn-add"><i class="fas fa-plus"></i> Add New Patient</a>
+                    <a href="{{ url_for('force_cloud_sync') }}" class="btn-add" style="background-color: #2ec4b6;" title="Sync from cloud"><i class="fas fa-sync-alt"></i></a>
+                    <a href="{{ url_for('add_patient') }}" class="btn-add"><i class="fas fa-user-plus"></i> Add Patient</a>
                 </div>
             </div>
 
