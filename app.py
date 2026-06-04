@@ -447,6 +447,7 @@ def dashboard():
                                chart_patient_reg=chart_patient_reg,
                                chart_appointments=chart_appointments,
                                system_notifications=system_notifications,
+                               hms_db_use_supabase=hms.db.use_supabase,
                                active_page='dashboard')
     except Exception as e:
         print(f"[CRITICAL ERROR] Dashboard route failed: {e}")
@@ -709,6 +710,28 @@ def add_to_queue(patient_id):
 
 # ── PATIENTS ──────────────────────────────────────────────────────────────────
 
+@app.route('/debug/db')
+def debug_db():
+    try:
+        conn = hms.db.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM patients")
+        total = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM patients WHERE is_deleted = 0")
+        active = cursor.fetchone()[0]
+        db_path = os.path.abspath(hms.db.db_file)
+        conn.close()
+        return jsonify({
+            'db_file': hms.db.db_file,
+            'db_abs_path': db_path,
+            'db_exists': os.path.exists(db_path),
+            'total_patients': total,
+            'active_patients': active,
+            'use_supabase': hms.db.use_supabase
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 @app.route('/patients')
 def patients():
     page = request.args.get('page', 1, type=int)
@@ -755,6 +778,7 @@ def patients():
 
     conn.close()
     patients_list = [hms.db._row_to_obj(Patient, row) for row in rows]
+    print(f"[Debug] Patients found: {len(patients_list)} / Total: {total_count}")
     total_pages = math.ceil(total_count / per_page) if total_count else 1
 
     return render_template('patients.html', patients=patients_list, page=page,
@@ -1180,7 +1204,8 @@ def billing_dashboard():
     bills = [hms.db._row_to_obj(Bill, row) for row in rows]
     total_pages = math.ceil(total_count / per_page) if total_count else 1
     return render_template('billing_dashboard.html', bills=bills, page=page, total_pages=total_pages,
-                           total_count=total_count, total_paid=total_paid, total_unpaid=total_unpaid,
+                           total_count=total_count, total_revenue=total_paid, pending_amount=total_unpaid,
+                           total_bills=total_count,
                            search_term=search_term, active_page='billing')
 
 
@@ -1889,6 +1914,63 @@ def view_medical_record(record_id):
                            doctor=doctor, active_page='patients')
 
 
+@app.route('/medical_record/<record_id>/export_csv')
+def export_medical_record_csv(record_id):
+    record = hms.get_medical_record(record_id)
+    if not record:
+        flash('Medical record not found!', 'error')
+        return redirect(url_for('patients'))
+    
+    patient = hms.get_patient(record.patient_id)
+    doctor = hms.get_doctor(record.doctor_id)
+    hospital_name = hms.settings.get('hospital_name', 'Hospital')
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['MEDICAL RECORD'])
+    writer.writerow(['Hospital', hospital_name])
+    writer.writerow(['Date Exported', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    writer.writerow([])
+    
+    writer.writerow(['Record ID', 'Date', 'Patient ID', 'Patient Name', 'Doctor', 'Consultation Reason', 'Diagnosis', 'Treatment', 'Prescriptions', 'Notes'])
+    writer.writerow([
+        record.record_id,
+        record.date,
+        record.patient_id,
+        f"{patient.first_name} {patient.last_name}" if patient else record.patient_id,
+        f"Dr. {doctor.last_name}" if doctor else record.doctor_id,
+        record.consult_reason,
+        record.diagnosis,
+        record.treatment,
+        record.prescriptions,
+        record.notes
+    ])
+    
+    output.seek(0)
+    return Response(output, mimetype='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename=medical_record_{record_id}.csv'})
+
+
+@app.route('/medical_record/<record_id>/print')
+def print_medical_record(record_id):
+    record = hms.get_medical_record(record_id)
+    if not record:
+        flash('Medical record not found!', 'error')
+        return redirect(url_for('patients'))
+    
+    patient = hms.get_patient(record.patient_id)
+    doctor = hms.get_doctor(record.doctor_id)
+    
+    return render_template('print_medical_record.html',
+                           record=record,
+                           patient=patient,
+                           doctor=doctor,
+                           hospital_name=hms.settings.get('hospital_name', 'Hospital'),
+                           hospital_address=hms.settings.get('hospital_address', ''),
+                           hospital_phone=hms.settings.get('hospital_phone', ''),
+                           hospital_email=hms.settings.get('hospital_email', ''))
+
+
 @app.route('/delete_medical_record/<record_id>')
 def delete_medical_record(record_id):
     record = hms.get_medical_record(record_id)
@@ -2133,20 +2215,44 @@ def send_message():
 
 @app.route('/general_reports')
 def general_reports():
-    stats = hms.get_stats()
-    total_patients = hms.get_patients_count()
-    total_appointments = stats['total_appointments']
-    status_counts = stats['appointment_statuses']
-    total_revenue = stats['total_revenue']
+    stats = hms.get_report_stats()
+    total_patients = stats.get('total_patients', 0)
+    total_appointments = stats.get('total_appointments', 0)
+    status_counts = stats.get('status_counts', {})
+    department_counts = stats.get('department_counts', {})
+    
+    # Use paid revenue for the main stat
     conn = hms.db.get_connection()
     cursor = conn.cursor()
+    cursor.execute("SELECT SUM(amount) FROM bills WHERE status = 'Paid'")
+    total_revenue = cursor.fetchone()[0] or 0.0
+    
+    # Calculate percentages for the chart
+    def get_pct(status_name):
+        if total_appointments == 0: return 0
+        return round((status_counts.get(status_name, 0) / total_appointments) * 100)
+
+    completed_pct = get_pct('Completed')
+    cancelled_pct = get_pct('Cancelled')
+    no_show_pct = get_pct('No Show')
+    
     cursor.execute("SELECT * FROM bills ORDER BY created_date DESC LIMIT 20")
     rows = cursor.fetchall()
     recent_bills = [hms.db._row_to_obj(Bill, row) for row in rows]
     conn.close()
-    return render_template('general_reports.html', total_patients=total_patients,
-                           total_appointments=total_appointments, total_revenue=total_revenue,
-                           status_counts=status_counts, recent_bills=recent_bills, active_page='reports')
+    
+    return render_template('general_reports.html', 
+                           total_patients=total_patients,
+                           total_appointments=total_appointments, 
+                           total_revenue=total_revenue,
+                           status_counts=status_counts, 
+                           department_counts=department_counts,
+                           completed_pct=completed_pct,
+                           cancelled_pct=cancelled_pct,
+                           no_show_pct=no_show_pct,
+                           recent_bills=recent_bills,
+                           today=datetime.date.today().strftime("%d %B %Y"),
+                           active_page='reports')
 
 
 # ── ADMIN ─────────────────────────────────────────────────────────────────────
@@ -2495,6 +2601,7 @@ def api_billing_autosave():
 
 
 if __name__ == '__main__':
+    print(f"[System] Current Working Directory: {os.getcwd()}")
     try:
         print("[System] Seeding default users...")
         seed_users()

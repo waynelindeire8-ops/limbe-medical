@@ -244,6 +244,11 @@
             </div>
         </main>
     </div>
+
+    <div id="db-status" style="position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #999; background: rgba(255,255,255,0.8); padding: 5px; border-radius: 4px; border: 1px solid #ddd;">
+        DB: {{ total_patients }} patients | Supabase: {{ 'Active' if hms_db_use_supabase else 'Disabled' }}
+    </div>
+
     <script>
         // Chart Initialization
         const ctx = document.getElementById('practiceChart').getContext('2d');

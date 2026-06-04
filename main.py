@@ -46,6 +46,7 @@ class HospitalManagementSystem:
     def __init__(self, data_file: str = "hospital_data.json", db_file: str = "hospital_data.db"):
         self.data_file = data_file
         self.db_file = db_file
+        print(f"[System] Initializing HMS with database: {os.path.abspath(db_file)}")
         
         # Enable Supabase if RENDER is detected, if credentials exist, or if we can connect via fallbacks
         from supabase_data_manager import supabase_connected
@@ -54,6 +55,7 @@ class HospitalManagementSystem:
                         supabase_connected())
         
         self.db = DatabaseManager(db_file=db_file, use_supabase=use_supabase)
+        print(f"[System] Supabase Integration: {'Active' if use_supabase else 'Disabled'}")
 
         # Cache settings for fast access, other data stays in DB
         self.settings: Dict[str, Any] = {
@@ -87,6 +89,10 @@ class HospitalManagementSystem:
         self.patient_scheme: Dict[str, Dict[str, Any]] = {}
         self.departments: List[str] = []
 
+        # Internal flag to prevent accidental overwriting of cloud data
+        # before we've had a chance to pull the existing data.
+        self._sync_completed = False
+
         # Route data file to OneDrive if available
         onedrive_path = self._route_data_file_to_onedrive(os.path.basename(self.data_file))
         if onedrive_path:
@@ -101,16 +107,29 @@ class HospitalManagementSystem:
         self.load_data()
 
         # 2. If the database is empty, try to pull from Supabase Cloud
-        if self.db.count('patients') == 0 and self.db.use_supabase:
-            print("[INFO] Fresh environment detected. Syncing from cloud...")
-            self.db.pull_all_from_supabase()
+        patient_count = self.db.count('patients')
+        print(f"[System] Local patients count: {patient_count}")
+        
+        if patient_count == 0 and self.db.use_supabase:
+            print("[INFO] No local patients found. Attempting initial cloud sync...")
+            try:
+                self.db.pull_all_from_supabase()
+                self._sync_completed = True
+                print(f"[INFO] Cloud sync completed. New patient count: {self.db.count('patients')}")
+            except Exception as e:
+                print(f"[ERROR] Initial cloud sync failed: {e}")
+        else:
+            self._sync_completed = True
 
         # 3. Check for legacy data migration — skipped automatically if DB already has data
         self._migrate_json_to_db()
 
     @property
     def patients(self) -> List[Patient]:
-        return self.db.get_all(Patient, 'patients', limit=10000, order_by='rowid DESC', where_clause="is_deleted = 0")
+        return self.db.get_all(Patient, 'patients', limit=1000000, order_by='rowid DESC', where_clause="is_deleted = 0")
+
+    def get_all_patients(self) -> List[Patient]:
+        return self.db.get_all(Patient, 'patients', limit=1000000, order_by='rowid DESC')
 
     def get_patients_paginated(self, page: int = 1, per_page: int = 20) -> List[Patient]:
         return self.db.get_all(Patient, 'patients', limit=per_page, offset=(page-1)*per_page, order_by='rowid DESC', where_clause="is_deleted = 0")
@@ -478,7 +497,11 @@ class HospitalManagementSystem:
         # Safety check: If we have no patients and no settings, 
         # avoid overwriting a potentially good cloud backup with an empty state
         # unless this is explicitly a fresh initialization.
-        if include_all_records and self.db.count('patients') == 0 and not self.activity:
+        if include_all_records and not self._sync_completed:
+             # If sync hasn't completed since startup, don't push to cloud
+             # as we might have an incomplete local state.
+             can_push_to_cloud = False
+        elif include_all_records and self.db.count('patients') == 0 and not self.activity:
              # If we are empty, only save locally, don't push to cloud
              # This prevents a failed load from wiping the cloud backup
              can_push_to_cloud = False
@@ -496,17 +519,19 @@ class HospitalManagementSystem:
 
             # If clinical data should be included (default True for cloud safety)
             if include_all_records:
+                # IMPORTANT: Pull ALL records for backup, ignoring filters like is_deleted
+                # and using a very high limit to ensure no data loss.
                 data.update({
-                    'patients': [asdict(p) for p in self.patients],
-                    'doctors': [asdict(d) for d in self.db.get_all(Doctor, 'doctors', limit=1000)],
-                    'appointments': [asdict(a) for a in self.db.get_all(Appointment, 'appointments', limit=5000)],
-                    'medical_records': [asdict(m) for m in self.db.get_all(MedicalRecord, 'medical_records', limit=5000)],
-                    'prescriptions': [asdict(p) for p in self.db.get_all(Prescription, 'prescriptions', limit=5000)],
-                    'bills': [asdict(b) for b in self.db.get_all(Bill, 'bills', limit=5000)],
-                    'inventory': [asdict(i) for i in self.db.get_all(InventoryItem, 'inventory', limit=2000)],
-                    'users': [asdict(u) for u in self.db.get_all(User, 'users', limit=100)],
-                    'queue': [asdict(q) for q in self.db.get_all(QueueItem, 'queue', limit=500)],
-                    'lab_results': [asdict(lr) for lr in self.db.get_all(LabResult, 'lab_results', limit=2000)]
+                    'patients': [asdict(p) for p in self.db.get_all(Patient, 'patients', limit=1000000)],
+                    'doctors': [asdict(d) for d in self.db.get_all(Doctor, 'doctors', limit=10000)],
+                    'appointments': [asdict(a) for a in self.db.get_all(Appointment, 'appointments', limit=1000000)],
+                    'medical_records': [asdict(m) for m in self.db.get_all(MedicalRecord, 'medical_records', limit=1000000)],
+                    'prescriptions': [asdict(p) for p in self.db.get_all(Prescription, 'prescriptions', limit=1000000)],
+                    'bills': [asdict(b) for b in self.db.get_all(Bill, 'bills', limit=1000000)],
+                    'inventory': [asdict(i) for i in self.db.get_all(InventoryItem, 'inventory', limit=100000)],
+                    'users': [asdict(u) for u in self.db.get_all(User, 'users', limit=1000)],
+                    'queue': [asdict(q) for q in self.db.get_all(QueueItem, 'queue', limit=10000)],
+                    'lab_results': [asdict(lr) for lr in self.db.get_all(LabResult, 'lab_results', limit=500000)]
                 })
 
             with open(self.data_file, 'w', encoding='utf-8') as f:
