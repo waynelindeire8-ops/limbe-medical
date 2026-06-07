@@ -92,6 +92,7 @@ class HospitalManagementSystem:
         # Internal flag to prevent accidental overwriting of cloud data
         # before we've had a chance to pull the existing data.
         self._sync_completed = False
+        self.last_save_status = {"local": True, "cloud": True, "error": None}
 
         # Route data file to OneDrive if available
         onedrive_path = self._route_data_file_to_onedrive(os.path.basename(self.data_file))
@@ -508,6 +509,7 @@ class HospitalManagementSystem:
         else:
              can_push_to_cloud = True
 
+        self.last_save_status = {"local": True, "cloud": True, "error": None}
         try:
             data = {
                 'settings': self.settings,
@@ -541,12 +543,18 @@ class HospitalManagementSystem:
             if self.db.use_supabase and can_push_to_cloud:
                 try:
                     from supabase_data_manager import put_supabase_json
-                    put_supabase_json(data)
+                    if not put_supabase_json(data):
+                        self.last_save_status["cloud"] = False
+                        self.last_save_status["error"] = "Cloud sync returned False"
                 except Exception as e:
                     print(f"[WARN] Supabase Cloud Storage sync failed: {e}")
+                    self.last_save_status["cloud"] = False
+                    self.last_save_status["error"] = str(e)
 
         except Exception as e:
             print(f"[ERROR] Failed to save data: {e}")
+            self.last_save_status["local"] = False
+            self.last_save_status["error"] = str(e)
 
     def load_data(self) -> None:
         """Load metadata from JSON file or Supabase."""

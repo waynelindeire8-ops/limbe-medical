@@ -17,6 +17,38 @@ app = Flask(__name__)
 app.secret_key = 'super_secret_key'
 hms = HospitalManagementSystem()
 
+# --- Unlim Cloud Backup Scheduler ---
+from apscheduler.schedulers.background import BackgroundScheduler
+import subprocess
+import sys
+
+def run_unlim_backup():
+    """Runs the unlim_backup.py script as a subprocess to handle its own asyncio loop."""
+    try:
+        print(f"[Backup] Starting hourly Unlim Cloud backup at {datetime.datetime.now()}")
+        # We run it as a separate process so it doesn't interfere with the Flask event loop if any
+        subprocess.run([sys.executable, "unlim_backup.py"], capture_output=True, text=True)
+        print(f"[Backup] Finished hourly Unlim Cloud backup attempt.")
+    except Exception as e:
+        print(f"[Backup] Failed to run Unlim Cloud backup: {e}")
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=run_unlim_backup, trigger="interval", hours=1)
+scheduler.start()
+# ------------------------------------
+
+
+def check_save_status():
+    """Check the last save status of HMS and flash warnings if necessary."""
+    if not hms.last_save_status["local"]:
+        flash(f"CRITICAL ERROR: Failed to save data locally! {hms.last_save_status['error']}", "error")
+    elif not hms.last_save_status["cloud"] and hms.db.use_supabase:
+        flash(f"Warning: Data saved locally but cloud backup failed. {hms.last_save_status['error']}", "warning")
+    
+    # Also check real-time database sync
+    if not hms.db.last_sync_success and hms.db.use_supabase:
+        flash(f"Warning: Real-time cloud database sync failed. {hms.db.last_error}", "warning")
+
 PROVIDERS = [
     "Cash",
     "Medical Aid Society of Malawi (MASM)",
@@ -199,6 +231,7 @@ def inventory_import():
             conn.close()
 
             flash(f'Successfully imported {imported_count} items.', 'success')
+            check_save_status()
             return redirect(url_for('inventory'))
         except Exception as e:
             flash(f'Error importing items: {e}', 'error')
@@ -226,6 +259,7 @@ def inventory_bulk_price_update():
         conn.close()
 
         flash(f'Successfully updated prices for {updated_count} items by {percentage}%.', 'success')
+        check_save_status()
         notify('Inventory Price Update', f"All inventory prices updated by {percentage}%.", 'admin')
     except Exception as e:
         flash(f'Error updating prices: {e}', 'error')
@@ -262,6 +296,7 @@ def add_inventory_item():
             conn.commit()
             conn.close()
             flash('Inventory item added successfully!', 'success')
+            check_save_status()
             notify('Inventory Updated', f"New item '{name}' added to inventory.", 'admin')
             return redirect(url_for('inventory'))
         except Exception as e:
@@ -307,6 +342,7 @@ def edit_inventory_item(item_id):
             conn.commit()
             conn.close()
             flash('Item updated successfully!', 'success')
+            check_save_status()
             return redirect(url_for('inventory'))
         except Exception as e:
             flash(f'Error updating item: {e}', 'error')
@@ -324,6 +360,7 @@ def delete_inventory_item(item_id):
         conn.commit()
         conn.close()
         flash('Item deleted successfully!', 'success')
+        check_save_status()
         notify('Inventory Updated', f"Item {item_id} deleted from inventory.", 'admin')
     except Exception as e:
         flash(f'Error deleting item: {e}', 'error')
@@ -344,6 +381,7 @@ def restock_inventory_item(item_id):
         conn.commit()
         conn.close()
         flash(f'Added {quantity_to_add} units to stock.', 'success')
+        check_save_status()
         notify('Inventory Restocked', f"Item {item_id} restocked by {quantity_to_add} units.", 'admin')
     except Exception as e:
         flash(f'Error restocking item: {e}', 'error')
@@ -562,6 +600,7 @@ def queue_checkin():
             hms.db.save('queue', queue_item, 'queue_id')
             hms.save_data()
             flash(f'{patient.first_name} {patient.last_name} checked in successfully!', 'success')
+            check_save_status()
             notify('Queue Check-in', f"{patient.first_name} {patient.last_name} has checked in.", 'nurse')
             return redirect(url_for('queue_dashboard'))
         except Exception as e:
@@ -592,6 +631,7 @@ def queue_clear_all():
         hms.queue = [q for q in hms.queue if q.status == 'Completed']
         hms.save_data()
         flash('Queue cleared successfully!', 'success')
+        check_save_status()
         notify('Queue Cleared', 'All active queue items have been cleared.', 'all')
     except Exception as e:
         flash(f'Error clearing queue: {e}', 'error')
@@ -700,6 +740,7 @@ def add_to_queue(patient_id):
             hms.db.save('queue', queue_item, 'queue_id')
             hms.save_data()
             flash('Patient added to queue successfully!', 'success')
+            check_save_status()
             notify('Queue Update', f"{patient.first_name} {patient.last_name} added to queue.", 'nurse')
             return redirect(url_for('queue_dashboard'))
         except Exception as e:
@@ -839,6 +880,7 @@ def add_patient():
             )
             if hms.add_patient(new_patient):
                 flash('Patient added successfully!', 'success')
+                check_save_status()
                 return redirect(url_for('patients'))
             else:
                 flash('Error adding patient: ID might already be in use or database error.', 'error')
@@ -881,6 +923,7 @@ def edit_patient(patient_id):
             success = hms.update_patient(original_id=patient_id, **update_data)
             if success:
                 flash('Patient updated successfully!', 'success')
+                check_save_status()
                 notify('Patient updated', new_id or patient_id, 'admin')
                 return redirect(url_for('patients'))
             else:
@@ -894,6 +937,7 @@ def edit_patient(patient_id):
 def delete_patient(patient_id):
     if hms.delete_patient(patient_id):
         flash('Patient deleted successfully! You can recover it from the recovery system.', 'success')
+        check_save_status()
         notify('Patient soft-deleted', patient_id, 'admin')
     else:
         flash('Error deleting patient!', 'error')
@@ -910,6 +954,7 @@ def deleted_patients():
 def recover_patient(patient_id):
     if hms.recover_patient(patient_id):
         flash('Patient recovered successfully!', 'success')
+        check_save_status()
         notify('Patient recovered', patient_id, 'admin')
     else:
         flash('Error recovering patient.', 'error')
@@ -920,6 +965,7 @@ def recover_patient(patient_id):
 def permanent_delete_patient(patient_id):
     if hms.delete_patient(patient_id, permanent=True):
         flash('Patient permanently deleted.', 'success')
+        check_save_status()
         notify('Patient permanently deleted', patient_id, 'admin')
     else:
         flash('Error deleting patient.', 'error')
@@ -1051,6 +1097,7 @@ def add_doctor():
             )
             if hms.add_doctor(new_doctor):
                 flash('Doctor added successfully!', 'success')
+                check_save_status()
                 notify('Doctor added', f"{new_doctor.first_name} {new_doctor.last_name} ({new_doctor.doctor_id})", 'admin')
                 return redirect(url_for('doctors'))
             else:
@@ -1080,6 +1127,7 @@ def edit_doctor(doctor_id):
                 locum_name=request.form.get('locum_name', '')
             ):
                 flash('Doctor updated successfully!', 'success')
+                check_save_status()
                 notify('Doctor updated', doctor_id, 'admin')
                 return redirect(url_for('doctors'))
             else:
@@ -1093,6 +1141,7 @@ def edit_doctor(doctor_id):
 def delete_doctor(doctor_id):
     if hms.delete_doctor(doctor_id):
         flash('Doctor deleted successfully!', 'success')
+        check_save_status()
         notify('Doctor deleted', doctor_id, 'admin')
     else:
         flash('Error deleting doctor!', 'error')
@@ -1158,6 +1207,7 @@ def schedule_appointment():
             )
             hms.schedule_appointment(new_appointment)
             flash('Appointment scheduled successfully!', 'success')
+            check_save_status()
             notify('New Appointment',
                    f"Appointment scheduled for {patient.first_name} {patient.last_name} on {date} at {time}.",
                    doctor_id)
@@ -1247,6 +1297,7 @@ def edit_bill(bill_id):
             conn.commit()
             conn.close()
             flash('Bill updated successfully!', 'success')
+            check_save_status()
             notify('Bill Updated', f"Bill {bill_id} has been updated.", 'cashier')
             return redirect(url_for('view_bill', bill_id=bill_id))
         except Exception as e:
@@ -1290,6 +1341,7 @@ def add_bill():
             conn.commit()
             conn.close()
             flash('Bill created successfully!', 'success')
+            check_save_status()
             notify('New Bill', f"Bill created for {patient.first_name} {patient.last_name}.", 'cashier')
             return redirect(url_for('billing_dashboard'))
         except Exception as e:
@@ -1314,6 +1366,7 @@ def delete_bill(bill_id):
         conn.commit()
         conn.close()
         flash('Bill deleted successfully!', 'success')
+        check_save_status()
         notify('Bill Deleted', f"Bill {bill_id} has been deleted.", 'admin')
     except Exception as e:
         flash(f'Error deleting bill: {e}', 'error')
@@ -1502,6 +1555,7 @@ def add_prescription():
             
             if hms.add_prescription(new_prescription):
                 flash('Prescription added successfully!', 'success')
+                check_save_status()
                 notify('New Prescription',
                        f"Prescription for {medication_str} added for {patient.first_name} {patient.last_name}.",
                        doctor_id or 'doctor')
@@ -1561,6 +1615,7 @@ def edit_prescription(prescription_id):
             
             if hms.update_prescription(prescription):
                 flash('Prescription updated successfully!', 'success')
+                check_save_status()
                 return redirect(url_for('view_prescription', prescription_id=prescription_id))
             else:
                 flash('Failed to update prescription.', 'error')
@@ -1578,6 +1633,7 @@ def delete_prescription(prescription_id):
     try:
         if hms.delete_prescription(prescription_id):
             flash('Prescription deleted successfully!', 'success')
+            check_save_status()
             notify('Prescription Deleted', f"Prescription {prescription_id} has been deleted.", 'admin')
         else:
             flash('Failed to delete prescription.', 'error')
@@ -1693,6 +1749,7 @@ def add_medical_record():
             )
             if hms.add_medical_record(new_record):
                 flash('Medical record added successfully!', 'success')
+                check_save_status()
                 notify('New Medical Record',
                        f"Medical record created for {patient.first_name} {patient.last_name}.", doctor_id)
                 return redirect(url_for('patient_details', patient_id=patient_id))
@@ -1809,6 +1866,7 @@ def create_medical_record():
                     flash('Medical record saved and sent to Lab!', 'success')
                 else:
                     flash('Medical record created successfully!', 'success')
+                    check_save_status()
                 return redirect(url_for('patient_details', patient_id=new_record.patient_id))
             else:
                 flash('Failed to create medical record in database.', 'error')
@@ -1912,6 +1970,7 @@ def edit_medical_record(record_id):
 
             if hms.update_medical_record(updated_record):
                 flash('Medical record updated successfully!', 'success')
+                check_save_status()
                 return redirect(url_for('patient_details', patient_id=updated_record.patient_id))
             else:
                 flash('Failed to update medical record in database.', 'error')
@@ -2003,6 +2062,7 @@ def delete_medical_record(record_id):
     patient_id = record.patient_id
     if hms.db.delete('medical_records', record_id, 'record_id'):
         flash('Medical record deleted successfully!', 'success')
+        check_save_status()
     else:
         flash('Failed to delete medical record.', 'error')
     return redirect(url_for('patient_details', patient_id=patient_id))
@@ -2087,6 +2147,7 @@ def add_lab_result():
             hms.lab_results.append(new_result)
             hms.save_data()
             flash('Lab result added successfully!', 'success')
+            check_save_status()
             notify('New Lab Result',
                    f"Lab result '{test_name}' added for {patient.first_name} {patient.last_name}.",
                    'lab_assistant')
@@ -2131,6 +2192,7 @@ def edit_lab_result(result_id):
             
             if hms.update_lab_result(result):
                 flash('Lab result updated successfully!', 'success')
+                check_save_status()
                 return redirect(url_for('view_lab_results', result_id=result_id))
             else:
                 flash('Failed to update lab result.', 'error')
@@ -2147,6 +2209,7 @@ def edit_lab_result(result_id):
 def delete_lab_result(result_id):
     if hms.delete_lab_result(result_id):
         flash('Lab result deleted successfully!', 'success')
+        check_save_status()
     else:
         flash('Failed to delete lab result.', 'error')
     return redirect(url_for('lab_results'))
@@ -2425,6 +2488,7 @@ def settings():
             
             hms.save_data()
             flash('Settings saved successfully!', 'success')
+            check_save_status()
         except Exception as e:
             flash(f'Error saving settings: {e}', 'error')
         return redirect(url_for('settings'))
@@ -2498,6 +2562,7 @@ def edit_appointment(appointment_id):
                 notes=request.form.get('notes', appointment.notes)
             ), 'appointment_id')
             flash('Appointment updated successfully!', 'success')
+            check_save_status()
             return redirect(url_for('view_schedule'))
         except Exception as e:
             flash(f'Error updating appointment: {e}', 'error')
@@ -2512,6 +2577,7 @@ def edit_appointment(appointment_id):
 def delete_appointment(appointment_id):
     if hms.db.delete('appointments', appointment_id, 'appointment_id'):
         flash('Appointment deleted successfully!', 'success')
+        check_save_status()
     else:
         flash('Error deleting appointment!', 'error')
     return redirect(url_for('view_schedule'))

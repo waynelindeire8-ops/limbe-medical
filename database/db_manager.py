@@ -26,6 +26,8 @@ class DatabaseManager:
     def __init__(self, db_file: str = "hospital_data.db", use_supabase: bool = False):
         self.db_file = db_file
         self.use_supabase = use_supabase
+        self.last_sync_success = True
+        self.last_error = None
         self.init_sqlite_db()
     
     def get_connection(self):
@@ -405,9 +407,15 @@ class DatabaseManager:
             if self.use_supabase:
                 try:
                     supabase_table = SupabaseConfig.TABLES.get(table, table)
-                    supabase_client.upsert(supabase_table, self._obj_to_dict(obj))
+                    if not supabase_client.upsert(supabase_table, self._obj_to_dict(obj)):
+                        self.last_sync_success = False
+                        self.last_error = f"Supabase upsert returned None for {table}"
+                    else:
+                        self.last_sync_success = True
                 except Exception as e:
                     print(f"[WARN] Supabase upsert failed for {table}: {e}")
+                    self.last_sync_success = False
+                    self.last_error = str(e)
             
             # Sync to backup server if configured
             self.sync_to_backup(table, obj)
@@ -429,9 +437,15 @@ class DatabaseManager:
             if self.use_supabase:
                 try:
                     supabase_table = SupabaseConfig.TABLES.get(table, table)
-                    supabase_client.delete(supabase_table, id_field, id_value)
+                    if not supabase_client.delete(supabase_table, id_field, id_value):
+                        self.last_sync_success = False
+                        self.last_error = f"Supabase delete returned False for {table}"
+                    else:
+                        self.last_sync_success = True
                 except Exception as e:
                     print(f"[WARN] Supabase delete failed for {table}: {e}")
+                    self.last_sync_success = False
+                    self.last_error = str(e)
             return True
         except Exception as e:
             print(f"Error deleting from {table}: {e}")
