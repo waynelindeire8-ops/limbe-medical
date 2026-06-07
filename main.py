@@ -914,9 +914,12 @@ class HospitalManagementSystem:
                 first_name LIKE ? OR 
                 last_name LIKE ? OR
                 (first_name || ' ' || last_name) LIKE ? OR
-                (last_name || ' ' || first_name) LIKE ?
+                (last_name || ' ' || first_name) LIKE ? OR
+                phone LIKE ? OR
+                email LIKE ?
             )
-        """, (term, term, term, term, term))
+            ORDER BY last_name ASC, first_name ASC
+        """, (term, term, term, term, term, term, term))
 
         rows = cursor.fetchall()
         conn.close()
@@ -1218,6 +1221,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'add', 'medical_record', record.record_id, record.patient_id)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1238,6 +1242,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'update', 'medical_record', record.record_id, record.patient_id)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1248,6 +1253,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'add', 'prescription', prescription.prescription_id, prescription.patient_id)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1268,6 +1274,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'update', 'prescription', prescription.prescription_id, prescription.patient_id)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1277,6 +1284,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'delete', 'prescription', prescription_id, '')
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1286,6 +1294,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'delete', 'medical_record', record_id, '')
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1296,6 +1305,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'add', 'lab_result', result.result_id, result.patient_id)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1308,6 +1318,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'update', 'lab_result', result.result_id, result.patient_id)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1317,6 +1328,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'delete', 'lab_result', result_id, '')
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1327,6 +1339,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'create', 'bill', bill.bill_id, bill.patient_id)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1347,6 +1360,7 @@ class HospitalManagementSystem:
                     self.add_activity(None, 'update_status', 'bill', bill_id, status)
                 except Exception:
                     pass
+                self.save_data()
                 return True
         return False
 
@@ -1359,6 +1373,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'update', 'bill', bill.bill_id, bill.patient_id)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1368,6 +1383,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'delete', 'bill', bill_id, '')
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1385,6 +1401,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'add', 'inventory', item.item_id, item.name)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 
@@ -1397,6 +1414,7 @@ class HospitalManagementSystem:
                     self.add_activity(None, 'update_qty', 'inventory', item_id, str(quantity))
                 except Exception:
                     pass
+                self.save_data()
                 return True
         return False
 
@@ -1417,6 +1435,7 @@ class HospitalManagementSystem:
                 self.add_activity(None, 'update', 'inventory', item.item_id, item.name)
             except Exception:
                 pass
+            self.save_data()
             return True
         return False
 

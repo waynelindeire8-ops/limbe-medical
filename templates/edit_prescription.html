@@ -19,7 +19,7 @@
                         <label>Patient</label>
                         <select name="patient_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                             {% for p in patients %}
-                            <option value="{{ p.patient_id }}" {% if p.patient_id == rx.patient_id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }}</option>
+                            <option value="{{ p.patient_id }}" {% if p.patient_id == prescription.patient_id %}selected{% endif %}>{{ p.first_name }} {{ p.last_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -27,26 +27,26 @@
                         <label>Doctor</label>
                         <select name="doctor_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                             {% for d in doctors %}
-                            <option value="{{ d.doctor_id }}" {% if d.doctor_id == rx.doctor_id %}selected{% endif %}>Dr. {{ d.last_name }}</option>
+                            <option value="{{ d.doctor_id }}" {% if d.doctor_id == prescription.doctor_id %}selected{% endif %}>Dr. {{ d.last_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div>
                         <label>Date</label>
-                        <input type="date" name="date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;" value="{{ rx.date }}">
+                        <input type="date" name="date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;" value="{{ prescription.date }}">
                     </div>
                     <div>
                         <label>Status</label>
                         <select name="status" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                            <option {% if rx.status == 'Active' %}selected{% endif %}>Active</option>
-                            <option {% if rx.status == 'Completed' %}selected{% endif %}>Completed</option>
-                            <option {% if rx.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                            <option {% if prescription.status == 'Active' %}selected{% endif %}>Active</option>
+                            <option {% if prescription.status == 'Completed' %}selected{% endif %}>Completed</option>
+                            <option {% if prescription.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
                         </select>
                     </div>
                     <div style="grid-column: 1 / span 2;">
                         <label>Medications</label>
                         <div id="medication-list">
-                            {% set meds = rx.medication.split(', ') %}
+                            {% set meds = prescription.medication.split(', ') %}
                             {% for med in meds %}
                             <div class="medication-item" style="display: flex; gap: 10px; margin-bottom: 10px;">
                                 <input type="text" name="medication[]" required placeholder="Medication name" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;" value="{{ med }}">
@@ -58,11 +58,11 @@
                     </div>
                     <div style="grid-column: 1 / span 2;">
                         <label>Duration</label>
-                        <input type="text" name="duration" required placeholder="e.g., 7 days" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;" value="{{ rx.duration }}">
+                        <input type="text" name="duration" required placeholder="e.g., 7 days" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;" value="{{ prescription.duration }}">
                     </div>
                     <div style="grid-column: 1 / span 2;">
                         <label>Notes</label>
-                        <textarea name="notes" rows="3" placeholder="Additional instructions" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">{{ rx.notes }}</textarea>
+                        <textarea name="notes" rows="3" placeholder="Additional instructions" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">{{ prescription.notes }}</textarea>
                     </div>
                     <div style="grid-column: 1 / span 2; text-align: right;">
                         <button type="submit" class="btn btn-primary" style="padding: 10px 20px; background-color: #4361ee; color: white; border: none; border-radius: 8px;">Save Changes</button>

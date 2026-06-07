@@ -1198,7 +1198,7 @@ def billing_dashboard():
         total_count = cursor.fetchone()[0]
     cursor.execute("SELECT SUM(amount) FROM bills WHERE status = 'Paid'")
     total_paid = cursor.fetchone()[0] or 0
-    cursor.execute("SELECT SUM(amount) FROM bills WHERE status = 'Unpaid'")
+    cursor.execute("SELECT SUM(amount) FROM bills WHERE status IN ('Unpaid', 'Pending')")
     total_unpaid = cursor.fetchone()[0] or 0
     conn.close()
     bills = [hms.db._row_to_obj(Bill, row) for row in rows]
@@ -1430,15 +1430,27 @@ def prescriptions():
     if search_term:
         search_value = f"%{search_term}%"
         cursor.execute("""
-            SELECT * FROM prescriptions
-            WHERE prescription_id LIKE ? OR patient_id LIKE ? OR doctor_id LIKE ? OR medication LIKE ?
-            ORDER BY date DESC LIMIT ? OFFSET ?
-        """, (search_value, search_value, search_value, search_value, per_page, (page - 1) * per_page))
+            SELECT pr.* FROM prescriptions pr
+            LEFT JOIN patients p ON pr.patient_id = p.patient_id
+            WHERE pr.prescription_id LIKE ? 
+               OR pr.patient_id LIKE ? 
+               OR pr.doctor_id LIKE ? 
+               OR pr.medication LIKE ? 
+               OR p.first_name LIKE ? 
+               OR p.last_name LIKE ?
+            ORDER BY pr.date DESC LIMIT ? OFFSET ?
+        """, (search_value, search_value, search_value, search_value, search_value, search_value, per_page, (page - 1) * per_page))
         rows = cursor.fetchall()
         cursor.execute("""
-            SELECT COUNT(*) FROM prescriptions
-            WHERE prescription_id LIKE ? OR patient_id LIKE ? OR doctor_id LIKE ? OR medication LIKE ?
-        """, (search_value, search_value, search_value, search_value))
+            SELECT COUNT(*) FROM prescriptions pr
+            LEFT JOIN patients p ON pr.patient_id = p.patient_id
+            WHERE pr.prescription_id LIKE ? 
+               OR pr.patient_id LIKE ? 
+               OR pr.doctor_id LIKE ? 
+               OR pr.medication LIKE ? 
+               OR p.first_name LIKE ? 
+               OR p.last_name LIKE ?
+        """, (search_value, search_value, search_value, search_value, search_value, search_value))
         total_count = cursor.fetchone()[0]
     else:
         cursor.execute("SELECT * FROM prescriptions ORDER BY date DESC LIMIT ? OFFSET ?",
@@ -1613,15 +1625,25 @@ def medical_records():
     if search_term:
         search_value = f"%{search_term}%"
         cursor.execute("""
-            SELECT * FROM medical_records 
-            WHERE record_id LIKE ? OR patient_id LIKE ? OR diagnosis LIKE ? 
-            ORDER BY date DESC LIMIT ? OFFSET ?
-        """, (search_value, search_value, search_value, per_page, (page - 1) * per_page))
+            SELECT mr.* FROM medical_records mr
+            LEFT JOIN patients p ON mr.patient_id = p.patient_id
+            WHERE mr.record_id LIKE ? 
+               OR mr.patient_id LIKE ? 
+               OR mr.diagnosis LIKE ? 
+               OR p.first_name LIKE ? 
+               OR p.last_name LIKE ?
+            ORDER BY mr.date DESC LIMIT ? OFFSET ?
+        """, (search_value, search_value, search_value, search_value, search_value, per_page, (page - 1) * per_page))
         rows = cursor.fetchall()
         cursor.execute("""
-            SELECT COUNT(*) FROM medical_records 
-            WHERE record_id LIKE ? OR patient_id LIKE ? OR diagnosis LIKE ?
-        """, (search_value, search_value, search_value))
+            SELECT COUNT(*) FROM medical_records mr
+            LEFT JOIN patients p ON mr.patient_id = p.patient_id
+            WHERE mr.record_id LIKE ? 
+               OR mr.patient_id LIKE ? 
+               OR mr.diagnosis LIKE ? 
+               OR p.first_name LIKE ? 
+               OR p.last_name LIKE ?
+        """, (search_value, search_value, search_value, search_value, search_value))
         total_count = cursor.fetchone()[0]
     else:
         cursor.execute("SELECT * FROM medical_records ORDER BY date DESC LIMIT ? OFFSET ?",

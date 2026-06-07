@@ -34,7 +34,7 @@
             </div>
             <div class="rx-title">
                 PRESCRIPTION<br>
-                <span style="font-size: 16px; color: #777;">#{{ rx.prescription_id }}</span>
+                <span style="font-size: 16px; color: #777;">#{{ prescription.prescription_id }}</span>
             </div>
         </div>
 
@@ -54,13 +54,13 @@
 
         <div class="section">
             <div class="label">Date</div>
-            <div class="value">{{ rx.date }}</div>
+            <div class="value">{{ prescription.date }}</div>
         </div>
 
         <div class="section" style="border: 1px dashed #ccc; padding: 16px; border-radius: 8px;">
             <div class="label">Medications</div>
             <div class="value" style="font-size: 18px;">
-                {% set meds = rx.medication.split(', ') %}
+                {% set meds = prescription.medication.split(', ') %}
                 <ul style="margin: 5px 0 0 0; padding-left: 20px;">
                     {% for med in meds %}
                     <li>{{ med }}</li>
@@ -69,12 +69,12 @@
             </div>
             <div style="margin-top: 12px;">
                 <div class="label">Duration</div>
-                <div class="value">{{ rx.duration }}</div>
+                <div class="value">{{ prescription.duration }}</div>
             </div>
-            {% if rx.notes %}
+            {% if prescription.notes %}
             <div class="section">
                 <div class="label">Notes</div>
-                <div class="value">{{ rx.notes }}</div>
+                <div class="value">{{ prescription.notes }}</div>
             </div>
             {% endif %}
         </div>
