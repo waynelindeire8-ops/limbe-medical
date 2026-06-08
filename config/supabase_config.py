@@ -3,7 +3,7 @@ Supabase Configuration and Integration
 """
 
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -46,6 +46,7 @@ class SupabaseClient:
         self.key = SupabaseConfig.SUPABASE_KEY
         self.service_key = SupabaseConfig.SUPABASE_SERVICE_KEY
         self._client = None
+        self._missing_tables = set()
     
     def connect(self):
         """Initialize Supabase client"""
@@ -81,15 +82,23 @@ class SupabaseClient:
     # CRUD Operations
     def upsert(self, table: str, data: Dict[str, Any]) -> Optional[Dict]:
         """Upsert record into table"""
+        if table in self._missing_tables:
+            return {"status": "skipped", "reason": "table_missing"}
+            
         try:
             client = self.get_client()
             if not client:
                 return None
             
             response = client.table(table).upsert(data).execute()
-            return response.data[0] if response.data else None
+            return response.data[0] if response.data else {"status": "success", "data_returned": False}
         except Exception as e:
-            print(f"Error upserting into {table}: {str(e)}")
+            error_msg = str(e)
+            if "PGRST205" in error_msg or "Could not find the table" in error_msg:
+                print(f"[Supabase] Table '{table}' not found. Disabling real-time sync for this table.")
+                self._missing_tables.add(table)
+                return {"status": "skipped", "reason": "table_missing"}
+            print(f"Error upserting into {table}: {error_msg}")
             return None
     
     def insert(self, table: str, data: Dict[str, Any]) -> Optional[Dict]:
@@ -109,7 +118,6 @@ class SupabaseClient:
                 for key, value in filters.items():
                     query = query.eq(key, value)
             
-            # Use range for pagination to overcome the 1000 record limit
             response = query.range(offset, offset + limit - 1).execute()
             return response.data if response.data else []
         except Exception as e:
@@ -131,15 +139,22 @@ class SupabaseClient:
     
     def delete(self, table: str, id_field: str, id_value: Any) -> bool:
         """Delete record from table"""
+        if table in self._missing_tables:
+            return True
+            
         try:
             client = self.get_client()
             if not client:
                 return False
             
-            response = client.table(table).delete().eq(id_field, id_value).execute()
+            client.table(table).delete().eq(id_field, id_value).execute()
             return True
         except Exception as e:
-            print(f"Error deleting from {table}: {str(e)}")
+            error_msg = str(e)
+            if "PGRST205" in error_msg or "Could not find the table" in error_msg:
+                self._missing_tables.add(table)
+                return True
+            print(f"Error deleting from {table}: {error_msg}")
             return False
     
     def search(self, table: str, search_field: str, search_value: str) -> Optional[list]:

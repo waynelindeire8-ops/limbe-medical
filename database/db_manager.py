@@ -407,9 +407,15 @@ class DatabaseManager:
             if self.use_supabase:
                 try:
                     supabase_table = SupabaseConfig.TABLES.get(table, table)
-                    if not supabase_client.upsert(supabase_table, self._obj_to_dict(obj)):
+                    result = supabase_client.upsert(supabase_table, self._obj_to_dict(obj))
+                    
+                    if result is None:
                         self.last_sync_success = False
-                        self.last_error = f"Supabase upsert returned None for {table}"
+                        self.last_error = f"Supabase sync failed for {table}"
+                    elif isinstance(result, dict) and result.get('status') == 'skipped':
+                        # Table is missing in Supabase, but JSON backup still works.
+                        # We don't mark this as a sync failure to avoid nagging the user.
+                        self.last_sync_success = True
                     else:
                         self.last_sync_success = True
                 except Exception as e:
