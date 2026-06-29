@@ -972,6 +972,103 @@ def permanent_delete_patient(patient_id):
     return redirect(url_for('deleted_patients'))
 
 
+@app.route('/admin/merge_duplicates', methods=['GET', 'POST'])
+def admin_merge_duplicates():
+    """
+    Secure admin endpoint: finds and merges duplicate patients by name+ID similarity.
+    Requires ?key=limbe2024admin in the query string.
+    Runs merge_patients() which updates SQLite + uploads to Supabase JSON.
+    """
+    if request.args.get('key') != 'limbe2024admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    import re as _re
+    from collections import defaultdict
+
+    def _norm(name):
+        return _re.sub(r'[^a-z]', '', (name or '').lower())
+
+    def _ids_similar(a, b):
+        c1 = _re.sub(r'[^a-z0-9]', '', (a or '').lower())
+        c2 = _re.sub(r'[^a-z0-9]', '', (b or '').lower())
+        if c1 == c2:
+            return True
+        prefix = 0
+        for x, y in zip(c1, c2):
+            if x == y:
+                prefix += 1
+            else:
+                break
+        return prefix >= 8
+
+    # Fetch all active patients directly from SQLite
+    conn = hms.db.get_connection()
+    rows = conn.execute(
+        "SELECT * FROM patients WHERE is_deleted = 0 OR is_deleted IS NULL"
+    ).fetchall()
+    conn.close()
+    patients = [dict(r) for r in rows]
+
+    # Group by normalised name
+    groups = defaultdict(list)
+    for p in patients:
+        key = (_norm(p.get('first_name', '')), _norm(p.get('last_name', '')))
+        groups[key].append(p)
+
+    # Find groups with at least two members sharing similar IDs
+    results = []
+    merged = []
+    for key, members in groups.items():
+        if len(members) < 2:
+            continue
+        dup_found = False
+        for i in range(len(members)):
+            for j in range(i + 1, len(members)):
+                if _ids_similar(members[i]['patient_id'], members[j]['patient_id']):
+                    dup_found = True
+                    break
+            if dup_found:
+                break
+        if not dup_found:
+            continue
+
+        # Pick master: most medical_records, then most filled fields
+        def _score(p):
+            conn2 = hms.db.get_connection()
+            count = conn2.execute(
+                "SELECT COUNT(*) FROM medical_records WHERE patient_id = ?",
+                (p['patient_id'],)
+            ).fetchone()[0]
+            conn2.close()
+            filled = sum(1 for f in ['date_of_birth','gender','phone','email','address',
+                                      'emergency_contact','blood_group','scheme_provider','scheme_type']
+                         if (p.get(f) or '').strip() and
+                            (p.get(f) or '').lower().strip() not in ('none','null','n/a'))
+            return count * 5 + filled
+
+        scored = sorted(members, key=_score, reverse=True)
+        master = scored[0]
+        dups = [d['patient_id'] for d in scored[1:]]
+
+        entry = {
+            'master': master['patient_id'],
+            'duplicates': dups,
+            'name': f"{master.get('first_name','')} {master.get('last_name','')}"
+        }
+        results.append(entry)
+
+        # Execute merge
+        if request.method == 'POST' or request.args.get('execute') == '1':
+            ok = hms.merge_patients(master['patient_id'], dups)
+            entry['merged'] = ok
+            merged.append(entry)
+
+    if request.method == 'POST' or request.args.get('execute') == '1':
+        return jsonify({'status': 'done', 'merged': merged})
+    else:
+        return jsonify({'status': 'dry_run', 'would_merge': results})
+
+
 @app.route('/patient/<patient_id>/send_to_lab')
 def send_to_lab(patient_id):
     queue_item = next((q for q in hms.queue if q.patient_id == patient_id and q.status != 'Completed'), None)
