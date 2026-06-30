@@ -25,6 +25,8 @@ class SupabaseConfig:
         'appointments': 'appointments',
         'medical_records': 'medical_records',
         'prescriptions': 'prescriptions',
+        'prescription_medications': 'prescription_medications',
+        'prescription_templates': 'prescription_templates',
         'bills': 'bills',
         'inventory': 'inventory_items',
         'users': 'users',

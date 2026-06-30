@@ -15,7 +15,7 @@ from dataclasses import asdict, fields
 from config.supabase_config import supabase_client, SupabaseConfig
 from models import (
     Patient, Doctor, Appointment, MedicalRecord, 
-    Prescription, Bill, InventoryItem, User, Message, QueueItem, LabResult
+    Prescription, PrescriptionMedication, Bill, InventoryItem, User, Message, QueueItem, LabResult
 )
 
 T = TypeVar('T')
@@ -117,12 +117,43 @@ class DatabaseManager:
                 patient_id TEXT,
                 doctor_id TEXT,
                 date TEXT,
+                date_prescribed TEXT DEFAULT '',
                 medication TEXT,
                 duration TEXT,
                 notes TEXT,
-                status TEXT,
+                status TEXT DEFAULT 'Pending',
+                record_id TEXT DEFAULT '',
                 FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
                 FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id)
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS prescription_medications (
+                med_id TEXT PRIMARY KEY,
+                prescription_id TEXT,
+                medication_name TEXT,
+                dosage TEXT DEFAULT '',
+                frequency TEXT DEFAULT '',
+                route TEXT DEFAULT '',
+                duration TEXT DEFAULT '',
+                quantity INTEGER DEFAULT 0,
+                refills_allowed INTEGER DEFAULT 0,
+                refills_used INTEGER DEFAULT 0,
+                notes TEXT DEFAULT '',
+                FOREIGN KEY (prescription_id) REFERENCES prescriptions(prescription_id)
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_rx_med_prescription ON prescription_medications(prescription_id)')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS prescription_templates (
+                template_id TEXT PRIMARY KEY,
+                name TEXT,
+                doctor_id TEXT,
+                medications TEXT,
+                is_global INTEGER DEFAULT 0,
+                created_at TEXT
             )
         ''')
 
@@ -260,6 +291,18 @@ class DatabaseManager:
             cursor.execute("ALTER TABLE patients ADD COLUMN deleted_at TEXT DEFAULT ''")
         except:
             pass
+        try:
+            cursor.execute("ALTER TABLE patients ADD COLUMN allergies TEXT DEFAULT ''")
+        except:
+            pass
+        try:
+            cursor.execute("ALTER TABLE prescriptions ADD COLUMN date_prescribed TEXT DEFAULT ''")
+        except:
+            pass
+        try:
+            cursor.execute("ALTER TABLE prescriptions ADD COLUMN record_id TEXT DEFAULT ''")
+        except:
+            pass
             
         conn.close()
 
@@ -316,6 +359,7 @@ class DatabaseManager:
                     'appointments': (Appointment, 'appointment_id'),
                     'medical_records': (MedicalRecord, 'record_id'),
                     'prescriptions': (Prescription, 'prescription_id'),
+                    'prescription_medications': (PrescriptionMedication, 'med_id'),
                     'bills': (Bill, 'bill_id'),
                     'inventory': (InventoryItem, 'item_id'),
                     'users': (User, 'user_id'),

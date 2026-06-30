@@ -82,15 +82,34 @@ class MedicalRecord:
 
 
 @dataclass
+class PrescriptionMedication:
+    """Normalized medication within a prescription"""
+    med_id: str = ""
+    prescription_id: str = ""
+    medication_name: str = ""
+    dosage: str = ""
+    frequency: str = ""
+    route: str = ""
+    duration: str = ""
+    quantity: int = 0
+    refills_allowed: int = 0
+    refills_used: int = 0
+    notes: str = ""
+
+
+@dataclass
 class Prescription:
     """Prescription model"""
     prescription_id: str
     patient_id: str
     doctor_id: str
-    medication_name: str
-    duration: str
+    medication_name: str = ""
+    duration: str = ""
     instructions: str = ""
     issued_date: str = field(default_factory=lambda: datetime.now().isoformat())
+    status: str = "Pending"
+    record_id: str = ""
+    date_prescribed: str = ""
 
 
 @dataclass

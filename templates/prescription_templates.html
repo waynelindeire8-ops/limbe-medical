@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prescription Templates</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+        .template-card { background: white; padding: 16px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #eee; }
+        .template-card h3 { margin: 0 0 8px 0; }
+        .med-list { margin: 8px 0; padding: 0; list-style: none; }
+        .med-list li { padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+        .med-list li:last-child { border-bottom: none; }
+        .badge-global { background: #e8f0fe; color: #4361ee; font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% include 'sidebar.html' %}
+        <main class="main-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Prescription Templates</h2>
+                <a href="{{ url_for('add_prescription_template') }}" class="btn-add" style="background: #4361ee; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px;"><i class="fas fa-plus"></i> New Template</a>
+            </div>
+
+            {% if templates %}
+            <div class="template-grid">
+                {% for t in templates %}
+                <div class="template-card">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <h3>{{ t.name }}</h3>
+                        {% if t.is_global %}<span class="badge-global">Global</span>{% endif %}
+                    </div>
+                    <ul class="med-list">
+                        {% for m in t.medications %}
+                        <li><strong>{{ m.medication_name }}</strong> {{ m.dosage }} {{ m.frequency }} {{ m.route }}</li>
+                        {% endfor %}
+                    </ul>
+                    <div style="margin-top: 10px; display: flex; gap: 8px;">
+                        <a href="{{ url_for('add_prescription', template=t.template_id) }}" class="btn-sm" style="background: #4361ee; color: white; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 12px;"><i class="fas fa-plus"></i> Use</a>
+                        <a href="{{ url_for('delete_prescription_template', template_id=t.template_id) }}" class="btn-sm" style="background: #dc3545; color: white; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 12px;" onclick="return confirm('Delete this template?')"><i class="fas fa-trash"></i></a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 60px; color: #888;">
+                <i class="fas fa-file-prescription" style="font-size: 48px; display: block; margin-bottom: 16px; color: #ddd;"></i>
+                <p>No templates yet. Create one to quickly add common prescriptions!</p>
+                <a href="{{ url_for('add_prescription_template') }}" style="color: #4361ee;">Create your first template</a>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

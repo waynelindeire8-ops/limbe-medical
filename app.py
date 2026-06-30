@@ -7,7 +7,8 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 from dataclasses import asdict
 from main import HospitalManagementSystem
-from models import Patient, Appointment, Doctor, Message, Bill, Prescription, MedicalRecord, QueueItem, InventoryItem, User, LabResult
+from models import Patient, Appointment, Doctor, Message, Bill, Prescription, PrescriptionMedication, MedicalRecord, QueueItem, InventoryItem, User, LabResult
+from models import PRESCRIPTION_STATUS_CYCLE, PRESCRIPTION_VALID_TRANSITIONS
 import sqlite3
 import csv
 import io
@@ -472,9 +473,11 @@ def dashboard():
         role = session.get('role')
         system_notifications = hms.get_recent_notifications(username, role)
 
+        rx_stats = hms.get_prescription_stats()
         return render_template('dashboard.html',
                                total_patients=total_patients,
                                stats=stats,
+                               rx_stats=rx_stats,
                                active_doctors=stats['active_doctors'],
                                todays_appointments=stats['todays_appointments'],
                                pending_appointments=stats['pending_appointments'],
@@ -873,6 +876,7 @@ def add_patient():
                 address=request.form.get('address', ''),
                 emergency_contact=request.form.get('emergency_contact', ''),
                 blood_group=request.form.get('blood_group', ''),
+                allergies=request.form.get('allergies', ''),
                 medical_history=request.form.get('medical_history', ''),
                 created_date=datetime.datetime.now().strftime("%Y-%m-%d"),
                 scheme_provider=request.form.get('scheme_provider', ''),
@@ -915,6 +919,7 @@ def edit_patient(patient_id):
                 'address': request.form.get('address', ''),
                 'emergency_contact': request.form.get('emergency_contact', ''),
                 'blood_group': request.form.get('blood_group', ''),
+                'allergies': request.form.get('allergies', ''),
                 'medical_history': request.form.get('medical_history', ''),
                 'scheme_provider': request.form.get('scheme_provider', ''),
                 'scheme_type': request.form.get('scheme_type', '')
@@ -1574,114 +1579,249 @@ def export_invoice_csv(bill_id):
 def prescriptions():
     page = request.args.get('page', 1, type=int)
     search_term = request.args.get('search', '').strip()
+    status_filter = request.args.get('status', '').strip()
     per_page = 20
     conn = hms.db.get_connection()
     cursor = conn.cursor()
+
+    where_extra = ""
+    params = []
+    if status_filter:
+        where_extra = "AND pr.status = ?"
+        params.append(status_filter)
+
     if search_term:
         search_value = f"%{search_term}%"
-        cursor.execute("""
-            SELECT pr.* FROM prescriptions pr
+        base_params = [search_value] * 6 + params
+        cursor.execute(f"""
+            SELECT pr.*, p.first_name as p_first, p.last_name as p_last,
+                   d.first_name as d_first, d.last_name as d_last
+            FROM prescriptions pr
             LEFT JOIN patients p ON pr.patient_id = p.patient_id
-            WHERE pr.prescription_id LIKE ? 
+            LEFT JOIN doctors d ON pr.doctor_id = d.doctor_id
+            WHERE (pr.prescription_id LIKE ? 
                OR pr.patient_id LIKE ? 
                OR pr.doctor_id LIKE ? 
                OR pr.medication LIKE ? 
                OR p.first_name LIKE ? 
-               OR p.last_name LIKE ?
+               OR p.last_name LIKE ?)
+            {where_extra}
             ORDER BY pr.date DESC LIMIT ? OFFSET ?
-        """, (search_value, search_value, search_value, search_value, search_value, search_value, per_page, (page - 1) * per_page))
+        """, tuple(base_params + [per_page, (page - 1) * per_page]))
         rows = cursor.fetchall()
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT COUNT(*) FROM prescriptions pr
             LEFT JOIN patients p ON pr.patient_id = p.patient_id
-            WHERE pr.prescription_id LIKE ? 
+            WHERE (pr.prescription_id LIKE ? 
                OR pr.patient_id LIKE ? 
                OR pr.doctor_id LIKE ? 
                OR pr.medication LIKE ? 
                OR p.first_name LIKE ? 
-               OR p.last_name LIKE ?
-        """, (search_value, search_value, search_value, search_value, search_value, search_value))
+               OR p.last_name LIKE ?)
+            {where_extra}
+        """, tuple(base_params))
         total_count = cursor.fetchone()[0]
     else:
-        cursor.execute("SELECT * FROM prescriptions ORDER BY date DESC LIMIT ? OFFSET ?",
-                       (per_page, (page - 1) * per_page))
+        cursor.execute(f"""
+            SELECT pr.*, p.first_name as p_first, p.last_name as p_last,
+                   d.first_name as d_first, d.last_name as d_last
+            FROM prescriptions pr
+            LEFT JOIN patients p ON pr.patient_id = p.patient_id
+            LEFT JOIN doctors d ON pr.doctor_id = d.doctor_id
+            {where_extra.replace('AND', 'WHERE') if where_extra else ''}
+            ORDER BY pr.date DESC LIMIT ? OFFSET ?
+        """, tuple(params + [per_page, (page - 1) * per_page]))
         rows = cursor.fetchall()
-        cursor.execute("SELECT COUNT(*) FROM prescriptions")
+        where_clause = f"WHERE status = ?" if status_filter else ""
+        cursor.execute(f"SELECT COUNT(*) FROM prescriptions {where_clause}", tuple(params))
         total_count = cursor.fetchone()[0]
     conn.close()
-    prescriptions_list = [hms.db._row_to_obj(Prescription, row) for row in rows]
+
+    prescriptions_list = []
+    for row in rows:
+        d = dict(row)
+        rx = hms.db._row_to_obj(Prescription, row)
+        rx.patient_name = f"{d.get('p_last', '')}, {d.get('p_first', '')}"
+        rx.doctor_name = f"Dr. {d.get('d_last', '')}" if d.get('d_last') else ''
+        prescriptions_list.append(rx)
+
     total_pages = math.ceil(total_count / per_page) if total_count else 1
     return render_template('prescriptions.html', prescriptions=prescriptions_list, page=page,
                            total_pages=total_pages, total_count=total_count,
-                           search_term=search_term, active_page='prescriptions')
+                           search_term=search_term, status_filter=status_filter,
+                           active_page='prescriptions')
 
 
 @app.route('/prescriptions/add', methods=['GET', 'POST'])
 def add_prescription():
     patient_id = request.args.get('patient_id', '')
+    template_id = request.args.get('template', '')
     if request.method == 'POST':
         try:
             patient_id = request.form.get('patient_id', '').strip()
             doctor_id = request.form.get('doctor_id', '').strip()
-            medications = request.form.getlist('medication[]')
-            medication_str = ", ".join([m.strip() for m in medications if m.strip()])
-            duration = request.form.get('duration', '').strip()
+            record_id = request.form.get('record_id', '').strip()
             notes = request.form.get('notes', '').strip()
             date = request.form.get('date', datetime.datetime.now().strftime("%Y-%m-%d")).strip()
-            status = request.form.get('status', 'Active').strip()
-            
-            if not patient_id or not medication_str:
-                flash('Patient and medication are required!', 'error')
+            status = request.form.get('status', 'Pending').strip()
+
+            # Collect medications with dosage/frequency/route
+            med_names = request.form.getlist('medication_name[]')
+            med_dosages = request.form.getlist('dosage[]')
+            med_frequencies = request.form.getlist('frequency[]')
+            med_routes = request.form.getlist('route[]')
+            med_durations = request.form.getlist('med_duration[]')
+            med_quantities = request.form.getlist('quantity[]')
+            med_refills = request.form.getlist('refills_allowed[]')
+
+            medications = []
+            for i in range(len(med_names)):
+                name = med_names[i].strip()
+                if not name:
+                    continue
+                medications.append({
+                    'medication_name': name,
+                    'dosage': med_dosages[i].strip() if i < len(med_dosages) else '',
+                    'frequency': med_frequencies[i].strip() if i < len(med_frequencies) else '',
+                    'route': med_routes[i].strip() if i < len(med_routes) else '',
+                    'duration': med_durations[i].strip() if i < len(med_durations) else '',
+                    'quantity': int(med_quantities[i]) if i < len(med_quantities) and med_quantities[i].strip() else 0,
+                    'refills_allowed': int(med_refills[i]) if i < len(med_refills) and med_refills[i].strip() else 0,
+                    'refills_used': 0,
+                    'notes': ''
+                })
+
+            if not patient_id or not medications:
+                flash('Patient and at least one medication are required!', 'error')
                 return redirect(url_for('add_prescription'))
-                
+
             patient = hms.get_patient(patient_id)
             if not patient:
                 flash('Patient not found!', 'error')
                 return redirect(url_for('add_prescription'))
-                
-            new_prescription = Prescription(
+
+            # Check allergy warnings
+            all_warnings = []
+            for m in medications:
+                warnings = hms.check_allergy_warnings(patient_id, m['medication_name'])
+                all_warnings.extend(warnings)
+            if all_warnings:
+                flash('Allergy Warnings: ' + ' | '.join(all_warnings), 'warning')
+
+            # Build denormalized medication string
+            med_str_parts = []
+            for m in medications:
+                s = m['medication_name']
+                if m['dosage']:
+                    s += f" {m['dosage']}"
+                if m['frequency']:
+                    s += f" ({m['frequency']})"
+                med_str_parts.append(s)
+            medication_str = ", ".join(med_str_parts)
+
+            new_rx = Prescription(
                 prescription_id=hms.generate_id('RX'),
                 patient_id=patient_id,
                 doctor_id=doctor_id,
                 date=date,
+                date_prescribed=date,
                 medication=medication_str,
-                duration=duration,
+                duration=medications[0].get('duration', ''),
                 notes=notes,
-                status=status
+                status=status,
+                record_id=record_id
             )
-            
-            if hms.add_prescription(new_prescription):
+
+            if hms.add_prescription(new_rx):
+                # Save normalized medication entries
+                hms.save_prescription_medications(new_rx.prescription_id, medications)
                 flash('Prescription added successfully!', 'success')
                 check_save_status()
                 notify('New Prescription',
-                       f"Prescription for {medication_str} added for {patient.first_name} {patient.last_name}.",
+                       f"Prescription for {patient.first_name} {patient.last_name} ({new_rx.prescription_id}).",
                        doctor_id or 'doctor')
                 return redirect(url_for('prescriptions'))
             else:
                 flash('Failed to add prescription.', 'error')
         except Exception as e:
             flash(f'Error adding prescription: {e}', 'error')
+
     patients = hms.patients if hms.patients else hms.get_all_patients()
     doctors = hms.doctors if hms.doctors else hms.get_all_doctors()
+    templates = []
+    doc_id = session.get('user_id')
+    if doc_id:
+        templates = hms.get_prescription_templates(doc_id)
+    # Load template data if template_id is specified
+    template_data = None
+    if template_id:
+        all_templates = hms.get_prescription_templates()
+        for t in all_templates:
+            if t.get('template_id') == template_id:
+                template_data = t.get('medications', [])
+                break
     return render_template('add_prescription.html', patients=patients, doctors=doctors,
-                           patient_id=patient_id, active_page='prescriptions')
+                           patient_id=patient_id, active_page='prescriptions',
+                           templates=templates, template_data=template_data,
+                           PRESCRIPTION_STATUS_CYCLE=PRESCRIPTION_STATUS_CYCLE,
+                           datetime_now=datetime.datetime.now().strftime("%Y-%m-%d"))
 
 
 @app.route('/prescriptions/<prescription_id>')
 def view_prescription(prescription_id):
     conn = hms.db.get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM prescriptions WHERE prescription_id = ?", (prescription_id,))
+    cursor.execute("""SELECT pr.*, p.first_name as p_first, p.last_name as p_last,
+                      d.first_name as d_first, d.last_name as d_last
+                      FROM prescriptions pr
+                      LEFT JOIN patients p ON pr.patient_id = p.patient_id
+                      LEFT JOIN doctors d ON pr.doctor_id = d.doctor_id
+                      WHERE pr.prescription_id = ?""", (prescription_id,))
     row = cursor.fetchone()
     conn.close()
     if not row:
         flash('Prescription not found!', 'error')
         return redirect(url_for('prescriptions'))
+    d = dict(row)
     prescription = hms.db._row_to_obj(Prescription, row)
     patient = hms.get_patient(prescription.patient_id)
     doctor = hms.get_doctor(prescription.doctor_id) if prescription.doctor_id else None
+    medications = hms.get_prescription_medications(prescription_id)
+    refill_status = hms.get_refill_status(prescription_id)
     return render_template('view_prescription.html', prescription=prescription,
-                           patient=patient, doctor=doctor, active_page='prescriptions')
+                           patient=patient, doctor=doctor,
+                           medications=medications, refill_status=refill_status,
+                           PRESCRIPTION_STATUS_CYCLE=PRESCRIPTION_STATUS_CYCLE,
+                           PRESCRIPTION_VALID_TRANSITIONS=PRESCRIPTION_VALID_TRANSITIONS,
+                           active_page='prescriptions')
+
+
+@app.route('/prescriptions/<prescription_id>/status/<new_status>')
+def update_prescription_status(prescription_id, new_status):
+    try:
+        if new_status not in PRESCRIPTION_STATUS_CYCLE:
+            flash(f'Invalid status: {new_status}', 'error')
+            return redirect(url_for('view_prescription', prescription_id=prescription_id))
+        if hms.update_prescription_status(prescription_id, new_status):
+            flash(f'Prescription status updated to {new_status}.', 'success')
+            notify('Prescription Status', f"Prescription {prescription_id} → {new_status}", 'doctor')
+        else:
+            flash(f'Failed to update status. Check valid transitions.', 'error')
+    except Exception as e:
+        flash(f'Error updating status: {e}', 'error')
+    return redirect(url_for('view_prescription', prescription_id=prescription_id))
+
+
+@app.route('/prescriptions/<prescription_id>/refill/<med_id>')
+def use_refill(prescription_id, med_id):
+    try:
+        if hms.use_refill(med_id):
+            flash('Refill used successfully.', 'success')
+        else:
+            flash('No refills remaining or medication not found.', 'error')
+    except Exception as e:
+        flash(f'Error: {e}', 'error')
+    return redirect(url_for('view_prescription', prescription_id=prescription_id))
 
 
 @app.route('/prescriptions/<prescription_id>/edit', methods=['GET', 'POST'])
@@ -1695,22 +1835,45 @@ def edit_prescription(prescription_id):
         flash('Prescription not found!', 'error')
         return redirect(url_for('prescriptions'))
     prescription = hms.db._row_to_obj(Prescription, row)
+    medications = hms.get_prescription_medications(prescription_id)
+
     if request.method == 'POST':
         try:
-            medications = request.form.getlist('medication[]')
-            medication_str = ", ".join([m.strip() for m in medications if m.strip()])
-            if not medication_str:
-                medication_str = request.form.get('medication', prescription.medication)
-            
+            med_names = request.form.getlist('medication_name[]')
+            med_dosages = request.form.getlist('dosage[]')
+            med_frequencies = request.form.getlist('frequency[]')
+            med_routes = request.form.getlist('route[]')
+            med_durations = request.form.getlist('med_duration[]')
+            med_quantities = request.form.getlist('quantity[]')
+            med_refills = request.form.getlist('refills_allowed[]')
+
+            new_medications = []
+            for i in range(len(med_names)):
+                name = med_names[i].strip()
+                if not name:
+                    continue
+                new_medications.append({
+                    'medication_name': name,
+                    'dosage': med_dosages[i].strip() if i < len(med_dosages) else '',
+                    'frequency': med_frequencies[i].strip() if i < len(med_frequencies) else '',
+                    'route': med_routes[i].strip() if i < len(med_routes) else '',
+                    'duration': med_durations[i].strip() if i < len(med_durations) else '',
+                    'quantity': int(med_quantities[i]) if i < len(med_quantities) and med_quantities[i].strip() else 0,
+                    'refills_allowed': int(med_refills[i]) if i < len(med_refills) and med_refills[i].strip() else 0,
+                    'refills_used': 0,
+                    'notes': ''
+                })
+
             prescription.patient_id = request.form.get('patient_id', prescription.patient_id)
             prescription.doctor_id = request.form.get('doctor_id', prescription.doctor_id)
-            prescription.medication = medication_str
-            prescription.duration = request.form.get('duration', prescription.duration)
             prescription.notes = request.form.get('notes', prescription.notes)
             prescription.date = request.form.get('date', prescription.date)
             prescription.status = request.form.get('status', prescription.status)
-            
+            prescription.record_id = request.form.get('record_id', prescription.record_id)
+
             if hms.update_prescription(prescription):
+                if new_medications:
+                    hms.save_prescription_medications(prescription_id, new_medications)
                 flash('Prescription updated successfully!', 'success')
                 check_save_status()
                 return redirect(url_for('view_prescription', prescription_id=prescription_id))
@@ -1718,10 +1881,14 @@ def edit_prescription(prescription_id):
                 flash('Failed to update prescription.', 'error')
         except Exception as e:
             flash(f'Error updating prescription: {e}', 'error')
+
     patients = hms.patients if hms.patients else hms.get_all_patients()
     doctors = hms.doctors if hms.doctors else hms.get_all_doctors()
     return render_template('edit_prescription.html', prescription=prescription,
-                           patients=patients, doctors=doctors, active_page='prescriptions')
+                           patients=patients, doctors=doctors,
+                           medications=medications,
+                           PRESCRIPTION_STATUS_CYCLE=PRESCRIPTION_STATUS_CYCLE,
+                           active_page='prescriptions')
 
 
 @app.route('/prescriptions/<prescription_id>/delete')
@@ -1743,23 +1910,96 @@ def delete_prescription(prescription_id):
 def print_prescription(prescription_id):
     conn = hms.db.get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM prescriptions WHERE prescription_id = ?", (prescription_id,))
+    cursor.execute("""SELECT pr.*, p.first_name as p_first, p.last_name as p_last,
+                      p.date_of_birth, p.address, p.phone,
+                      d.first_name as d_first, d.last_name as d_last,
+                      d.specialty
+                      FROM prescriptions pr
+                      LEFT JOIN patients p ON pr.patient_id = p.patient_id
+                      LEFT JOIN doctors d ON pr.doctor_id = d.doctor_id
+                      WHERE pr.prescription_id = ?""", (prescription_id,))
     row = cursor.fetchone()
     conn.close()
     if not row:
         flash('Prescription not found!', 'error')
         return redirect(url_for('prescriptions'))
+    d = dict(row)
     prescription = hms.db._row_to_obj(Prescription, row)
     patient = hms.get_patient(prescription.patient_id)
     doctor = hms.get_doctor(prescription.doctor_id) if prescription.doctor_id else None
+    medications = hms.get_prescription_medications(prescription_id)
     return render_template('prescriptions/print.html',
                            prescription=prescription,
                            patient=patient,
                            doctor=doctor,
+                           medications=medications,
                            hospital_name=hms.settings.get('hospital_name', 'Hospital'),
                            hospital_address=hms.settings.get('hospital_address', ''),
                            hospital_phone=hms.settings.get('hospital_phone', ''),
                            hospital_email=hms.settings.get('hospital_email', ''))
+
+
+@app.route('/prescriptions/templates')
+def prescription_templates():
+    doc_id = session.get('user_id')
+    templates = hms.get_prescription_templates(doc_id)
+    return render_template('prescription_templates.html', templates=templates,
+                           active_page='prescriptions')
+
+
+@app.route('/prescriptions/templates/add', methods=['GET', 'POST'])
+def add_prescription_template():
+    if request.method == 'POST':
+        try:
+            name = request.form.get('name', '').strip()
+            is_global = request.form.get('is_global') == 'on'
+            doctor_id = session.get('user_id', '')
+
+            med_names = request.form.getlist('medication_name[]')
+            med_dosages = request.form.getlist('dosage[]')
+            med_frequencies = request.form.getlist('frequency[]')
+            med_routes = request.form.getlist('route[]')
+            med_durations = request.form.getlist('med_duration[]')
+            med_quantities = request.form.getlist('quantity[]')
+            med_refills = request.form.getlist('refills_allowed[]')
+
+            medications = []
+            for i in range(len(med_names)):
+                med_name = med_names[i].strip()
+                if not med_name:
+                    continue
+                medications.append({
+                    'medication_name': med_name,
+                    'dosage': med_dosages[i].strip() if i < len(med_dosages) else '',
+                    'frequency': med_frequencies[i].strip() if i < len(med_frequencies) else '',
+                    'route': med_routes[i].strip() if i < len(med_routes) else '',
+                    'duration': med_durations[i].strip() if i < len(med_durations) else '',
+                    'quantity': int(med_quantities[i]) if i < len(med_quantities) and med_quantities[i].strip() else 0,
+                    'refills_allowed': int(med_refills[i]) if i < len(med_refills) and med_refills[i].strip() else 0,
+                })
+
+            if not name or not medications:
+                flash('Template name and at least one medication required.', 'error')
+                return redirect(url_for('add_prescription_template'))
+
+            if hms.add_prescription_template(name, doctor_id, medications, is_global):
+                flash('Template saved successfully!', 'success')
+                return redirect(url_for('prescription_templates'))
+            else:
+                flash('Failed to save template.', 'error')
+        except Exception as e:
+            flash(f'Error: {e}', 'error')
+
+    return render_template('add_prescription_template.html', active_page='prescriptions')
+
+
+@app.route('/prescriptions/templates/<template_id>/delete')
+def delete_prescription_template(template_id):
+    if hms.delete_prescription_template(template_id):
+        flash('Template deleted.', 'success')
+    else:
+        flash('Failed to delete template.', 'error')
+    return redirect(url_for('prescription_templates'))
 
 
                    

@@ -15,12 +15,25 @@
             <a href="{{ url_for('prescriptions') }}" class="back-link" style="color: #4361ee; text-decoration: none; display: block; margin-bottom: 20px;"><i class="fas fa-arrow-left"></i> Back to Prescriptions</a>
             <div class="card" style="background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
                 <h2 style="margin-top: 0;">Add Prescription</h2>
+
+                {% if templates %}
+                <div style="margin-bottom: 20px; padding: 12px; background: #f0f4ff; border-radius: 8px; border: 1px solid #d0d8ff;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 6px;"><i class="fas fa-file-prescription"></i> Load from Template</label>
+                    <select id="templateSelect" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;" onchange="loadTemplate(this)">
+                        <option value="">-- Select Template --</option>
+                        {% for t in templates %}
+                        <option value='{{ t.medications | tojson | safe }}'>{{ t.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
                 <form method="post" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
                         <label>Patient</label>
                         <select name="patient_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                             {% for p in patients %}
-                            <option value="{{ p.patient_id }}">{{ p.last_name }}, {{ p.first_name }}</option>
+                            <option value="{{ p.patient_id }}" {% if p.patient_id == patient_id %}selected{% endif %}>{{ p.last_name }}, {{ p.first_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -34,36 +47,70 @@
                     </div>
                     <div>
                         <label>Date</label>
-                        <input type="date" name="date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                        <input type="date" name="date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;" value="{{ datetime_now }}">
                     </div>
                     <div>
                         <label>Status</label>
                         <select name="status" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                            <option>Active</option>
-                            <option>Completed</option>
-                            <option>Cancelled</option>
+                            {% for s in PRESCRIPTION_STATUS_CYCLE %}
+                            <option value="{{ s }}" {% if s == 'Pending' %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div style="grid-column: 1 / span 2;">
-                        <label>Medications</label>
+                        <label>Medications <span id="allergy-indicator" style="display:none;margin-left:10px;color:#dc3545;"><i class="fas fa-exclamation-triangle"></i> Allergy check pending</span></label>
                         <div id="medication-list">
-                            <div class="medication-item" style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                <input type="text" name="medication[]" required placeholder="Medication name" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                                <button type="button" onclick="removeMedication(this)" class="btn btn-danger" style="background: #ff4d4d; color: white; border: none; border-radius: 8px; padding: 0 15px; display: none;">×</button>
+                            <div class="medication-item" style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0;">
+                                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px 60px; gap: 8px; align-items: center;">
+                                    <input type="text" name="medication_name[]" required placeholder="Medication name" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                    <input type="text" name="dosage[]" placeholder="Dosage (e.g. 500mg)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;" title="Dosage">
+                                    <select name="frequency[]" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                        <option value="">Frequency</option>
+                                        <option>Once daily</option>
+                                        <option>Twice daily</option>
+                                        <option>Three times daily</option>
+                                        <option>Four times daily</option>
+                                        <option>Every 4 hours</option>
+                                        <option>Every 6 hours</option>
+                                        <option>Every 8 hours</option>
+                                        <option>At bedtime</option>
+                                        <option>As needed (PRN)</option>
+                                        <option>Before meals</option>
+                                        <option>After meals</option>
+                                        <option>Weekly</option>
+                                        <option>Monthly</option>
+                                    </select>
+                                    <select name="route[]" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                        <option value="">Route</option>
+                                        <option>Oral</option>
+                                        <option>Topical</option>
+                                        <option>IV</option>
+                                        <option>IM</option>
+                                        <option>Subcutaneous</option>
+                                        <option>Sublingual</option>
+                                        <option>Inhalation</option>
+                                        <option>Ophthalmic</option>
+                                        <option>Otic</option>
+                                        <option>Rectal</option>
+                                        <option>Vaginal</option>
+                                    </select>
+                                    <input type="number" name="quantity[]" placeholder="Qty" min="0" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px; width: 70px;">
+                                    <input type="number" name="refills_allowed[]" placeholder="Refills" min="0" value="0" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px; width: 50px;">
+                                    <button type="button" onclick="removeMedication(this)" class="btn btn-danger" style="background: #ff4d4d; color: white; border: none; border-radius: 6px; padding: 8px; display: none;">×</button>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                                    <input type="text" name="med_duration[]" placeholder="Duration (e.g. 7 days)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                </div>
                             </div>
                         </div>
                         <button type="button" onclick="addMedication()" class="btn btn-outline" style="margin-top: 5px; background: #f0f2f5; border: 1px solid #ddd; border-radius: 8px; padding: 5px 15px; cursor: pointer;"><i class="fas fa-plus"></i> Add Another Medication</button>
                     </div>
                     <div style="grid-column: 1 / span 2;">
-                        <label>Duration</label>
-                        <input type="text" name="duration" required placeholder="e.g., 7 days" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                    </div>
-                    <div style="grid-column: 1 / span 2;">
-                        <label>Notes</label>
-                        <textarea name="notes" rows="3" placeholder="Additional instructions" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;"></textarea>
+                        <label>Notes / Instructions</label>
+                        <textarea name="notes" rows="3" placeholder="Additional instructions for the patient" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;"></textarea>
                     </div>
                     <div style="grid-column: 1 / span 2; text-align: right;">
-                        <button type="submit" class="btn btn-primary" style="padding: 10px 20px; background-color: #4361ee; color: white; border: none; border-radius: 8px;">Save</button>
+                        <button type="submit" class="btn btn-primary" style="padding: 10px 20px; background-color: #4361ee; color: white; border: none; border-radius: 8px;">Save Prescription</button>
                     </div>
                 </form>
             </div>
@@ -71,19 +118,65 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <script>
-        function addMedication() {
+        let medIndex = 1;
+
+        function addMedication(data) {
             const list = document.getElementById('medication-list');
             const newItem = document.createElement('div');
             newItem.className = 'medication-item';
-            newItem.style.display = 'flex';
-            newItem.style.gap = '10px';
-            newItem.style.marginBottom = '10px';
+            newItem.style.cssText = 'background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0;';
+            const name = data && data.medication_name ? data.medication_name : '';
+            const dosage = data && data.dosage ? data.dosage : '';
+            const frequency = data && data.frequency ? data.frequency : '';
+            const route = data && data.route ? data.route : '';
+            const duration = data && data.duration ? data.duration : '';
+            const qty = data && data.quantity ? data.quantity : '';
+            const refills = data && data.refills_allowed ? data.refills_allowed : '0';
             newItem.innerHTML = `
-                <input type="text" name="medication[]" required placeholder="Medication name" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                <button type="button" onclick="removeMedication(this)" class="btn btn-danger" style="background: #ff4d4d; color: white; border: none; border-radius: 8px; padding: 0 15px;">×</button>
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px 60px; gap: 8px; align-items: center;">
+                    <input type="text" name="medication_name[]" required placeholder="Medication name" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;" value="${name}">
+                    <input type="text" name="dosage[]" placeholder="Dosage (e.g. 500mg)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;" value="${dosage}">
+                    <select name="frequency[]" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Frequency</option>
+                        <option ${frequency === 'Once daily' ? 'selected' : ''}>Once daily</option>
+                        <option ${frequency === 'Twice daily' ? 'selected' : ''}>Twice daily</option>
+                        <option ${frequency === 'Three times daily' ? 'selected' : ''}>Three times daily</option>
+                        <option ${frequency === 'Four times daily' ? 'selected' : ''}>Four times daily</option>
+                        <option ${frequency === 'Every 4 hours' ? 'selected' : ''}>Every 4 hours</option>
+                        <option ${frequency === 'Every 6 hours' ? 'selected' : ''}>Every 6 hours</option>
+                        <option ${frequency === 'Every 8 hours' ? 'selected' : ''}>Every 8 hours</option>
+                        <option ${frequency === 'At bedtime' ? 'selected' : ''}>At bedtime</option>
+                        <option ${frequency === 'As needed (PRN)' ? 'selected' : ''}>As needed (PRN)</option>
+                        <option ${frequency === 'Before meals' ? 'selected' : ''}>Before meals</option>
+                        <option ${frequency === 'After meals' ? 'selected' : ''}>After meals</option>
+                        <option ${frequency === 'Weekly' ? 'selected' : ''}>Weekly</option>
+                        <option ${frequency === 'Monthly' ? 'selected' : ''}>Monthly</option>
+                    </select>
+                    <select name="route[]" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Route</option>
+                        <option ${route === 'Oral' ? 'selected' : ''}>Oral</option>
+                        <option ${route === 'Topical' ? 'selected' : ''}>Topical</option>
+                        <option ${route === 'IV' ? 'selected' : ''}>IV</option>
+                        <option ${route === 'IM' ? 'selected' : ''}>IM</option>
+                        <option ${route === 'Subcutaneous' ? 'selected' : ''}>Subcutaneous</option>
+                        <option ${route === 'Sublingual' ? 'selected' : ''}>Sublingual</option>
+                        <option ${route === 'Inhalation' ? 'selected' : ''}>Inhalation</option>
+                        <option ${route === 'Ophthalmic' ? 'selected' : ''}>Ophthalmic</option>
+                        <option ${route === 'Otic' ? 'selected' : ''}>Otic</option>
+                        <option ${route === 'Rectal' ? 'selected' : ''}>Rectal</option>
+                        <option ${route === 'Vaginal' ? 'selected' : ''}>Vaginal</option>
+                    </select>
+                    <input type="number" name="quantity[]" placeholder="Qty" min="0" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px; width: 70px;" value="${qty}">
+                    <input type="number" name="refills_allowed[]" placeholder="Refills" min="0" value="${refills}" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px; width: 50px;">
+                    <button type="button" onclick="removeMedication(this)" class="btn btn-danger" style="background: #ff4d4d; color: white; border: none; border-radius: 6px; padding: 8px;">×</button>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                    <input type="text" name="med_duration[]" placeholder="Duration (e.g. 7 days)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;" value="${duration}">
+                </div>
             `;
             list.appendChild(newItem);
             updateRemoveButtons();
+            medIndex++;
         }
 
         function removeMedication(btn) {
@@ -103,17 +196,27 @@
             });
         }
 
+        function loadTemplate(select) {
+            if (!select.value) return;
+            try {
+                const meds = JSON.parse(select.value);
+                // Clear existing
+                document.getElementById('medication-list').innerHTML = '';
+                meds.forEach(m => addMedication(m));
+            } catch(e) {
+                console.error('Failed to load template', e);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            const selectElements = document.querySelectorAll('select');
+            const selectElements = document.querySelectorAll('select:not([name="frequency[]"]):not([name="route[]"])');
             selectElements.forEach(select => {
-                new Choices(select, {
-                    searchEnabled: true,
-                    itemSelectText: '',
-                    placeholder: true,
-                });
+                try {
+                    new Choices(select, { searchEnabled: true, itemSelectText: '', placeholder: true });
+                } catch(e) {}
             });
+            updateRemoveButtons();
         });
     </script>
 </body>
 </html>
-

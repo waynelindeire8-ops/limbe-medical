@@ -17,20 +17,29 @@
         .label { color: #666; font-size: 13px; }
         .value { font-weight: 600; font-size: 16px; }
         .footer { text-align: center; font-size: 12px; color: #999; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; }
+        .med-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .med-table th { background: #f0f4ff; padding: 8px 10px; text-align: left; font-size: 11px; color: #4361ee; border-bottom: 2px solid #4361ee; }
+        .med-table td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .med-table tr:last-child td { border-bottom: none; }
         @media print { .no-print { display: none; } body { padding: 0; } .rx-box { border: none; box-shadow: none; } }
     </style>
-    </head>
+</head>
 <body>
     <div class="no-print" style="text-align: right; max-width: 800px; margin: auto; margin-bottom: 10px;">
         <button onclick="window.print()" style="padding: 10px 20px; background: #4361ee; color: white; border: none; border-radius: 4px; cursor: pointer;">Print Prescription</button>
+        <a href="{{ url_for('view_prescription', prescription_id=prescription.prescription_id) }}" style="padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; margin-left: 8px;">Back</a>
     </div>
 
     <div class="rx-box">
         <div class="rx-header">
             <div>
                 <div class="brand">Limbe Medical Clinic</div>
-                <div class="clinic-info">Tel: +237 000 000 000 · Email: info@limbemedical.cm</div>
-                <div class="clinic-info">Address: Limbe, Southwest Region, Cameroon</div>
+                <div class="clinic-info">
+                    {% if hospital_phone %}Tel: {{ hospital_phone }} · {% endif %}
+                    {% if hospital_email %}{{ hospital_email }} · {% endif %}
+                    Limbe, Southwest Region, Malawi
+                </div>
+                <div class="clinic-info">{% if hospital_address %}{{ hospital_address }}{% endif %}</div>
             </div>
             <div class="rx-title">
                 PRESCRIPTION<br>
@@ -42,23 +51,50 @@
             <div class="patient">
                 <strong>Patient</strong><br>
                 {{ patient.first_name }} {{ patient.last_name }}<br>
-                {{ patient.address }}<br>
-                {{ patient.phone }}
+                {% if patient.date_of_birth %}DOB: {{ patient.date_of_birth }}<br>{% endif %}
+                {% if patient.address %}{{ patient.address }}<br>{% endif %}
+                {% if patient.phone %}{{ patient.phone }}{% endif %}
             </div>
             <div class="doctor" style="text-align: right;">
                 <strong>Prescribing Doctor</strong><br>
                 Dr. {{ doctor.first_name }} {{ doctor.last_name }}<br>
-                {{ doctor.specialization if doctor.specialization else 'General Practice' }}
+                {{ doctor.specialty if doctor.specialty else 'General Practice' }}
             </div>
         </div>
 
         <div class="section">
             <div class="label">Date</div>
-            <div class="value">{{ prescription.date }}</div>
+            <div class="value">{{ prescription.date_prescribed or prescription.date }}</div>
         </div>
 
         <div class="section" style="border: 1px dashed #ccc; padding: 16px; border-radius: 8px;">
             <div class="label">Medications</div>
+            {% if medications %}
+            <table class="med-table">
+                <thead>
+                    <tr>
+                        <th>Medication</th>
+                        <th>Dosage</th>
+                        <th>Frequency</th>
+                        <th>Route</th>
+                        <th>Duration</th>
+                        <th>Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in medications %}
+                    <tr>
+                        <td><strong>{{ m.medication_name }}</strong></td>
+                        <td>{{ m.dosage }}</td>
+                        <td>{{ m.frequency }}</td>
+                        <td>{{ m.route }}</td>
+                        <td>{{ m.duration }}</td>
+                        <td>{{ m.quantity }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
             <div class="value" style="font-size: 18px;">
                 {% set meds = prescription.medication.split(', ') %}
                 <ul style="margin: 5px 0 0 0; padding-left: 20px;">
@@ -67,20 +103,23 @@
                     {% endfor %}
                 </ul>
             </div>
+            {% endif %}
+            {% if prescription.duration %}
             <div style="margin-top: 12px;">
                 <div class="label">Duration</div>
                 <div class="value">{{ prescription.duration }}</div>
             </div>
+            {% endif %}
             {% if prescription.notes %}
             <div class="section">
-                <div class="label">Notes</div>
+                <div class="label">Notes / Instructions</div>
                 <div class="value">{{ prescription.notes }}</div>
             </div>
             {% endif %}
         </div>
 
         <div class="section" style="margin-top: 24px;">
-            <div class="label">Signature</div>
+            <div class="label">Prescriber Signature</div>
             <div style="height: 60px; border-bottom: 1px solid #333; width: 280px;"></div>
             <div class="label">Dr. {{ doctor.last_name }}</div>
         </div>

@@ -30,7 +30,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Any
-from models import Patient, Doctor, Appointment, MedicalRecord, Prescription, Bill, InventoryItem, User, Message, QueueItem, LabResult
+from models import Patient, Doctor, Appointment, MedicalRecord, Prescription, PrescriptionMedication, Bill, InventoryItem, User, Message, QueueItem, LabResult
+from models import PRESCRIPTION_STATUS_CYCLE, PRESCRIPTION_VALID_TRANSITIONS
 
 
 from database.db_manager import DatabaseManager
@@ -77,6 +78,8 @@ class HospitalManagementSystem:
         self._appointments_cache: List[Appointment] = []
         self._medical_records_cache: List[MedicalRecord] = []
         self._prescriptions_cache: List[Prescription] = []
+        self._prescription_meds_cache: List[PrescriptionMedication] = []
+        self._prescription_templates_cache: List[Dict[str, Any]] = []
         self._bills_cache: List[Bill] = []
         self._inventory_cache: List[InventoryItem] = []
         self._users_cache: List[User] = []
@@ -131,6 +134,9 @@ class HospitalManagementSystem:
 
     def get_all_patients(self) -> List[Patient]:
         return self.db.get_all(Patient, 'patients', limit=1000000, order_by='rowid DESC')
+
+    def get_all_doctors(self) -> List[Doctor]:
+        return self.db.get_all(Doctor, 'doctors', limit=10000)
 
     def get_patients_paginated(self, page: int = 1, per_page: int = 20) -> List[Patient]:
         return self.db.get_all(Patient, 'patients', limit=per_page, offset=(page-1)*per_page, order_by='rowid DESC', where_clause="is_deleted = 0")
@@ -241,6 +247,8 @@ class HospitalManagementSystem:
         self._appointments_cache = []
         self._medical_records_cache = []
         self._prescriptions_cache = []
+        self._prescription_meds_cache = []
+        self._prescription_templates_cache = []
         self._bills_cache = []
         self._inventory_cache = []
         self._users_cache = []
@@ -529,6 +537,7 @@ class HospitalManagementSystem:
                     'appointments': [asdict(a) for a in self.db.get_all(Appointment, 'appointments', limit=1000000)],
                     'medical_records': [asdict(m) for m in self.db.get_all(MedicalRecord, 'medical_records', limit=1000000)],
                     'prescriptions': [asdict(p) for p in self.db.get_all(Prescription, 'prescriptions', limit=1000000)],
+                    'prescription_medications': [asdict(pm) for pm in self.db.get_all(PrescriptionMedication, 'prescription_medications', limit=1000000)],
                     'bills': [asdict(b) for b in self.db.get_all(Bill, 'bills', limit=1000000)],
                     'inventory': [asdict(i) for i in self.db.get_all(InventoryItem, 'inventory', limit=100000)],
                     'users': [asdict(u) for u in self.db.get_all(User, 'users', limit=1000)],
@@ -642,6 +651,7 @@ class HospitalManagementSystem:
         new_appointments = [Appointment(**_normalize_appointment(a)) for a in data.get('appointments', [])]
         new_records = [MedicalRecord(**_normalize_record(m)) for m in data.get('medical_records', [])]
         new_prescriptions = [Prescription(**_filter(Prescription, p)) for p in data.get('prescriptions', [])]
+        new_prescription_meds = [PrescriptionMedication(**_filter(PrescriptionMedication, pm)) for pm in data.get('prescription_medications', [])]
         new_bills = [Bill(**_normalize_bill(b)) for b in data.get('bills', [])]
         new_inventory = [InventoryItem(**_filter(InventoryItem, i)) for i in data.get('inventory', [])]
         new_users = [User(**_filter(User, u)) for u in data.get('users', [])]
@@ -655,6 +665,7 @@ class HospitalManagementSystem:
             self._appointments_cache.extend(new_appointments)
             self._medical_records_cache.extend(new_records)
             self._prescriptions_cache.extend(new_prescriptions)
+            self._prescription_meds_cache.extend(new_prescription_meds)
             self._bills_cache.extend(new_bills)
             self._inventory_cache.extend(new_inventory)
             self._users_cache.extend(new_users)
@@ -667,6 +678,7 @@ class HospitalManagementSystem:
             self._appointments_cache = new_appointments
             self._medical_records_cache = new_records
             self._prescriptions_cache = new_prescriptions
+            self._prescription_meds_cache = new_prescription_meds
             self._bills_cache = new_bills
             self._inventory_cache = new_inventory
             self._users_cache = new_users
@@ -1043,6 +1055,8 @@ class HospitalManagementSystem:
             'appointments',
             'medical_records',
             'prescriptions',
+            'prescription_medications',
+            'prescription_templates',
             'bills',
             'lab_results',
             'queue',
@@ -1067,6 +1081,7 @@ class HospitalManagementSystem:
         self._appointments_cache = []
         self._medical_records_cache = []
         self._prescriptions_cache = []
+        self._prescription_meds_cache = []
         self._bills_cache = []
         self._lab_results_cache = []
         self._queue_cache = []
@@ -1256,6 +1271,10 @@ class HospitalManagementSystem:
 
     # ---------- Prescriptions ----------
     def add_prescription(self, prescription: Prescription) -> bool:
+        if not prescription.date_prescribed:
+            prescription.date_prescribed = prescription.date or datetime.datetime.now().strftime("%Y-%m-%d")
+        if not prescription.status:
+            prescription.status = 'Pending'
         if self.db.save('prescriptions', prescription, 'prescription_id'):
             try:
                 self.add_activity(None, 'add', 'prescription', prescription.prescription_id, prescription.patient_id)
@@ -1268,7 +1287,7 @@ class HospitalManagementSystem:
     def get_patient_prescriptions(self, patient_id: str) -> List[Prescription]:
         conn = self.db.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM prescriptions WHERE patient_id = ?", (patient_id,))
+        cursor.execute("SELECT * FROM prescriptions WHERE patient_id = ? ORDER BY date DESC", (patient_id,))
         rows = cursor.fetchall()
         conn.close()
         return [self.db._row_to_obj(Prescription, row) for row in rows]
@@ -1287,6 +1306,14 @@ class HospitalManagementSystem:
         return False
 
     def delete_prescription(self, prescription_id: str) -> bool:
+        # Also delete associated medications
+        conn = self.db.get_connection()
+        try:
+            conn.execute("DELETE FROM prescription_medications WHERE prescription_id = ?", (prescription_id,))
+            conn.commit()
+        except Exception:
+            pass
+        conn.close()
         if self.db.delete('prescriptions', prescription_id, 'prescription_id'):
             try:
                 self.add_activity(None, 'delete', 'prescription', prescription_id, '')
@@ -1295,6 +1322,267 @@ class HospitalManagementSystem:
             self.save_data()
             return True
         return False
+
+    # ── Prescription Medications ──────────────────────────────────────────
+
+    def add_prescription_medication(self, med: PrescriptionMedication) -> bool:
+        """Add a single medication entry to a prescription."""
+        if not med.med_id:
+            med.med_id = self.generate_id('RXM')
+        return self.db.save('prescription_medications', med, 'med_id')
+
+    def get_prescription_medications(self, prescription_id: str) -> List[PrescriptionMedication]:
+        """Get all medications for a prescription."""
+        return self.db.get_all(PrescriptionMedication, 'prescription_medications',
+                               limit=100, where_clause="prescription_id = ?", params=(prescription_id,))
+
+    def save_prescription_medications(self, prescription_id: str, medications: List[Dict[str, Any]]) -> bool:
+        """Replace all medications for a prescription with a new list."""
+        conn = self.db.get_connection()
+        try:
+            conn.execute("DELETE FROM prescription_medications WHERE prescription_id = ?", (prescription_id,))
+            conn.commit()
+        except Exception:
+            pass
+        conn.close()
+        for m in medications:
+            med = PrescriptionMedication(
+                med_id=self.generate_id('RXM'),
+                prescription_id=prescription_id,
+                medication_name=m.get('medication_name', ''),
+                dosage=m.get('dosage', ''),
+                frequency=m.get('frequency', ''),
+                route=m.get('route', ''),
+                duration=m.get('duration', ''),
+                quantity=int(m.get('quantity', 0)),
+                refills_allowed=int(m.get('refills_allowed', 0)),
+                refills_used=int(m.get('refills_used', 0)),
+                notes=m.get('notes', '')
+            )
+            if not self.db.save('prescription_medications', med, 'med_id'):
+                return False
+        # Rebuild the denormalized medication string
+        self._rebuild_prescription_medication_str(prescription_id)
+        return True
+
+    def _rebuild_prescription_medication_str(self, prescription_id: str):
+        """Rebuild the comma-separated medication string from normalized entries."""
+        meds = self.get_prescription_medications(prescription_id)
+        parts = []
+        for m in meds:
+            s = m.medication_name
+            if m.dosage:
+                s += f" {m.dosage}"
+            if m.frequency:
+                s += f" ({m.frequency})"
+            parts.append(s)
+        med_str = ", ".join(parts)
+        conn = self.db.get_connection()
+        try:
+            conn.execute("UPDATE prescriptions SET medication = ? WHERE prescription_id = ?",
+                         (med_str, prescription_id))
+            conn.commit()
+        except Exception:
+            pass
+        conn.close()
+
+    # ── Prescription Status Lifecycle ─────────────────────────────────────
+
+    def update_prescription_status(self, prescription_id: str, new_status: str) -> bool:
+        """Update prescription status with lifecycle validation."""
+        rx = self.get_prescription(prescription_id)
+        if not rx:
+            return False
+        old_status = rx.status
+        if old_status == new_status:
+            return True
+        valid_next = PRESCRIPTION_VALID_TRANSITIONS.get(old_status, [])
+        if new_status not in valid_next:
+            print(f"[WARN] Invalid status transition: {old_status} → {new_status} "
+                  f"(allowed: {valid_next})")
+            return False
+        rx.status = new_status
+        ok = self.db.save('prescriptions', rx, 'prescription_id')
+        if ok:
+            try:
+                self.add_activity(None, 'update_status', 'prescription', prescription_id,
+                                  f"{old_status} → {new_status}")
+            except Exception:
+                pass
+            self.save_data()
+        return ok
+
+    def expire_old_prescriptions(self):
+        """Auto-expire prescriptions whose duration has passed."""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        cursor.execute("""
+            SELECT prescription_id FROM prescriptions
+            WHERE status IN ('Active', 'Pending')
+            AND date < date('now', '-30 days')
+        """)
+        expired = cursor.fetchall()
+        conn.close()
+        for (rx_id,) in expired:
+            self.update_prescription_status(rx_id, 'Expired')
+
+    # ── Refill Tracking ───────────────────────────────────────────────────
+
+    def use_refill(self, med_id: str) -> bool:
+        """Use one refill for a medication."""
+        meds = self.db.get_all(PrescriptionMedication, 'prescription_medications',
+                               limit=1, where_clause="med_id = ?", params=(med_id,))
+        if not meds:
+            return False
+        med = meds[0]
+        if med.refills_used >= med.refills_allowed:
+            return False
+        med.refills_used += 1
+        return self.db.save('prescription_medications', med, 'med_id')
+
+    def get_refill_status(self, prescription_id: str) -> List[Dict[str, Any]]:
+        """Get refill status for all medications in a prescription."""
+        meds = self.get_prescription_medications(prescription_id)
+        return [{
+            'med_id': m.med_id,
+            'medication_name': m.medication_name,
+            'refills_allowed': m.refills_allowed,
+            'refills_used': m.refills_used,
+            'refills_remaining': m.refills_allowed - m.refills_used,
+            'can_refill': m.refills_used < m.refills_allowed
+        } for m in meds]
+
+    # ── Allergy Warnings ──────────────────────────────────────────────────
+
+    def check_allergy_warnings(self, patient_id: str, medication_name: str) -> List[str]:
+        """Check if a medication might conflict with patient allergies."""
+        warnings = []
+        patient = self.get_patient(patient_id)
+        if not patient:
+            return warnings
+
+        # Check allergies field
+        allergies_text = (getattr(patient, 'allergies', '') or '') + ' ' + (patient.medical_history or '')
+        allergies_lower = allergies_text.lower()
+
+        # Common allergy-related keywords
+        allergy_keywords = {
+            'penicillin': ['penicillin', 'amoxicillin', 'ampicillin', 'augmentin', 'piperacillin'],
+            'sulfa': ['sulfa', 'sulfonamide', 'bactrim', 'septra'],
+            'aspirin': ['aspirin', 'salicylate', 'nsaid'],
+            'nsaid': ['ibuprofen', 'naproxen', 'diclofenac', 'indomethacin', 'ketorolac', 'meloxicam'],
+            'opioid': ['morphine', 'codeine', 'tramadol', 'fentanyl', 'oxycodone'],
+            'cephalosporin': ['cephalexin', 'ceftriaxone', 'cefazolin', 'cefuroxime'],
+            'tetracycline': ['tetracycline', 'doxycycline', 'minocycline'],
+            'macrolide': ['erythromycin', 'azithromycin', 'clarithromycin'],
+        }
+
+        med_lower = medication_name.lower()
+
+        for allergy_group, drugs in allergy_keywords.items():
+            # Check if patient is allergic to this group
+            patient_has_allergy = any(kw in allergies_lower for kw in [allergy_group] + drugs)
+            if patient_has_allergy:
+                # Check if prescribed drug is in this group
+                if any(d in med_lower for d in drugs):
+                    warnings.append(
+                        f"Warning: {medication_name} may conflict with patient's {allergy_group} allergy."
+                    )
+
+        return warnings
+
+    # ── Prescription Templates ────────────────────────────────────────────
+
+    def add_prescription_template(self, name: str, doctor_id: str, medications: List[Dict[str, Any]],
+                                   is_global: bool = False) -> bool:
+        """Save a prescription template for quick reuse."""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        template_id = self.generate_id('TP')
+        created_at = datetime.datetime.now().isoformat()
+        meds_json = json.dumps(medications)
+        try:
+            cursor.execute("""
+                INSERT INTO prescription_templates (template_id, name, doctor_id, medications, is_global, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (template_id, name, doctor_id, meds_json, 1 if is_global else 0, created_at))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to save template: {e}")
+            conn.close()
+            return False
+
+    def get_prescription_templates(self, doctor_id: str = None) -> List[Dict[str, Any]]:
+        """Get templates for a doctor (includes global templates)."""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        if doctor_id:
+            cursor.execute("""
+                SELECT * FROM prescription_templates
+                WHERE doctor_id = ? OR is_global = 1
+                ORDER BY name
+            """, (doctor_id,))
+        else:
+            cursor.execute("SELECT * FROM prescription_templates ORDER BY name")
+        rows = cursor.fetchall()
+        conn.close()
+        results = []
+        for row in rows:
+            d = dict(row)
+            try:
+                d['medications'] = json.loads(d.get('medications', '[]'))
+            except Exception:
+                d['medications'] = []
+            results.append(d)
+        return results
+
+    def delete_prescription_template(self, template_id: str) -> bool:
+        conn = self.db.get_connection()
+        try:
+            conn.execute("DELETE FROM prescription_templates WHERE template_id = ?", (template_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            conn.close()
+            return False
+
+    # ── Prescription Stats ────────────────────────────────────────────────
+
+    def get_prescription_stats(self) -> Dict[str, Any]:
+        """Get prescription statistics for dashboard."""
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        stats = {}
+        try:
+            cursor.execute("SELECT COUNT(*) FROM prescriptions WHERE status = 'Active'")
+            stats['active'] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM prescriptions WHERE status = 'Pending'")
+            stats['pending'] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM prescriptions WHERE status = 'Dispensed'")
+            stats['dispensed'] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM prescriptions WHERE status = 'Completed'")
+            stats['completed'] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM prescriptions WHERE status = 'Expired'")
+            stats['expired'] = cursor.fetchone()[0]
+            cursor.execute("""
+                SELECT COUNT(*) FROM prescriptions
+                WHERE status IN ('Active', 'Pending')
+                AND date < date('now', '-7 days')
+            """)
+            stats['overdue'] = cursor.fetchone()[0]
+            cursor.execute("""
+                SELECT COUNT(DISTINCT patient_id) FROM prescriptions
+                WHERE status IN ('Active', 'Pending')
+            """)
+            stats['patients_on_rx'] = cursor.fetchone()[0]
+        except Exception:
+            pass
+        conn.close()
+        return stats
 
     def delete_medical_record(self, record_id: str) -> bool:
         if self.db.delete('medical_records', record_id, 'record_id'):
@@ -1559,6 +1847,16 @@ class HospitalManagementSystem:
         stats['active_doctors'] = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM bills WHERE status = 'Pending'")
         stats['pending_bills'] = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM prescriptions WHERE status = 'Active'")
+        stats['active_prescriptions'] = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM prescriptions WHERE status IN ('Active', 'Pending')")
+        stats['open_prescriptions'] = cursor.fetchone()[0]
+        cursor.execute("""
+            SELECT COUNT(*) FROM prescriptions
+            WHERE status IN ('Active', 'Pending')
+            AND date < date('now', '-7 days')
+        """)
+        stats['overdue_prescriptions'] = cursor.fetchone()[0]
         conn.close()
         return stats
 

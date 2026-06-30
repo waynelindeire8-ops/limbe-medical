@@ -87,6 +87,17 @@
                         <h2>{{ stats.pending_bills }}</h2>
                     </div>
                 </div>
+                <div class="card stat-card" style="cursor: pointer;" onclick="window.location.href='{{ url_for('prescriptions', status='Active') }}'">
+                    <div class="stat-icon" style="background: #fff3cd; color: #856404;"><i class="fas fa-capsules"></i></div>
+                    <h3>Active Rx</h3>
+                    <p class="subtext">Active prescriptions</p>
+                    <div class="stat-value">
+                        <h2>{{ rx_stats.active if rx_stats else 0 }}</h2>
+                        {% if rx_stats and rx_stats.overdue > 0 %}
+                        <span style="font-size: 11px; color: #dc3545; font-weight: 600;">{{ rx_stats.overdue }} overdue</span>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
 
             <div class="content-grid" style="grid-template-columns: 2fr 1fr;">

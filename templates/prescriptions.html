@@ -8,9 +8,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .table-container { background-color: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
-        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         .btn-add { background-color: #4361ee; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: 500; }
         .btn-add:hover { background-color: #3f37c9; }
+        .btn-template { background-color: #7209b7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 8px; font-weight: 500; }
+        .btn-template:hover { background-color: #5a078e; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #f8f9fa; font-weight: 600; }
@@ -18,27 +20,42 @@
         .actions a:hover { color: #4361ee; }
         .actions a.delete { color: #dc3545; }
         .actions a.delete:hover { color: #b02a37; }
-        .status { padding: 4px 8px; border-radius: 6px; font-size: 12px; }
-        .status.active { background-color: #e8f0fe; color: #4361ee; }
-        .status.inactive { background-color: #fde8e8; color: #dc3545; }
+        .status { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; display: inline-block; }
+        .status.Pending { background-color: #fff3cd; color: #856404; }
+        .status.Active { background-color: #e8f0fe; color: #4361ee; }
+        .status.Dispensed { background-color: #d4edda; color: #155724; }
+        .status.Completed { background-color: #cce5ff; color: #004085; }
+        .status.Cancelled { background-color: #fde8e8; color: #dc3545; }
+        .status.Expired { background-color: #e2e3e5; color: #383d41; }
+        .filter-bar { display: flex; gap: 10px; align-items: center; }
+        .filter-bar select { padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
     </style>
-    </head>
+</head>
 <body>
     <div class="container">
         {% include 'sidebar.html' %}
-        
         <main class="main-content">
             <div class="header-actions">
                 <h2>Prescriptions</h2>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                     <form action="{{ url_for('prescriptions') }}" method="get" class="search-form" style="display: flex; align-items: center; gap: 10px;">
                         <input type="text" name="search" placeholder="Search prescriptions..." value="{{ search_term if search_term else '' }}" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px; outline: none; width: 250px;">
+                        <select name="status" style="padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                            <option value="">All Status</option>
+                            <option value="Pending" {% if status_filter == 'Pending' %}selected{% endif %}>Pending</option>
+                            <option value="Active" {% if status_filter == 'Active' %}selected{% endif %}>Active</option>
+                            <option value="Dispensed" {% if status_filter == 'Dispensed' %}selected{% endif %}>Dispensed</option>
+                            <option value="Completed" {% if status_filter == 'Completed' %}selected{% endif %}>Completed</option>
+                            <option value="Cancelled" {% if status_filter == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                            <option value="Expired" {% if status_filter == 'Expired' %}selected{% endif %}>Expired</option>
+                        </select>
                         <button type="submit" style="background-color: #4361ee; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;"><i class="fas fa-search"></i></button>
-                        {% if search_term %}
+                        {% if search_term or status_filter %}
                         <a href="{{ url_for('prescriptions') }}" style="color: #666; text-decoration: none; display: flex; align-items: center; padding: 0 5px;"><i class="fas fa-times"></i></a>
                         {% endif %}
                     </form>
                     <a href="{{ url_for('add_prescription') }}" class="btn-add"><i class="fas fa-plus"></i> Add Prescription</a>
+                    <a href="{{ url_for('prescription_templates') }}" class="btn-template"><i class="fas fa-file-prescription"></i> Templates</a>
                 </div>
             </div>
             <div class="table-container">
@@ -49,7 +66,7 @@
                             <th>Date</th>
                             <th>Patient</th>
                             <th>Doctor</th>
-                            <th>Medication</th>
+                            <th>Medications</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -57,22 +74,27 @@
                     <tbody>
                         {% for rx in prescriptions %}
                         <tr>
-                            <td>{{ rx.prescription_id }}</td>
+                            <td style="font-family: monospace;">{{ rx.prescription_id }}</td>
                             <td>{{ rx.date }}</td>
-                            <td>{{ rx.patient_name }}</td>
-                            <td>{{ rx.doctor_name }}</td>
-                            <td>{{ rx.medication }}</td>
-                            <td><span class="status {{ rx.status|lower }}">{{ rx.status }}</span></td>
+                            <td>{{ rx.patient_name or rx.patient_id }}</td>
+                            <td>{{ rx.doctor_name or rx.doctor_id }}</td>
+                            <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ rx.medication }}">{{ rx.medication }}</td>
+                            <td><span class="status {{ rx.status }}">{{ rx.status }}</span></td>
                             <td class="actions">
                                 <a href="{{ url_for('view_prescription', prescription_id=rx.prescription_id) }}" title="View"><i class="fas fa-eye"></i></a>
                                 <a href="{{ url_for('edit_prescription', prescription_id=rx.prescription_id) }}" title="Edit"><i class="fas fa-edit"></i></a>
+                                {% if current_role in ['admin'] %}
                                 <a href="{{ url_for('delete_prescription', prescription_id=rx.prescription_id) }}" class="delete" title="Delete" onclick="return confirm('Delete this prescription?')"><i class="fas fa-trash"></i></a>
+                                {% endif %}
                                 <a href="{{ url_for('print_prescription', prescription_id=rx.prescription_id) }}" title="Print"><i class="fas fa-print"></i></a>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" style="text-align:center;">No prescriptions found.</td>
+                            <td colspan="7" style="text-align:center; padding: 40px; color: #888;">
+                                <i class="fas fa-capsules" style="font-size: 40px; display: block; margin-bottom: 10px; color: #ddd;"></i>
+                                No prescriptions found.
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -81,15 +103,13 @@
 
             {% if total_pages > 1 %}
             <div class="pagination">
-                <a href="{{ url_for('prescriptions', page=page-1, search=search_term) }}" class="pagination-btn {{ 'disabled' if page == 1 else '' }}">
+                <a href="{{ url_for('prescriptions', page=page-1, search=search_term, status=status_filter) }}" class="pagination-btn {{ 'disabled' if page == 1 else '' }}">
                     <i class="fas fa-chevron-left"></i> Previous
                 </a>
-                
                 <div class="pagination-info">
                     Page {{ page }} of {{ total_pages }} (Total: {{ total_count }})
                 </div>
-
-                <a href="{{ url_for('prescriptions', page=page+1, search=search_term) }}" class="pagination-btn {{ 'disabled' if page == total_pages else '' }}">
+                <a href="{{ url_for('prescriptions', page=page+1, search=search_term, status=status_filter) }}" class="pagination-btn {{ 'disabled' if page == total_pages else '' }}">
                     Next <i class="fas fa-chevron-right"></i>
                 </a>
             </div>

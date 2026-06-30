@@ -6,6 +6,19 @@
     <title>View Prescription</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .status-badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; display: inline-block; }
+        .status-badge.Pending { background-color: #fff3cd; color: #856404; }
+        .status-badge.Active { background-color: #e8f0fe; color: #4361ee; }
+        .status-badge.Dispensed { background-color: #d4edda; color: #155724; }
+        .status-badge.Completed { background-color: #cce5ff; color: #004085; }
+        .status-badge.Cancelled { background-color: #fde8e8; color: #dc3545; }
+        .status-badge.Expired { background-color: #e2e3e5; color: #383d41; }
+        .med-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .med-table th { background: #f8f9fa; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #666; border-bottom: 2px solid #eee; }
+        .med-table td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+        .status-btn { display: inline-block; padding: 6px 14px; border-radius: 16px; text-decoration: none; font-size: 12px; font-weight: 600; margin: 2px; }
+    </style>
 </head>
 <body>
     <div class="container" >
@@ -13,58 +26,127 @@
         <main class="main-content" >
             <a href="{{ url_for('prescriptions') }}" class="back-link" style="color: #4361ee; text-decoration: none; display: block; margin-bottom: 20px;"><i class="fas fa-arrow-left"></i> Back to Prescriptions</a>
             <div class="card" style="background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
-                <div style="display:flex; justify-content: space-between; align-items: center;">
+                <div style="display:flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                     <h2 style="margin-top: 0;">Prescription #{{ prescription.prescription_id }}</h2>
                     <div>
-                        <a href="{{ url_for('edit_prescription', prescription_id=prescription.prescription_id) }}" class="btn btn-outline" style="text-decoration:none; margin-right:10px;"><i class="fas fa-edit"></i> Edit</a>
+                        <span class="status-badge {{ prescription.status }}">{{ prescription.status }}</span>
+                        <a href="{{ url_for('edit_prescription', prescription_id=prescription.prescription_id) }}" class="btn btn-outline" style="text-decoration:none; margin-left:10px;"><i class="fas fa-edit"></i> Edit</a>
                         <a href="{{ url_for('print_prescription', prescription_id=prescription.prescription_id) }}" class="btn btn-primary" style="text-decoration:none;"><i class="fas fa-print"></i> Print</a>
                     </div>
                 </div>
+
+                <!-- Status Transitions -->
+                <div style="margin: 15px 0; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+                    <span style="font-weight: 600; font-size: 13px;">Update Status:</span>
+                    {% set valid_next = PRESCRIPTION_VALID_TRANSITIONS.get(prescription.status, []) %}
+                    {% for s in PRESCRIPTION_STATUS_CYCLE %}
+                        {% if s in valid_next %}
+                        <a href="{{ url_for('update_prescription_status', prescription_id=prescription.prescription_id, new_status=s) }}"
+                           class="status-btn" style="background: #4361ee; color: white;">{{ s }}</a>
+                        {% endif %}
+                    {% endfor %}
+                    {% if not valid_next %}
+                    <span style="color: #888; font-size: 13px;">No further transitions available</span>
+                    {% endif %}
+                </div>
+
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px;">
                     <div>
                         <div style="color:#666;">Date</div>
                         <div style="font-weight:600;">{{ prescription.date }}</div>
                     </div>
                     <div>
-                        <div style="color:#666;">Status</div>
-                        <div style="font-weight:600;">{{ prescription.status }}</div>
+                        <div style="color:#666;">Date Prescribed</div>
+                        <div style="font-weight:600;">{{ prescription.date_prescribed or prescription.date }}</div>
                     </div>
                     <div>
                         <div style="color:#666;">Patient</div>
-                        <div style="font-weight:600;">{{ patient.last_name }}, {{ patient.first_name }}</div>
+                        <div style="font-weight:600;">{{ patient.last_name if patient else '' }}, {{ patient.first_name if patient else '' }}</div>
                     </div>
                     <div>
                         <div style="color:#666;">Doctor</div>
-                        <div style="font-weight:600;">Dr. {{ doctor.last_name }}</div>
+                        <div style="font-weight:600;">Dr. {{ doctor.last_name if doctor else '' }}</div>
                     </div>
+                    {% if prescription.record_id %}
+                    <div>
+                        <div style="color:#666;">Linked Medical Record</div>
+                        <div style="font-weight:600;">{{ prescription.record_id }}</div>
+                    </div>
+                    {% endif %}
                 </div>
+
                 <div style="margin-top: 20px;">
-                    <h3 style="margin-bottom: 10px;">Prescription Details</h3>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                        <div style="grid-column: 1 / span 2; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <label style="display: block; color: #666; margin-bottom: 5px;">Medications</label>
-                            <div style="font-weight: 600; font-size: 1.1em;">
-                                {% set meds = prescription.medication.split(', ') %}
-                                <ul style="margin: 0; padding-left: 20px;">
-                                    {% for med in meds %}
-                                    <li>{{ med }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        </div>
-                        <div style="grid-column: 1 / span 2;">
-                            <label style="display: block; color: #666; margin-bottom: 5px;">Duration</label>
-                            <div style="font-weight: 500;">{{ prescription.duration }}</div>
-                        </div>
+                    <h3 style="margin-bottom: 10px;">Medications</h3>
+                    {% if medications %}
+                    <table class="med-table">
+                        <thead>
+                            <tr>
+                                <th>Medication</th>
+                                <th>Dosage</th>
+                                <th>Frequency</th>
+                                <th>Route</th>
+                                <th>Duration</th>
+                                <th>Qty</th>
+                                <th>Refills</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in medications %}
+                            <tr>
+                                <td><strong>{{ m.medication_name }}</strong></td>
+                                <td>{{ m.dosage }}</td>
+                                <td>{{ m.frequency }}</td>
+                                <td>{{ m.route }}</td>
+                                <td>{{ m.duration }}</td>
+                                <td>{{ m.quantity }}</td>
+                                <td>
+                                    {{ m.refills_used }} / {{ m.refills_allowed }}
+                                    {% if m.refills_used < m.refills_allowed %}
+                                    <span style="color: #28a745; font-size: 11px;">({{ m.refills_allowed - m.refills_used }} left)</span>
+                                    {% elif m.refills_allowed > 0 %}
+                                    <span style="color: #dc3545; font-size: 11px;">(Exhausted)</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if m.refills_used < m.refills_allowed %}
+                                    <a href="{{ url_for('use_refill', prescription_id=prescription.prescription_id, med_id=m.med_id) }}" class="btn-sm" style="background: #28a745; color: white; text-decoration: none; padding: 4px 8px; border-radius: 4px; font-size: 11px;" onclick="return confirm('Use one refill for {{ m.medication_name }}?')">Use Refill</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <strong>{{ prescription.medication }}</strong>
+                        {% if prescription.duration %}
+                        <div style="margin-top: 6px; color: #666;">Duration: {{ prescription.duration }}</div>
+                        {% endif %}
                     </div>
-                    <div style="margin-top: 16px;">
-                        <div style="color:#666;">Notes</div>
-                        <div>{{ prescription.notes }}</div>
-                    </div>
+                    {% endif %}
                 </div>
+
+                {% if prescription.notes %}
+                <div style="margin-top: 16px;">
+                    <div style="color:#666;">Notes</div>
+                    <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-top: 4px;">{{ prescription.notes }}</div>
+                </div>
+                {% endif %}
+
+                {% if refill_status %}
+                <div style="margin-top: 20px; padding: 12px; background: #f0f8ff; border-radius: 8px; border: 1px solid #d0e0ff;">
+                    <h4 style="margin: 0 0 8px 0;"><i class="fas fa-sync-alt" style="color: #4361ee;"></i> Refill Summary</h4>
+                    {% for r in refill_status %}
+                    <div style="font-size: 13px; margin: 4px 0;">
+                        {{ r.medication_name }}: {{ r.refills_used }}/{{ r.refills_allowed }} refills used
+                        {% if r.can_refill %}<span style="color: #28a745;">({{ r.refills_remaining }} remaining)</span>{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
         </main>
     </div>
 </body>
 </html>
-

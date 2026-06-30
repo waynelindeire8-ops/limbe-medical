@@ -48,6 +48,7 @@
         
         {% if current_role in ['admin', 'doctor', 'receptionist', 'nurse'] %}
         <a href="{{ url_for('prescriptions') }}" class="menu-item {% if active_page == 'prescriptions' %}active{% endif %}" title="Prescriptions"><i class="fas fa-capsules"></i></a>
+        <a href="{{ url_for('prescription_templates') }}" class="menu-item" title="Rx Templates"><i class="fas fa-file-prescription"></i></a>
         {% endif %}
 
         {% if current_role in ['admin', 'cashier', 'nurse'] %}

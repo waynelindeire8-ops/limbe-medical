@@ -1,9 +1,31 @@
 """
-Models - Re-exports data models from the main Hospital Management System
+Models - Data models for the Hospital Management System
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List, Dict, Any
+
+# ── Status Constants ──────────────────────────────────────────────────────────
+
+PRESCRIPTION_STATUS_CYCLE = [
+    'Pending',       # Created but not yet given to patient
+    'Active',        # Currently active treatment
+    'Dispensed',     # Filled by pharmacy
+    'Completed',     # Treatment finished
+    'Cancelled',     # Cancelled by doctor
+    'Expired'        # Duration passed without completion
+]
+
+PRESCRIPTION_VALID_TRANSITIONS = {
+    'Pending': ['Active', 'Cancelled'],
+    'Active': ['Dispensed', 'Completed', 'Cancelled', 'Expired'],
+    'Dispensed': ['Completed', 'Cancelled'],
+    'Completed': [],
+    'Cancelled': [],
+    'Expired': ['Active']  # Allow re-activation after expiry
+}
+
+# ── Models ────────────────────────────────────────────────────────────────────
 
 @dataclass
 class Patient:
@@ -18,6 +40,7 @@ class Patient:
     emergency_contact: str = ""
     blood_group: str = ""
     medical_history: str = ""
+    allergies: str = ""
     created_date: str = ""
     scheme_provider: str = ""
     scheme_type: str = ""
@@ -67,15 +90,33 @@ class MedicalRecord:
 
 
 @dataclass
+class PrescriptionMedication:
+    """Normalized medication entry within a prescription"""
+    med_id: str = ""
+    prescription_id: str = ""
+    medication_name: str = ""
+    dosage: str = ""            # e.g. "500mg"
+    frequency: str = ""         # e.g. "Twice daily", "TID", "Once daily"
+    route: str = ""             # e.g. "Oral", "Topical", "IV", "IM"
+    duration: str = ""          # e.g. "7 days", "2 weeks"
+    quantity: int = 0
+    refills_allowed: int = 0
+    refills_used: int = 0
+    notes: str = ""
+
+
+@dataclass
 class Prescription:
     prescription_id: str = ""
     patient_id: str = ""
     doctor_id: str = ""
     date: str = ""
-    medication: str = ""
+    date_prescribed: str = ""
+    medication: str = ""        # Denormalized string for backward compat
     duration: str = ""
     notes: str = ""
-    status: str = ""
+    status: str = "Pending"
+    record_id: str = ""         # Link to medical record
 
 
 @dataclass
@@ -177,4 +218,5 @@ class LabResult:
 
 
 # Re-export all models for GUI compatibility
-__all__ = ['Patient', 'Doctor', 'Appointment', 'MedicalRecord', 'Prescription', 'Bill', 'InventoryItem', 'User', 'Message', 'QueueItem', 'LabResult']
+__all__ = ['Patient', 'Doctor', 'Appointment', 'MedicalRecord', 'Prescription', 'PrescriptionMedication', 'Bill', 'InventoryItem', 'User', 'Message', 'QueueItem', 'LabResult',
+           'PRESCRIPTION_STATUS_CYCLE', 'PRESCRIPTION_VALID_TRANSITIONS']

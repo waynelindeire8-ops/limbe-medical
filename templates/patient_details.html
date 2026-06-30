@@ -132,6 +132,7 @@
                             <a href="{{ url_for('add_medical_record', patient_id=patient.patient_id) }}" class="btn-add" style="background-color: #4361ee; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-size: 14px; margin-right: 5px;"><i class="fas fa-plus"></i> New Record</a>
                             {% if queue_item and queue_item.status != 'In Lab' %}
                             <a href="{{ url_for('send_to_lab', patient_id=patient.patient_id) }}" class="btn-add" style="background-color: #f72585; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-size: 14px; margin-right: 5px;"><i class="fas fa-flask"></i> Send to Lab</a>
+                            <a href="{{ url_for('add_prescription', patient_id=patient.patient_id) }}" class="btn-add" style="background-color: #7209b7; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-size: 14px;"><i class="fas fa-capsules"></i> Prescribe</a>
                             {% endif %}
                             <a href="{{ url_for('edit_patient', patient_id=patient.patient_id) }}" class="btn-add" style="background-color: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 6px; font-size: 14px;"><i class="fas fa-edit"></i> Edit Profile</a>
                         </div>

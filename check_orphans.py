@@ -6,7 +6,8 @@ cursor = conn.cursor()
 print("Checking for orphaned records...")
 
 tables_with_patient_id = [
-    'appointments', 'medical_records', 'prescriptions', 
+    'appointments', 'medical_records', 'prescriptions',
+    'prescription_medications',
     'bills', 'lab_results', 'queue'
 ]
 

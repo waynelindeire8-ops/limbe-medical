@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Prescription Template</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        {% include 'sidebar.html' %}
+        <main class="main-content">
+            <a href="{{ url_for('prescription_templates') }}" class="back-link" style="color: #4361ee; text-decoration: none; display: block; margin-bottom: 20px;"><i class="fas fa-arrow-left"></i> Back to Templates</a>
+            <div class="card" style="background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+                <h2 style="margin-top: 0;">New Prescription Template</h2>
+                <p style="color: #666; font-size: 14px;">Save common medication regimens for quick prescription creation.</p>
+                <form method="post" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div style="grid-column: 1 / span 2;">
+                        <label>Template Name</label>
+                        <input type="text" name="name" required placeholder="e.g., Standard Antibiotic Course, Hypertension Protocol" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    </div>
+                    {% if current_role in ['admin'] %}
+                    <div style="grid-column: 1 / span 2;">
+                        <label><input type="checkbox" name="is_global"> Make available to all doctors (Global template)</label>
+                    </div>
+                    {% endif %}
+                    <div style="grid-column: 1 / span 2;">
+                        <label>Medications</label>
+                        <div id="medication-list">
+                            <div class="medication-item" style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0;">
+                                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px 60px; gap: 8px; align-items: center;">
+                                    <input type="text" name="medication_name[]" required placeholder="Medication name" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                    <input type="text" name="dosage[]" placeholder="Dosage (e.g. 500mg)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                    <select name="frequency[]" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                        <option value="">Frequency</option>
+                                        <option>Once daily</option>
+                                        <option>Twice daily</option>
+                                        <option>Three times daily</option>
+                                        <option>Four times daily</option>
+                                        <option>Every 4 hours</option>
+                                        <option>Every 6 hours</option>
+                                        <option>Every 8 hours</option>
+                                        <option>At bedtime</option>
+                                        <option>As needed (PRN)</option>
+                                        <option>Before meals</option>
+                                        <option>After meals</option>
+                                        <option>Weekly</option>
+                                        <option>Monthly</option>
+                                    </select>
+                                    <select name="route[]" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                        <option value="">Route</option>
+                                        <option>Oral</option>
+                                        <option>Topical</option>
+                                        <option>IV</option>
+                                        <option>IM</option>
+                                        <option>Subcutaneous</option>
+                                        <option>Sublingual</option>
+                                        <option>Inhalation</option>
+                                        <option>Ophthalmic</option>
+                                        <option>Otic</option>
+                                        <option>Rectal</option>
+                                        <option>Vaginal</option>
+                                    </select>
+                                    <input type="number" name="quantity[]" placeholder="Qty" min="0" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px; width: 70px;">
+                                    <input type="number" name="refills_allowed[]" placeholder="Refills" min="0" value="0" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px; width: 50px;">
+                                    <button type="button" onclick="removeMedication(this)" class="btn btn-danger" style="background: #ff4d4d; color: white; border: none; border-radius: 6px; padding: 8px; display: none;">×</button>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                                    <input type="text" name="med_duration[]" placeholder="Duration (e.g. 7 days)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="addMedication()" class="btn btn-outline" style="margin-top: 5px; background: #f0f2f5; border: 1px solid #ddd; border-radius: 8px; padding: 5px 15px; cursor: pointer;"><i class="fas fa-plus"></i> Add Medication</button>
+                    </div>
+                    <div style="grid-column: 1 / span 2; text-align: right;">
+                        <button type="submit" class="btn btn-primary" style="padding: 10px 20px; background-color: #4361ee; color: white; border: none; border-radius: 8px;">Save Template</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+    <script>
+        function addMedication() {
+            const list = document.getElementById('medication-list');
+            const newItem = document.createElement('div');
+            newItem.className = 'medication-item';
+            newItem.style.cssText = 'background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #e0e0e0;';
+            newItem.innerHTML = `
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 80px 60px; gap: 8px; align-items: center;">
+                    <input type="text" name="medication_name[]" required placeholder="Medication name" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                    <input type="text" name="dosage[]" placeholder="Dosage" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                    <select name="frequency[]" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Frequency</option>
+                        <option>Once daily</option>
+                        <option>Twice daily</option>
+                        <option>Three times daily</option>
+                        <option>Four times daily</option>
+                        <option>Every 4 hours</option>
+                        <option>Every 6 hours</option>
+                        <option>Every 8 hours</option>
+                        <option>At bedtime</option>
+                        <option>As needed (PRN)</option>
+                        <option>Before meals</option>
+                        <option>After meals</option>
+                        <option>Weekly</option>
+                        <option>Monthly</option>
+                    </select>
+                    <select name="route[]" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Route</option>
+                        <option>Oral</option>
+                        <option>Topical</option>
+                        <option>IV</option>
+                        <option>IM</option>
+                        <option>Subcutaneous</option>
+                        <option>Sublingual</option>
+                        <option>Inhalation</option>
+                        <option>Ophthalmic</option>
+                        <option>Otic</option>
+                        <option>Rectal</option>
+                        <option>Vaginal</option>
+                    </select>
+                    <input type="number" name="quantity[]" placeholder="Qty" min="0" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px; width: 70px;">
+                    <input type="number" name="refills_allowed[]" placeholder="Refills" min="0" value="0" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px; width: 50px;">
+                    <button type="button" onclick="removeMedication(this)" class="btn btn-danger" style="background: #ff4d4d; color: white; border: none; border-radius: 6px; padding: 8px;">×</button>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                    <input type="text" name="med_duration[]" placeholder="Duration (e.g. 7 days)" style="padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+                </div>
+            `;
+            list.appendChild(newItem);
+            updateRemoveButtons();
+        }
+
+        function removeMedication(btn) {
+            btn.closest('.medication-item').remove();
+            updateRemoveButtons();
+        }
+
+        function updateRemoveButtons() {
+            const items = document.querySelectorAll('.medication-item');
+            items.forEach(item => {
+                const btn = item.querySelector('.btn-danger');
+                if (items.length > 1) {
+                    btn.style.display = 'block';
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateRemoveButtons();
+        });
+    </script>
+</body>
+</html>
